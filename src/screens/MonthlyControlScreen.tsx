@@ -1,66 +1,111 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
-import { DataTable, Icon } from "react-native-paper";
+import { Button, DataTable, Icon } from "react-native-paper";
 import { AddTransactionModal } from "../components/AddTransactionModal";
+import { Transaction } from "../interface/Transaction";
+import dayjs from "dayjs";
+import { realm } from "../database/realm";
+import { Balance } from "../interface/Balance";
+import { getAllItems, getFilteredItems } from "../database/realmHelpers";
 
 export default function MonthlyControlScreen() {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [isOpenModal, setIsOpenModal] = useState(false)
 
-  const formatMonth = (date: Date) =>
-    date.toLocaleString("pt-br", { month: "long", year: "numeric" });
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const [isOpenModal, setIsOpenModal] = useState(false)
+  const [transactions, setTransactions] = useState<any>([])
+
+  const currentMonth = currentDate.getMonth() + 1
+  const currentYear = currentDate.getFullYear()
+
+  // Função que busca os dados do mês atual
+  const loadTransactions = async (date: Date) => {
+    const month = date.getMonth()
+    const year = date.getFullYear()
+
+    const data = getTransactionsByMonth(month, year)// usando seu método baseado no Realm
+    console.log('data', data)
+    setTransactions(data)
+  }
+
+  const getAccumulatedBalance = (targetYear: number, targetMonth: number) => {
+    const balances = realm.objects<Balance>('Balance');
+
+    let total = 0;
+
+    balances
+      .filtered('year < $0 OR (year == $0 AND month < $1)', targetYear, targetMonth)
+      .sorted([['year', true], ['month', true]])
+      .forEach(b => total += b.partialBalance);
+
+    return total;
+  }
+
+
+
+
+  // Carrega ao iniciar e sempre que currentDate mudar
+  useEffect(() => {
+    loadTransactions(currentDate)
+  }, [currentDate])
 
   const goToPreviousMonth = () => {
-    const prev = new Date(currentDate);
-    prev.setMonth(prev.getMonth() - 1);
-    setCurrentDate(prev);
+    const prev = new Date(currentDate)
+    prev.setMonth(prev.getMonth() - 1)
+    setCurrentDate(prev)
+    loadTransactions(prev)
   };
+
 
   const goToNextMonth = () => {
-    const next = new Date(currentDate);
-    next.setMonth(next.getMonth() + 1);
-    setCurrentDate(next);
+    const next = new Date(currentDate)
+    next.setMonth(next.getMonth() + 1)
+    setCurrentDate(next)
+    loadTransactions(next)
   };
 
-  // MOCK
-  const entries = [{ id: "1", desc: "Salário", value: 3500 }];
-  const expenses = [{ id: "2", desc: "Conta de luz", value: 120 }];
-  const creditCards = [
-    {
-      id: "card1",
-      name: "Nubank",
-      items: [
-        { id: "3", desc: "Supermercado", value: 250 },
-        { id: "4", desc: "Gasolina", value: 150 },
-      ],
-    },
-  ];
+  const getTransactionsByMonth = (month: number, year: number) => {
+    const start = new Date(year, month, 1);
+    const end = new Date(year, month + 1, 0, 23, 59, 59);
 
-  const totalEntries = entries.reduce((acc, t) => acc + t.value, 0);
-  const totalExpenses = expenses.reduce((acc, t) => acc + t.value, 0);
-  const totalCredit = creditCards
-    .flatMap((c) => c.items)
-    .reduce((acc, t) => acc + t.value, 0);
+    const transactions = realm.objects('Transaction')
+      .filtered('date >= $0 && date <= $1', start, end)
+      .sorted('date', true);
 
-  const saldoParcial = totalEntries - totalExpenses;
-  const saldoTotal = saldoParcial - totalCredit;
-  const totalGastoMes = totalExpenses + totalCredit;
+    return transactions;
+  }
+
+
+
+
+
+  //ErdV/?6N%Mibd36
+
+  const entries = transactions.filter((t: Transaction) => t.type === 'income');
+  const expenses = transactions.filter((t: Transaction) => t.type === 'expense');
+  const credits = transactions.filter((t: Transaction) => t.type === 'credit');
+
+  const totalEntries = entries.reduce((acc: number, t: Transaction) => acc + t.value, 0)
+  const totalExpenses = expenses.reduce((acc: number, t: Transaction) => acc + t.value, 0)
+
+
+  const saldoParcial = (totalEntries - totalExpenses) + getAccumulatedBalance(currentYear, currentMonth)
+
 
   return (
     <View style={styles.container}>
-    
-     
-     <AddTransactionModal visible={isOpenModal} onDismiss={()=> setIsOpenModal(false)}/>
-      
-      
+
+
+      <AddTransactionModal visible={isOpenModal} onDismiss={() => setIsOpenModal(false)} />
+
+
       {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={goToPreviousMonth}>
-        <Icon source="chevron-left" size={24} />
-        {/* <MaterialIcons name="home-filled" size={size} color={color} /> */}
+          <Icon source="chevron-left" size={24} />
+
         </TouchableOpacity>
 
-        <Text style={styles.monthText}>{formatMonth(currentDate)}</Text>
+        <Text style={styles.monthText}>{`${dayjs(currentDate).format('MMMM/YYYY')}`}</Text>
 
         <TouchableOpacity onPress={goToNextMonth}>
           <Icon source="chevron-right" size={24} color="#333" />
@@ -76,9 +121,9 @@ export default function MonthlyControlScreen() {
             <DataTable.Title>Descrição</DataTable.Title>
             <DataTable.Title numeric>Valor</DataTable.Title>
           </DataTable.Header>
-          {entries.map((item) => (
-            <DataTable.Row key={item.id}>
-              <DataTable.Cell>{item.desc}</DataTable.Cell>
+          {entries.map((item: Transaction) => (
+            <DataTable.Row key={item.description}>
+              <DataTable.Cell>{item.description}</DataTable.Cell>
               <DataTable.Cell numeric>R$ {item.value.toFixed(2)}</DataTable.Cell>
             </DataTable.Row>
           ))}
@@ -91,16 +136,16 @@ export default function MonthlyControlScreen() {
             <DataTable.Title>Descrição</DataTable.Title>
             <DataTable.Title numeric>Valor</DataTable.Title>
           </DataTable.Header>
-          {expenses.map((item) => (
-            <DataTable.Row key={item.id}>
-              <DataTable.Cell>{item.desc}</DataTable.Cell>
+          {expenses.map((item: Transaction, index: number) => (
+            <DataTable.Row key={`row${index}`}>
+              <DataTable.Cell>{item.description}</DataTable.Cell>
               <DataTable.Cell numeric>R$ {item.value.toFixed(2)}</DataTable.Cell>
             </DataTable.Row>
           ))}
         </DataTable>
 
         {/* Cartões */}
-        {creditCards.map((card) => (
+        {/* {creditCards.map((card) => (
           <View key={card.id}>
             <Text style={styles.sectionTitle}>Cartão: {card.name}</Text>
             <DataTable>
@@ -116,7 +161,7 @@ export default function MonthlyControlScreen() {
               ))}
             </DataTable>
           </View>
-        ))}
+        ))} */}
 
         {/* Espaço para o resumo fixo */}
         <View style={{ height: 130 }} />
@@ -126,14 +171,11 @@ export default function MonthlyControlScreen() {
       <View style={styles.summaryContainer}>
         <View>
           <Text style={styles.summaryText}>Saldo parcial: R$ {saldoParcial}</Text>
-          <Text style={styles.summaryText}>Saldo total: R$ {saldoTotal}</Text>
-          <Text style={styles.summaryText}>Total gasto no mês: R$ {totalGastoMes}</Text>
         </View>
 
         {/* Botão flutuante */}
-        <TouchableOpacity style={styles.fab}>
-          <Text onPress={()=> setIsOpenModal(true)}>+</Text>
-          {/* <Ionicons name="add" size={30} color="#fff" onPress={()=> } /> */}
+        <TouchableOpacity onPress={() => setIsOpenModal(true)} style={styles.fab}>
+          <Icon source="plus" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
     </View>
