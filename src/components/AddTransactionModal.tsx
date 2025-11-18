@@ -1,28 +1,56 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
-import { Modal, Portal, Text, TextInput, Button, RadioButton } from 'react-native-paper';
+import { Modal, Portal, Text, TextInput, Button, RadioButton, Checkbox } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { insertItem } from '../database/realmHelpers';
-import { Transaction } from '../interface/Transaction';
+import { Recurrence, Transaction } from '../interface/Transaction';
 import { realm } from '../database/realm';
 import { Balance } from '../interface/Balance';
+import { RecurringTransaction } from '../interface/RecurringTransaction';
 
 type Props = {
   visible: boolean;
   onDismiss: () => void;
-};
+}
 
+type DateType = 'date' | 'endDate' | null
+
+interface Params {
+  type: string;
+  description: string;
+  value: string;
+  date: Date;
+  endDate?: Date; // Aqui o endDate é opcional
+  recurrency: Recurrence;
+  noEndDate: boolean,
+}
 export const AddTransactionModal = ({ visible, onDismiss }: Props) => {
 
-
-
-  const [params, setParams] = useState({
+  const [emptyParams] = useState<Params>({
+    type: '',
     description: '',
     value: '',
-    type: 'expense' as 'income' | 'expense' | 'credit',
     date: new Date(),
-  });
-  const [showDatePicker, setShowDatePicker] = useState(false)
+    endDate: undefined,
+    recurrency: 'unique',
+    noEndDate: false,
+  })
+  const [params, setParams] = useState<Params>(emptyParams)
+  const [activePicker, setActivePicker] = useState<DateType>(null);
+
+
+
+  const handleDateChange = (event: any, selectedDate: Date | undefined) => {
+    const currentDate = selectedDate || params[activePicker!];  // Use o valor anterior se não tiver seleção
+    setParams(prevData => ({
+      ...prevData,
+      [activePicker!]: currentDate,  // Atualiza a data correspondente ao activePicker
+      noEndDate: prevData.endDate ? true : false
+    }));
+
+    // Fecha o picker depois da seleção
+    setActivePicker(null);
+  };
 
 
   const updateBalanceAfterTransaction = (transaction: Transaction) => {
@@ -58,27 +86,40 @@ export const AddTransactionModal = ({ visible, onDismiss }: Props) => {
   const handleSave = () => {
     if (!params.description.trim() || !params.value) return;
 
-    const newTransaction = {
-      description: params.description,
-      value: parseFloat(params.value),
-      type: params.type,
-      date: params.date,
-    } as Transaction
+    if (params.recurrency === 'unique') {
+      const newTransaction = {
+        description: params.description,
+        value: parseFloat(params.value),
+        type: params.type,
+        date: params.date,
+      } as Transaction
 
-    insertItem('Transaction', newTransaction);
-    updateBalanceAfterTransaction(newTransaction);
+      insertItem('Transaction', newTransaction);
+      updateBalanceAfterTransaction(newTransaction);
 
-    // limpa e fecha
-    setParams({
-      description: '',
-      value: '',
-      type: 'expense',
-      date: new Date(),
-    });
+    } else {
+      const newRecurrencyTransaction = {
+        type: params.type,
+        description: params.description,
+        amount: parseFloat(params.value),
+        startDate: params.date,
+        recurrence: params.recurrency,
+        endDate: params.endDate
+      } as RecurringTransaction
 
-    onDismiss();
+      insertItem('RecurringTransaction', newRecurrencyTransaction)
+      
+    }
+    setParams(emptyParams)
+    onDismiss()
   };
 
+
+  const isInvalidForm = () => {
+    if (!params.value || !params.description)
+      return true
+    return false
+  }
 
   return (
     <Portal>
@@ -92,35 +133,30 @@ export const AddTransactionModal = ({ visible, onDismiss }: Props) => {
           padding: 16,
         }}
       >
-        <Text variant="titleMedium" style={{ marginBottom: 10 }}>
+        <Text variant="titleMedium" style={{ marginBottom: 12, fontWeight: 'bold' }}>
           Nova Transação
         </Text>
 
-        <Text style={{ marginBottom: 4 }}>Tipo</Text>
+        <Text style={{ marginBottom: 6 }}>Tipo</Text>
         <RadioButton.Group
           onValueChange={(v) => setParams(prev => ({ ...prev, type: v as any }))}
           value={params.type}
         >
-          <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginBottom: 10 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
             <RadioButton.Item label="Entrada" value="income" />
             <RadioButton.Item label="Saída" value="expense" />
             <RadioButton.Item label="Cartão" value="credit" />
           </View>
         </RadioButton.Group>
 
-        {params.type === 'credit' && (
-          <View>
-            <Text>Selecione o cartão</Text>
-          </View>
-        )}
-
         <TextInput
           label="Descrição"
           value={params.description}
           onChangeText={(text) => setParams(prev => ({ ...prev, description: text }))}
           mode="outlined"
-          style={{ marginBottom: 10 }}
+          style={{ marginBottom: 16 }}
         />
+
 
         <TextInput
           label="Valor"
@@ -128,34 +164,72 @@ export const AddTransactionModal = ({ visible, onDismiss }: Props) => {
           onChangeText={(text) => setParams(prev => ({ ...prev, value: text }))}
           keyboardType="numeric"
           mode="outlined"
-          style={{ marginBottom: 10 }}
+          style={{ marginBottom: 16 }}
         />
 
         <Button
           mode="outlined"
-          onPress={() => setShowDatePicker(true)}
-          style={{ marginBottom: 10 }}
+          onPress={() => setActivePicker('date')}
+          style={{ marginBottom: 16 }}
         >
           {params.date.toLocaleDateString('pt-BR')}
         </Button>
 
-        {showDatePicker && (
+        {/* DateTimePicker (um único picker) */}
+        {activePicker && (
           <DateTimePicker
-            value={params.date}
-            mode="date"
+            value={params[activePicker] || new Date()}  // Mostra a data correspondente (startDate ou endDate)
+            mode="date"  // Pode ser 'date', 'time', ou 'datetime'
             display="default"
-            onChange={(_, selectedDate) => {
-              setShowDatePicker(false);
-              if (selectedDate)
-                setParams(prev => ({ ...prev, date: selectedDate }));
-            }}
+            onChange={handleDateChange}  // Passa o evento e a data selecionada para a função
           />
         )}
 
+        <Text style={{ marginBottom: 6 }}>Frequência</Text>
+        <RadioButton.Group
+          onValueChange={(v) => setParams(prev => ({ ...prev, recurrency: v as any }))}
+          value={params.recurrency}
+        >
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 }}>
+            <RadioButton.Item label="Única" value="unique" />
+            <RadioButton.Item label="Mensal" value="monthly" />
+            <RadioButton.Item label="Anual" value="yearly" />
+          </View>
+        </RadioButton.Group>
+
+
+        <Text style={{ marginBottom: 6 }}>Fim</Text>
+
+
+        {params.recurrency !== 'unique' && params.recurrency !== 'installments' &&
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+            <Checkbox
+              status={params.noEndDate ? 'checked' : 'unchecked'}
+              onPress={() => setParams(prev => ({ ...prev, noEndDate: !prev.noEndDate, endDate: undefined }))}
+            />
+            <Text>Sem data fim</Text>
+          </View>
+
+        }
+
+        {params.recurrency !== 'unique' &&
+          <View>
+
+            <Button
+              mode="outlined"
+              onPress={() => setActivePicker('endDate')}
+              style={{ marginBottom: 16 }}
+            >
+              {params.endDate ? params.endDate.toLocaleDateString('pt-BR') : 'Selecione a data fim'}
+            </Button>
+          </View>
+        }
+
         <Button
+          disabled={isInvalidForm()}
           mode="contained"
           onPress={handleSave}
-          style={{ marginTop: 10 }}
+          style={{ marginTop: 16 }}
         >
           Salvar
         </Button>
@@ -163,11 +237,12 @@ export const AddTransactionModal = ({ visible, onDismiss }: Props) => {
         <Button
           mode="text"
           onPress={onDismiss}
-          style={{ marginTop: 6 }}
+          style={{ marginTop: 8 }}
         >
           Cancelar
         </Button>
       </Modal>
     </Portal>
+
   );
 }  

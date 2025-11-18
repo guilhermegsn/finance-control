@@ -1,5 +1,5 @@
 export type Type = 'income' | 'expense' | 'credit'
-export type Recurrence = | 'monthly' | 'weekly' | 'yearly' | 'installments'
+export type Recurrence = 'monthly' | 'weekly' | 'yearly' | 'installments'
 
 export interface RecurringTransaction {
     _id: Realm.BSON.ObjectId;

@@ -7,6 +7,7 @@ import dayjs from "dayjs";
 import { realm } from "../database/realm";
 import { Balance } from "../interface/Balance";
 import { getAllItems, getFilteredItems } from "../database/realmHelpers";
+import { RecurringTransaction } from "../interface/RecurringTransaction";
 
 export default function MonthlyControlScreen() {
 
@@ -27,18 +28,67 @@ export default function MonthlyControlScreen() {
     setTransactions(data)
   }
 
+  // const getAccumulatedBalance = (targetYear: number, targetMonth: number) => {
+  //   const balances = realm.objects<Balance>('Balance');
+
+  //   let total = 0;
+
+  //   balances
+  //     .filtered('year < $0 OR (year == $0 AND month < $1)', targetYear, targetMonth)
+  //     .sorted([['year', true], ['month', true]])
+  //     .forEach(b => total += b.partialBalance);
+
+  //   return total;
+  // }
+
   const getAccumulatedBalance = (targetYear: number, targetMonth: number) => {
+    // ----------------------------
+    // 1. Somar Balances já salvos
+    // ----------------------------
     const balances = realm.objects<Balance>('Balance');
-
+  
     let total = 0;
-
+  
     balances
       .filtered('year < $0 OR (year == $0 AND month < $1)', targetYear, targetMonth)
-      .sorted([['year', true], ['month', true]])
       .forEach(b => total += b.partialBalance);
-
+  
+  
+    // ----------------------------
+    // 2. Somar transações recorrentes
+    // ----------------------------
+    const recurring = realm.objects<RecurringTransaction>('RecurringTransaction');
+  
+    recurring.forEach(rt => {
+      // precisamos testar todo mês desde rt.startDate até o mês anterior ao target
+      const start = new Date(rt.startDate);
+  
+      let year = start.getFullYear();
+      let month = start.getMonth() + 1;
+  
+      while (year < targetYear || (year === targetYear && month < targetMonth)) {
+        
+        if (occursInMonth(rt, year, month)) {
+          if (rt.type === 'income') total += rt.amount;
+          if (rt.type === 'expense' || rt.type === 'credit') total -= rt.amount;
+        }
+  
+        // próximo mês
+        month++;
+        if (month > 12) {
+          month = 1;
+          year++;
+        }
+  
+        // respeitando endDate
+        if (rt.endDate && new Date(year, month - 1, 1) > rt.endDate) break;
+      }
+    });
+  
+  
     return total;
-  }
+  };
+  
 
 
 
@@ -63,17 +113,83 @@ export default function MonthlyControlScreen() {
     loadTransactions(next)
   };
 
-  const getTransactionsByMonth = (month: number, year: number) => {
+  // const getTransactionsByMonth = (month: number, year: number) => {
+  //   const start = new Date(year, month, 1);
+  //   const end = new Date(year, month + 1, 0, 23, 59, 59);
+
+  //   const transactions = realm.objects('Transaction')
+  //     .filtered('date >= $0 && date <= $1', start, end)
+  //     .sorted('date', true);
+
+  //   return transactions;
+  // }
+
+
+  function occursInMonth(rec: RecurringTransaction, month: number, year: number): boolean {
+    const start = rec.startDate;
+    const end = rec.endDate;
+
+    const monthStart = new Date(year, month, 1);
+    const monthEnd = new Date(year, month + 1, 0, 23, 59, 59);
+
+    // Não começou ainda
+    if (start > monthEnd) return false;
+
+    // Já acabou
+    if (end && end < monthStart) return false;
+
+    return true;
+  }
+
+  function generateRecurringTransactionInstance(
+    rec: RecurringTransaction,
+    month: number,
+    year: number
+  ): Transaction {
+
+    // Use o mesmo dia da startDate (limite no último dia do mês)
+    const day = Math.min(
+      rec.startDate.getDate(),
+      new Date(year, month + 1, 0).getDate()
+    );
+
+    const date = new Date(year, month, day);
+
+    return {
+      description: rec.description,
+      value: rec.amount,
+      type: rec.type,
+      date,
+    } as Transaction;
+  }
+
+  function getTransactionsByMonth(month: number, year: number) {
     const start = new Date(year, month, 1);
     const end = new Date(year, month + 1, 0, 23, 59, 59);
 
-    const transactions = realm.objects('Transaction')
+    // 1. Transações normais
+    const normal = realm.objects<Transaction>('Transaction')
       .filtered('date >= $0 && date <= $1', start, end)
-      .sorted('date', true);
+      .slice(); // copia para array JS
 
-    return transactions;
+    // 2. Recorrentes
+    const recurrents = realm.objects<RecurringTransaction>('RecurringTransaction');
+
+    const monthRecurring = recurrents
+      .filter((rec) => occursInMonth(rec, month, year))
+      .map((rec) => generateRecurringTransactionInstance(rec, month, year));
+
+    // 3. Combinar ambos
+    const all = [...normal, ...monthRecurring];
+
+    return all;
   }
 
+
+  useEffect(() => {
+    if (!isOpenModal)
+      loadTransactions(currentDate)
+  }, [isOpenModal])
 
 
 
@@ -170,11 +286,18 @@ export default function MonthlyControlScreen() {
       {/* RESUMO FIXO */}
       <View style={styles.summaryContainer}>
         <View>
+        <Text style={styles.summaryText}>Total entradas: R$ {totalEntries}</Text>
           <Text style={styles.summaryText}>Saldo parcial: R$ {saldoParcial}</Text>
         </View>
 
         {/* Botão flutuante */}
         <TouchableOpacity onPress={() => setIsOpenModal(true)} style={styles.fab}>
+          <Icon source="plus" size={24} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => console.log(getAllItems('RecurringTransaction'))} style={styles.fab}>
+          <Icon source="plus" size={24} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => console.log(transactions)} style={styles.fab}>
           <Icon source="plus" size={24} color="#fff" />
         </TouchableOpacity>
       </View>

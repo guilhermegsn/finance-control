@@ -1,5 +1,5 @@
 export type TransactionType = 'income' | 'expense' | 'credit';
-export type Recurrence = 'unique' | 'monthly' | 'annual';
+export type Recurrence = 'unique' | 'monthly' | 'annual' | 'installments';
 
 export interface Transaction {
     _id: Realm.BSON.ObjectId;
