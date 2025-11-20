@@ -16,7 +16,6 @@ type Props = {
 }
 
 type DateType = 'date' | 'endDate' | null
-
 interface Params {
   type: string;
   description: string;
@@ -69,7 +68,7 @@ export const AddTransactionModal = ({ visible, onDismiss, data, isEdit }: Props)
   };
 
 
-  const updateBalanceAfterTransaction = (transaction: Transaction) => {
+  const updateBalanceAfterTransaction = (transaction: Transaction, previousTransaction?: Transaction) => {
     if (!transaction.date) return
     const monthKey = `${transaction.date.getFullYear()}-${String(transaction.date.getMonth() + 1).padStart(2, '0')}`;
 
@@ -89,7 +88,16 @@ export const AddTransactionModal = ({ visible, onDismiss, data, isEdit }: Props)
         });
       }
 
-      if (transaction.type === 'income') balance.income += transaction.value;
+
+
+      if (transaction.type === 'income') {
+        if (previousTransaction) {
+          balance.income -= previousTransaction.value;
+          balance.income += transaction.value
+        }else{
+          balance.income += transaction.value;
+        }
+      }
       if (transaction.type === 'expense') balance.expense += transaction.value;
       if (transaction.type === 'credit') balance.credit += transaction.value;
 
@@ -99,7 +107,7 @@ export const AddTransactionModal = ({ visible, onDismiss, data, isEdit }: Props)
 
 
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!params.description.trim() || !params.value) return;
 
     if (params.recurrence === 'unique') {
@@ -111,11 +119,19 @@ export const AddTransactionModal = ({ visible, onDismiss, data, isEdit }: Props)
       } as Transaction
 
 
-      if (isEdit)
+      if (isEdit) {
+        const previousData = getItemById('Transaction', data?._id) as Transaction
+        console.log('previous-->>', previousData)
+        updateBalanceAfterTransaction(newTransaction, previousData)
         updateItem('Transaction', data?._id, newTransaction)
-      else
+        
+      }
+      else {
         insertItem('Transaction', newTransaction)
-      updateBalanceAfterTransaction(newTransaction)
+        updateBalanceAfterTransaction(newTransaction)
+      }
+
+
 
     } else {
       const newRecurrencyTransaction = {

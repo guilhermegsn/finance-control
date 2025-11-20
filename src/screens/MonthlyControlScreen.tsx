@@ -344,7 +344,7 @@ export default function MonthlyControlScreen() {
         <TouchableOpacity onPress={() => console.log(getAllItems('RecurringTransaction'))} style={styles.fab}>
           <Icon source="plus" size={24} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => console.log(transactions)} style={styles.fab}>
+        <TouchableOpacity onPress={() => console.log(getAllItems('Balance'))} style={styles.fab}>
           <Icon source="plus" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
