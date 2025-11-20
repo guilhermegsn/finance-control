@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Modal, Portal, Text, TextInput, Button, RadioButton, Checkbox } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { insertItem } from '../database/realmHelpers';
+import { getItemById, insertItem, updateItem } from '../database/realmHelpers';
 import { Recurrence, Transaction } from '../interface/Transaction';
 import { realm } from '../database/realm';
 import { Balance } from '../interface/Balance';
@@ -11,6 +11,8 @@ import { RecurringTransaction } from '../interface/RecurringTransaction';
 type Props = {
   visible: boolean;
   onDismiss: () => void;
+  data: any,
+  isEdit: boolean
 }
 
 type DateType = 'date' | 'endDate' | null
@@ -21,10 +23,10 @@ interface Params {
   value: string;
   date: Date;
   endDate?: Date; // Aqui o endDate é opcional
-  recurrency: Recurrence;
-  noEndDate: boolean,
+  recurrence: Recurrence;
+  noEndDate?: boolean,
 }
-export const AddTransactionModal = ({ visible, onDismiss }: Props) => {
+export const AddTransactionModal = ({ visible, onDismiss, data, isEdit }: Props) => {
 
   const [emptyParams] = useState<Params>({
     type: '',
@@ -32,11 +34,25 @@ export const AddTransactionModal = ({ visible, onDismiss }: Props) => {
     value: '',
     date: new Date(),
     endDate: undefined,
-    recurrency: 'unique',
+    recurrence: 'unique',
     noEndDate: false,
   })
   const [params, setParams] = useState<Params>(emptyParams)
-  const [activePicker, setActivePicker] = useState<DateType>(null);
+  const [activePicker, setActivePicker] = useState<DateType>(null)
+
+  useEffect(() => {
+    if (data && isEdit) {
+      setParams({
+        type: data.type,
+        description: data.description,
+        value: data?.value?.toString(),
+        date: data.date,
+        endDate: data.end,
+        recurrence: 'unique',
+        noEndDate: data.end === null,
+      })
+    }
+  }, [data])
 
 
 
@@ -86,7 +102,7 @@ export const AddTransactionModal = ({ visible, onDismiss }: Props) => {
   const handleSave = () => {
     if (!params.description.trim() || !params.value) return;
 
-    if (params.recurrency === 'unique') {
+    if (params.recurrence === 'unique') {
       const newTransaction = {
         description: params.description,
         value: parseFloat(params.value),
@@ -94,8 +110,12 @@ export const AddTransactionModal = ({ visible, onDismiss }: Props) => {
         date: params.date,
       } as Transaction
 
-      insertItem('Transaction', newTransaction);
-      updateBalanceAfterTransaction(newTransaction);
+
+      if (isEdit)
+        updateItem('Transaction', data?._id, newTransaction)
+      else
+        insertItem('Transaction', newTransaction)
+      updateBalanceAfterTransaction(newTransaction)
 
     } else {
       const newRecurrencyTransaction = {
@@ -103,12 +123,12 @@ export const AddTransactionModal = ({ visible, onDismiss }: Props) => {
         description: params.description,
         amount: parseFloat(params.value),
         startDate: params.date,
-        recurrence: params.recurrency,
+        recurrence: params.recurrence,
         endDate: params.endDate
       } as RecurringTransaction
 
       insertItem('RecurringTransaction', newRecurrencyTransaction)
-      
+
     }
     setParams(emptyParams)
     onDismiss()
@@ -134,7 +154,7 @@ export const AddTransactionModal = ({ visible, onDismiss }: Props) => {
         }}
       >
         <Text variant="titleMedium" style={{ marginBottom: 12, fontWeight: 'bold' }}>
-          Nova Transação
+          {isEdit ? 'Editar transação' : 'Nova Transação'}
         </Text>
 
         <Text style={{ marginBottom: 6 }}>Tipo</Text>
@@ -172,7 +192,7 @@ export const AddTransactionModal = ({ visible, onDismiss }: Props) => {
           onPress={() => setActivePicker('date')}
           style={{ marginBottom: 16 }}
         >
-          {params.date.toLocaleDateString('pt-BR')}
+          {params?.date?.toLocaleDateString('pt-BR')}
         </Button>
 
         {/* DateTimePicker (um único picker) */}
@@ -187,8 +207,8 @@ export const AddTransactionModal = ({ visible, onDismiss }: Props) => {
 
         <Text style={{ marginBottom: 6 }}>Frequência</Text>
         <RadioButton.Group
-          onValueChange={(v) => setParams(prev => ({ ...prev, recurrency: v as any }))}
-          value={params.recurrency}
+          onValueChange={(v) => setParams(prev => ({ ...prev, recurrence: v as any }))}
+          value={params.recurrence}
         >
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 }}>
             <RadioButton.Item label="Única" value="unique" />
@@ -201,7 +221,7 @@ export const AddTransactionModal = ({ visible, onDismiss }: Props) => {
         <Text style={{ marginBottom: 6 }}>Fim</Text>
 
 
-        {params.recurrency !== 'unique' && params.recurrency !== 'installments' &&
+        {params.recurrence !== 'unique' && params.recurrence !== 'installments' &&
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
             <Checkbox
               status={params.noEndDate ? 'checked' : 'unchecked'}
@@ -212,7 +232,7 @@ export const AddTransactionModal = ({ visible, onDismiss }: Props) => {
 
         }
 
-        {params.recurrency !== 'unique' &&
+        {params.recurrence !== 'unique' &&
           <View>
 
             <Button
@@ -236,10 +256,20 @@ export const AddTransactionModal = ({ visible, onDismiss }: Props) => {
 
         <Button
           mode="text"
-          onPress={onDismiss}
+          onPress={() => {
+            onDismiss()
+            setParams(emptyParams)
+          }}
           style={{ marginTop: 8 }}
         >
           Cancelar
+        </Button>
+        <Button
+          mode="text"
+          onPress={() => console.log(data)}
+          style={{ marginTop: 8 }}
+        >
+          params
         </Button>
       </Modal>
     </Portal>

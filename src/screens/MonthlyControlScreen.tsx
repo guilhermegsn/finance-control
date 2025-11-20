@@ -1,19 +1,22 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
-import { Button, DataTable, Icon } from "react-native-paper";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from "react-native";
+import { DataTable, Icon } from "react-native-paper";
 import { AddTransactionModal } from "../components/AddTransactionModal";
-import { Transaction } from "../interface/Transaction";
+import { Recurrence, Transaction } from "../interface/Transaction";
 import dayjs from "dayjs";
 import { realm } from "../database/realm";
-import { Balance } from "../interface/Balance";
-import { getAllItems, getFilteredItems } from "../database/realmHelpers";
+import { getAllItems, getFilteredItems, getItemById } from "../database/realmHelpers";
 import { RecurringTransaction } from "../interface/RecurringTransaction";
+import { useNavigation } from "@react-navigation/native";
 
 export default function MonthlyControlScreen() {
+  const navigation = useNavigation()
 
   const [currentDate, setCurrentDate] = useState(new Date())
   const [isOpenModal, setIsOpenModal] = useState(false)
   const [transactions, setTransactions] = useState<any>([])
+  const [selectedTransaction, setSelectedTransaction] = useState({})
+  const [isEdit, setIsEdit] = useState(false)
 
   const currentMonth = currentDate.getMonth() + 1
   const currentYear = currentDate.getFullYear()
@@ -24,73 +27,65 @@ export default function MonthlyControlScreen() {
     const year = date.getFullYear()
 
     const data = getTransactionsByMonth(month, year)// usando seu método baseado no Realm
-    console.log('data', data)
     setTransactions(data)
   }
 
-  // const getAccumulatedBalance = (targetYear: number, targetMonth: number) => {
-  //   const balances = realm.objects<Balance>('Balance');
 
-  //   let total = 0;
 
-  //   balances
-  //     .filtered('year < $0 OR (year == $0 AND month < $1)', targetYear, targetMonth)
-  //     .sorted([['year', true], ['month', true]])
-  //     .forEach(b => total += b.partialBalance);
-
-  //   return total;
-  // }
-
-  const getAccumulatedBalance = (targetYear: number, targetMonth: number) => {
+  function getAccumulatedBalance(
+    targetYear: number,
+    targetMonth: number, // 1-based (jan=1)
+  ) {
     // ----------------------------
     // 1. Somar Balances já salvos
     // ----------------------------
-    const balances = realm.objects<Balance>('Balance');
-  
+    const balances = realm.objects('Balance');
+
     let total = 0;
-  
+
+    // mesma query que você usava: somar partialBalance de meses ANTERIORES ao target
     balances
       .filtered('year < $0 OR (year == $0 AND month < $1)', targetYear, targetMonth)
-      .forEach(b => total += b.partialBalance);
-  
-  
+      .forEach((b: any) => (total += b.partialBalance));
+
     // ----------------------------
-    // 2. Somar transações recorrentes
+    // 2. Somar transações recorrentes (virtual)
     // ----------------------------
-    const recurring = realm.objects<RecurringTransaction>('RecurringTransaction');
-  
-    recurring.forEach(rt => {
-      // precisamos testar todo mês desde rt.startDate até o mês anterior ao target
+    const recurring = realm.objects<RecurringTransaction>('RecurringTransaction')
+
+    // Representação linear do limite (mês ANTES do target)
+    // Exemplo: targetYear=2025, targetMonth=5 (maio) => limitYM = 2025*12 + 4 (abril)
+    const targetLimitYM = targetYear * 12 + (targetMonth - 1);
+
+    recurring.forEach((rt: RecurringTransaction) => {
       const start = new Date(rt.startDate);
-  
-      let year = start.getFullYear();
-      let month = start.getMonth() + 1;
-  
-      while (year < targetYear || (year === targetYear && month < targetMonth)) {
-        
-        if (occursInMonth(rt, year, month)) {
+      const startYM = start.getFullYear() * 12 + (start.getMonth() + 1); // 1-based month
+
+      // se a recorrência começa depois do limite, pula
+      if (startYM > targetLimitYM) return;
+
+      const end = rt.endDate ? new Date(rt.endDate) : null;
+      const endYM = end ? end.getFullYear() * 12 + (end.getMonth() + 1) : Infinity;
+
+      // itera de startYM até o mês anterior ao target (inclusive), respeitando endYM
+      // isso preserva exatamente a semântica da sua função original
+      const upper = Math.min(targetLimitYM, endYM);
+
+      // iterar linearmente em ym reduz comparações complexas
+      for (let ym = startYM; ym <= upper; ym++) {
+        const y = Math.floor(ym / 12); // ano
+        const m1 = ym - y * 12; // mês 1-based
+
+        // ocorreInMonth verifica a regra (dia, frequência, etc)
+        if (occursInMonth(rt, y, m1)) {
           if (rt.type === 'income') total += rt.amount;
-          if (rt.type === 'expense' || rt.type === 'credit') total -= rt.amount;
+          else if (rt.type === 'expense' || rt.type === 'credit') total -= rt.amount;
         }
-  
-        // próximo mês
-        month++;
-        if (month > 12) {
-          month = 1;
-          year++;
-        }
-  
-        // respeitando endDate
-        if (rt.endDate && new Date(year, month - 1, 1) > rt.endDate) break;
       }
     });
-  
-  
+
     return total;
-  };
-  
-
-
+  }
 
 
   // Carrega ao iniciar e sempre que currentDate mudar
@@ -112,17 +107,6 @@ export default function MonthlyControlScreen() {
     setCurrentDate(next)
     loadTransactions(next)
   };
-
-  // const getTransactionsByMonth = (month: number, year: number) => {
-  //   const start = new Date(year, month, 1);
-  //   const end = new Date(year, month + 1, 0, 23, 59, 59);
-
-  //   const transactions = realm.objects('Transaction')
-  //     .filtered('date >= $0 && date <= $1', start, end)
-  //     .sorted('date', true);
-
-  //   return transactions;
-  // }
 
 
   function occursInMonth(rec: RecurringTransaction, month: number, year: number): boolean {
@@ -156,10 +140,12 @@ export default function MonthlyControlScreen() {
     const date = new Date(year, month, day);
 
     return {
+      _id: rec._id,
       description: rec.description,
       value: rec.amount,
       type: rec.type,
       date,
+      isRecurrence: true
     } as Transaction;
   }
 
@@ -179,8 +165,16 @@ export default function MonthlyControlScreen() {
       .filter((rec) => occursInMonth(rec, month, year))
       .map((rec) => generateRecurringTransactionInstance(rec, month, year));
 
+    const accumulatedBalance = {
+      _id: 'accumulatedBalance',
+      date: new Date(),
+      description: "Saldo acumulado",
+      type: "income",
+      value: getAccumulatedBalance(currentYear, currentMonth)
+    }
+
     // 3. Combinar ambos
-    const all = [...normal, ...monthRecurring];
+    const all = [accumulatedBalance, ...normal, ...monthRecurring];
 
     return all;
   }
@@ -192,7 +186,47 @@ export default function MonthlyControlScreen() {
   }, [isOpenModal])
 
 
+  const selecTransaction = (transaction: any) => {
+    if (transaction?.isRecurrence) {
+      Alert.alert(
+        'Deseja editar este evento?',
+        'Escolha uma opção:',
+        [
+          {
+            text: 'Somente neste mês',
+            onPress: () => console.log('Somente neste mês'),
+          },
+          {
+            text: 'Toda a sequência',
+            onPress: () => console.log('Toda a sequência'),
+          },
+          {
+            text: 'Cancelar',
+            onPress: () => console.log('Cancelado'),
+            style: 'cancel',
+          },
+        ],
+        { cancelable: false }
+      )
+    } else {
+      edit(transaction)
+    }
 
+  }
+
+
+  const edit = (transaction: any) => {
+    setIsEdit(true)
+    const data = getItemById('Transaction', transaction._id)
+    if (data) {
+      setSelectedTransaction(data)
+    }
+  }
+
+  const add = () => {
+    // navigation.navigate('AddTransaction')
+    setIsOpenModal(true)
+  }
 
   //ErdV/?6N%Mibd36
 
@@ -203,15 +237,22 @@ export default function MonthlyControlScreen() {
   const totalEntries = entries.reduce((acc: number, t: Transaction) => acc + t.value, 0)
   const totalExpenses = expenses.reduce((acc: number, t: Transaction) => acc + t.value, 0)
 
-
-  const saldoParcial = (totalEntries - totalExpenses) + getAccumulatedBalance(currentYear, currentMonth)
+  const saldoParcial = (totalEntries - totalExpenses)
 
 
   return (
     <View style={styles.container}>
 
 
-      <AddTransactionModal visible={isOpenModal} onDismiss={() => setIsOpenModal(false)} />
+      <AddTransactionModal
+        visible={isOpenModal || isEdit}
+        data={selectedTransaction!}
+        onDismiss={() => {
+          setIsOpenModal(false)
+          setIsEdit(false)
+        }}
+        isEdit={isEdit}
+      />
 
 
       {/* HEADER */}
@@ -228,7 +269,7 @@ export default function MonthlyControlScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* LISTAS COM SCROLL */}
+
       <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false}>
         {/* Entradas */}
         <Text style={styles.sectionTitle}>Entradas</Text>
@@ -238,7 +279,11 @@ export default function MonthlyControlScreen() {
             <DataTable.Title numeric>Valor</DataTable.Title>
           </DataTable.Header>
           {entries.map((item: Transaction) => (
-            <DataTable.Row key={item.description}>
+            <DataTable.Row
+              key={item._id.toString()}
+              onLongPress={() => selecTransaction(item)}
+
+            >
               <DataTable.Cell>{item.description}</DataTable.Cell>
               <DataTable.Cell numeric>R$ {item.value.toFixed(2)}</DataTable.Cell>
             </DataTable.Row>
@@ -252,8 +297,8 @@ export default function MonthlyControlScreen() {
             <DataTable.Title>Descrição</DataTable.Title>
             <DataTable.Title numeric>Valor</DataTable.Title>
           </DataTable.Header>
-          {expenses.map((item: Transaction, index: number) => (
-            <DataTable.Row key={`row${index}`}>
+          {expenses.map((item: Transaction) => (
+            <DataTable.Row key={item._id.toString()}>
               <DataTable.Cell>{item.description}</DataTable.Cell>
               <DataTable.Cell numeric>R$ {item.value.toFixed(2)}</DataTable.Cell>
             </DataTable.Row>
@@ -286,12 +331,14 @@ export default function MonthlyControlScreen() {
       {/* RESUMO FIXO */}
       <View style={styles.summaryContainer}>
         <View>
-        <Text style={styles.summaryText}>Total entradas: R$ {totalEntries}</Text>
+          <Text style={styles.summaryText}>Total entradas: R$ {totalEntries}</Text>
           <Text style={styles.summaryText}>Saldo parcial: R$ {saldoParcial}</Text>
         </View>
 
         {/* Botão flutuante */}
-        <TouchableOpacity onPress={() => setIsOpenModal(true)} style={styles.fab}>
+        <TouchableOpacity
+          onPress={add}
+          style={styles.fab}>
           <Icon source="plus" size={24} color="#fff" />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => console.log(getAllItems('RecurringTransaction'))} style={styles.fab}>

@@ -12,4 +12,5 @@ export interface Transaction {
     date?: Date;
     start?: Date;
     end?: Date | null;
+    isRecurrence: boolean;
 }

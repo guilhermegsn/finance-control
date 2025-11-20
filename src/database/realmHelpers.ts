@@ -45,6 +45,14 @@ export function updateItem<T extends Record<string, any>>(
   return updated;
 }
 
+export function getItemById<T extends Record<string, any>>(
+  schemaName: string,
+  id: string | number
+): T | null {
+  const result = realm.objects<T>(schemaName).filtered('_id == $0', id);
+  return result.length > 0 ? result[0] : null; // Retorna o primeiro item ou null se não encontrado
+}
+
 export function deleteItem(
   schemaName: string,
   id: Realm.BSON.ObjectId
