@@ -2,7 +2,7 @@ export type TransactionType = 'income' | 'expense' | 'credit';
 export type Recurrence = 'unique' | 'monthly' | 'annual' | 'installments';
 
 export interface Transaction {
-    _id: Realm.BSON.ObjectId;
+    _id: string;
     description: string;
     type: TransactionType;
     cardName: string;
@@ -13,4 +13,5 @@ export interface Transaction {
     start?: Date;
     end?: Date | null;
     isRecurrence: boolean;
+    parentId?: string
 }

@@ -1,5 +1,6 @@
 import Realm from 'realm';
 import { realm } from './realm';
+import { generateRandomId } from '../service/function';
 
 export function insertItem<T extends Record<string, any>>(
   schemaName: string,
@@ -8,7 +9,7 @@ export function insertItem<T extends Record<string, any>>(
   let created: T;
   realm.write(() => {
     created = realm.create(schemaName, {
-      _id: new Realm.BSON.ObjectId(),
+      _id: generateRandomId(),
       ...data,
     }) as unknown as T;
   });
@@ -31,7 +32,7 @@ export function getFilteredItems<T extends Record<string, any>>(
 
 export function updateItem<T extends Record<string, any>>(
   schemaName: string,
-  id: Realm.BSON.ObjectId,
+  id: string,
   data: Partial<T>
 ): T | undefined {
   let updated: T | undefined;
@@ -55,7 +56,7 @@ export function getItemById<T extends Record<string, any>>(
 
 export function deleteItem(
   schemaName: string,
-  id: Realm.BSON.ObjectId
+  id: string
 ): void {
   realm.write(() => {
     const item = realm.objectForPrimaryKey(schemaName, id);

@@ -7,7 +7,7 @@ export const TransactionSchema: ObjectSchema = {
     name: 'Transaction',
     primaryKey: '_id',
     properties: {
-      _id: 'objectId',
+      _id: 'string',
       description: 'string',
       type: 'string',
       cardName: 'string?',

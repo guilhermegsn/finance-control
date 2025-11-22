@@ -4,7 +4,7 @@ export const RecurringTransactionSchema: ObjectSchema = {
   name: 'RecurringTransaction',
   primaryKey: '_id',
   properties: {
-    _id: 'objectId',
+    _id: 'string',
     type:  'string',
     description: 'string',
     amount: 'double',
@@ -12,6 +12,7 @@ export const RecurringTransactionSchema: ObjectSchema = {
     recurrence: 'string',
     installments: 'int?',
     category: 'string?',
-    endDate: 'date?'
+    endDate: 'date?',
+    parentId: 'string?'
   },
 };

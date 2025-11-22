@@ -1,22 +1,41 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from "react-native";
-import { DataTable, Icon } from "react-native-paper";
+import { Button, Checkbox, DataTable, Icon, Modal, Portal, TextInput } from "react-native-paper";
 import { AddTransactionModal } from "../components/AddTransactionModal";
-import { Recurrence, Transaction } from "../interface/Transaction";
+import { Transaction } from "../interface/Transaction";
 import dayjs from "dayjs";
 import { realm } from "../database/realm";
-import { getAllItems, getFilteredItems, getItemById } from "../database/realmHelpers";
+import { getAllItems, getItemById, insertItem, updateItem } from "../database/realmHelpers";
 import { RecurringTransaction } from "../interface/RecurringTransaction";
 import { useNavigation } from "@react-navigation/native";
+import { generateRandomId } from "../service/function";
+import DateTimePicker from '@react-native-community/datetimepicker';
 
+type DateType = 'startDate' | 'endDate' | null
+interface ParamsRec {
+  id: string,
+  description: string,
+  amount: string,
+  startDate?: Date | null,
+  endDate?: Date | null
+}
 export default function MonthlyControlScreen() {
-  const navigation = useNavigation()
 
   const [currentDate, setCurrentDate] = useState(new Date())
   const [isOpenModal, setIsOpenModal] = useState(false)
   const [transactions, setTransactions] = useState<any>([])
   const [selectedTransaction, setSelectedTransaction] = useState({})
   const [isEdit, setIsEdit] = useState(false)
+  const [isEditRecurrence, setIsEditRecurrence] = useState(false)
+  const [emptyParamsRec] = useState<ParamsRec>({
+    id: '',
+    description: '',
+    amount: '',
+    startDate: new Date(),
+    endDate: new Date()
+  })
+  const [paramsRec, setParamsRec] = useState(emptyParamsRec)
+  const [activePicker, setActivePicker] = useState<DateType>(null)
 
   const currentMonth = currentDate.getMonth() + 1
   const currentYear = currentDate.getFullYear()
@@ -77,7 +96,7 @@ export default function MonthlyControlScreen() {
         const m1 = ym - y * 12; // mês 1-based
 
         // ocorreInMonth verifica a regra (dia, frequência, etc)
-        if (occursInMonth(rt, y, m1)) {
+        if (occursInMonth(rt, m1, y)) {
           if (rt.type === 'income') total += rt.amount;
           else if (rt.type === 'expense' || rt.type === 'credit') total -= rt.amount;
         }
@@ -145,7 +164,9 @@ export default function MonthlyControlScreen() {
       value: rec.amount,
       type: rec.type,
       date,
-      isRecurrence: true
+      end: rec.endDate,
+      isRecurrence: true,
+      parentId: rec.parentId
     } as Transaction;
   }
 
@@ -160,10 +181,17 @@ export default function MonthlyControlScreen() {
 
     // 2. Recorrentes
     const recurrents = realm.objects<RecurringTransaction>('RecurringTransaction');
-
-    const monthRecurring = recurrents
+    let monthRecurring = recurrents
       .filter((rec) => occursInMonth(rec, month, year))
       .map((rec) => generateRecurringTransactionInstance(rec, month, year));
+
+    const itemsWithParentId = monthRecurring.filter((item: Transaction) => item.parentId);
+
+    // Excluindo as transações que têm um parentId correspondente
+    monthRecurring = monthRecurring.filter((transaction: Transaction) => {
+      const hasParentId = itemsWithParentId.some((parent: Transaction) => transaction._id === parent.parentId);
+      return !hasParentId;
+    });
 
     const accumulatedBalance = {
       _id: 'accumulatedBalance',
@@ -185,26 +213,67 @@ export default function MonthlyControlScreen() {
       loadTransactions(currentDate)
   }, [isOpenModal])
 
+  const editRecurrence = (transaction: any) => {
+    setIsEditRecurrence(true)
+    setParamsRec({
+      id: transaction._id,
+      description: transaction.description,
+      amount: transaction.value.toString(),
+      endDate: transaction.end
+    })
+  }
+
+  const save = () => {
+    if (isEditRecurrence) {
+      //obtendo dados completos da sequencia
+      const rec = getItemById('RecurringTransaction', paramsRec.id)
+      if (rec) {
+        const { _id, ...recWithoutId } = rec
+        const data = { ...recWithoutId, endDate: currentDate }
+        //fecho recorrencia atual com a data do mes.
+        console.log('data', data)
+        updateItem('RecurringTransaction', paramsRec.id, data)
+
+        //criar nova recorrencia iniciando hoje até a data escolhida.
+        const newRecurrence = {
+          ...recWithoutId,
+          description: paramsRec.description,
+          amount: parseFloat(paramsRec.amount),
+          startDate: currentDate,
+          endDate: paramsRec.endDate || null,
+          parentId: paramsRec.id
+        }
+
+        console.log(newRecurrence)
+
+        insertItem('RecurringTransaction', newRecurrence)
+      }
+      setIsEditRecurrence(false)
+      loadTransactions(currentDate)
+    }
+  }
+
 
   const selecTransaction = (transaction: any) => {
     if (transaction?.isRecurrence) {
       Alert.alert(
-        'Deseja editar este evento?',
-        'Escolha uma opção:',
+        'Editar Transação recorrente',
+        'Como deseja editar essa transação?',
         [
-          {
-            text: 'Somente neste mês',
-            onPress: () => console.log('Somente neste mês'),
-          },
-          {
-            text: 'Toda a sequência',
-            onPress: () => console.log('Toda a sequência'),
-          },
           {
             text: 'Cancelar',
             onPress: () => console.log('Cancelado'),
             style: 'cancel',
           },
+          {
+            text: 'Editar sequência',
+            onPress: () => editRecurrence(transaction),
+          },
+          {
+            text: 'Editar somente este mês',
+            onPress: () => console.log('Somente neste mês'),
+          },
+
         ],
         { cancelable: false }
       )
@@ -213,7 +282,6 @@ export default function MonthlyControlScreen() {
     }
 
   }
-
 
   const edit = (transaction: any) => {
     setIsEdit(true)
@@ -228,17 +296,26 @@ export default function MonthlyControlScreen() {
     setIsOpenModal(true)
   }
 
+  const handleDateChange = (event: any, selectedDate: Date | undefined) => {
+    const currentDate = selectedDate || paramsRec[activePicker!];  // Use o valor anterior se não tiver seleção
+    setParamsRec(prevData => ({
+      ...prevData,
+      [activePicker!]: currentDate,  // Atualiza a data correspondente ao activePicker
+      noEndDate: prevData.endDate ? true : false
+    }));
+
+    // Fecha o picker depois da seleção
+    setActivePicker(null);
+  };
+
   //ErdV/?6N%Mibd36
 
   const entries = transactions.filter((t: Transaction) => t.type === 'income');
   const expenses = transactions.filter((t: Transaction) => t.type === 'expense');
   const credits = transactions.filter((t: Transaction) => t.type === 'credit');
-
   const totalEntries = entries.reduce((acc: number, t: Transaction) => acc + t.value, 0)
   const totalExpenses = expenses.reduce((acc: number, t: Transaction) => acc + t.value, 0)
-
   const saldoParcial = (totalEntries - totalExpenses)
-
 
   return (
     <View style={styles.container}>
@@ -348,6 +425,127 @@ export default function MonthlyControlScreen() {
           <Icon source="plus" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
+
+
+
+
+
+
+
+
+      <Portal>
+        <Modal
+          visible={isEditRecurrence}
+          onDismiss={() => setIsEditRecurrence(false)}
+          contentContainerStyle={{
+            backgroundColor: 'white',
+            margin: 20,
+            borderRadius: 12,
+            padding: 16,
+          }}
+        >
+          {activePicker && (
+            <DateTimePicker
+              value={paramsRec[activePicker] || new Date()}  // Mostra a data correspondente (startDate ou endDate)
+              mode="date"  // Pode ser 'date', 'time', ou 'datetime'
+              display="default"
+              onChange={handleDateChange}  // Passa o evento e a data selecionada para a função
+            />
+          )}
+          <Text style={{ marginBottom: 10, fontSize: 20 }}>Editando toda a sequência</Text>
+          <TextInput
+            label="Descrição"
+            value={paramsRec.description}
+            onChangeText={(text) => setParamsRec(prev => ({ ...prev, description: text }))}
+            keyboardType="numeric"
+            mode="outlined"
+            style={{ marginBottom: 16 }}
+          />
+          <TextInput
+            label="Valor"
+            value={paramsRec.amount}
+            onChangeText={(text) => setParamsRec(prev => ({ ...prev, amount: text }))}
+            keyboardType="numeric"
+            mode="outlined"
+            style={{ marginBottom: 16 }}
+          />
+
+
+          {/* <Button
+            mode="outlined"
+            onPress={() => setActivePicker('startDate')}
+            style={{ marginBottom: 16 }}
+          >
+            Início: {paramsRec?.startDate?.toLocaleDateString('pt-BR')}
+          </Button>
+ */}
+
+
+
+          {paramsRec.endDate &&
+            <Button
+              mode="outlined"
+              onPress={() => setActivePicker('endDate')}
+              style={{ marginBottom: 16 }}
+            >
+              Fim: {paramsRec?.endDate?.toLocaleDateString('pt-BR')}
+            </Button>
+          }
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+            <Checkbox
+              status={!paramsRec.endDate ? 'checked' : 'unchecked'}
+              onPress={() => {
+                !paramsRec.endDate ?
+                  setParamsRec(prev => ({ ...prev, endDate: new Date() })) :
+                  setParamsRec(prev => ({ ...prev, endDate: null }))
+              }}
+            />
+            <Text>Sem data fim</Text>
+          </View>
+
+
+
+          <Button
+            mode="contained"
+            onPress={() => setActivePicker('endDate')}
+            buttonColor="#A50C36"
+            style={{ marginBottom: 16 }}
+          >
+            Excluir
+          </Button>
+
+
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Button
+              mode="outlined"
+
+              onPress={() => setIsEditRecurrence(false)}
+              style={{ marginBottom: 16, width: '48%' }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              mode="contained"
+
+              onPress={save}
+              style={{ marginBottom: 16, width: '48%' }}
+            >
+              Salvar
+            </Button>
+
+          </View>
+
+        </Modal>
+      </Portal>
+
+
+
+
+
+
+
+
+
     </View>
   );
 }

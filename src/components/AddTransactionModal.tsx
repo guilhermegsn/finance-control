@@ -94,7 +94,7 @@ export const AddTransactionModal = ({ visible, onDismiss, data, isEdit }: Props)
         if (previousTransaction) {
           balance.income -= previousTransaction.value;
           balance.income += transaction.value
-        }else{
+        } else {
           balance.income += transaction.value;
         }
       }
@@ -108,46 +108,55 @@ export const AddTransactionModal = ({ visible, onDismiss, data, isEdit }: Props)
 
 
   const handleSave = async () => {
+  //  console.log('new', params)
     if (!params.description.trim() || !params.value) return;
 
-    if (params.recurrence === 'unique') {
-      const newTransaction = {
-        description: params.description,
-        value: parseFloat(params.value),
-        type: params.type,
-        date: params.date,
-      } as Transaction
+    try {
+      if (params.recurrence === 'unique') {
+        const newTransaction = {
+          description: params.description,
+          value: parseFloat(params.value),
+          type: params.type,
+          date: params.date,
+        } as Transaction
+
+       
 
 
-      if (isEdit) {
-        const previousData = getItemById('Transaction', data?._id) as Transaction
-        console.log('previous-->>', previousData)
-        updateBalanceAfterTransaction(newTransaction, previousData)
-        updateItem('Transaction', data?._id, newTransaction)
-        
+        if (isEdit) {
+          const previousData = getItemById('Transaction', data?._id) as Transaction
+          console.log('previous-->>', previousData)
+          updateBalanceAfterTransaction(newTransaction, previousData)
+          updateItem('Transaction', data?._id, newTransaction)
+
+        }
+        else {
+          insertItem('Transaction', newTransaction)
+          updateBalanceAfterTransaction(newTransaction)
+        }
+
+
+
+      } else {
+        const newRecurrencyTransaction = {
+          type: params.type,
+          description: params.description,
+          amount: parseFloat(params.value),
+          startDate: params.date,
+          recurrence: params.recurrence,
+          endDate: params.endDate
+        } as RecurringTransaction
+
+        console.log('neww', newRecurrencyTransaction)
+
+        insertItem('RecurringTransaction', newRecurrencyTransaction)
+
       }
-      else {
-        insertItem('Transaction', newTransaction)
-        updateBalanceAfterTransaction(newTransaction)
-      }
-
-
-
-    } else {
-      const newRecurrencyTransaction = {
-        type: params.type,
-        description: params.description,
-        amount: parseFloat(params.value),
-        startDate: params.date,
-        recurrence: params.recurrence,
-        endDate: params.endDate
-      } as RecurringTransaction
-
-      insertItem('RecurringTransaction', newRecurrencyTransaction)
-
+      setParams(emptyParams)
+      onDismiss()
+    } catch (e) {
+      console.error('Erro ao salvar no Realm', e)
     }
-    setParams(emptyParams)
-    onDismiss()
   };
 
 
@@ -279,13 +288,6 @@ export const AddTransactionModal = ({ visible, onDismiss, data, isEdit }: Props)
           style={{ marginTop: 8 }}
         >
           Cancelar
-        </Button>
-        <Button
-          mode="text"
-          onPress={() => console.log(data)}
-          style={{ marginTop: 8 }}
-        >
-          params
         </Button>
       </Modal>
     </Portal>
