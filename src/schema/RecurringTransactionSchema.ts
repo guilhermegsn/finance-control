@@ -13,6 +13,7 @@ export const RecurringTransactionSchema: ObjectSchema = {
     installments: 'int?',
     category: 'string?',
     endDate: 'date?',
+    date: 'date?',
     parentId: 'string?'
   },
 };

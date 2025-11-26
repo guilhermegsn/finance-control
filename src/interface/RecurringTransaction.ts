@@ -11,5 +11,6 @@ export interface RecurringTransaction {
     installments: number | null; // só se recurrence = 'installments'
     category: string;
     endDate: Date | null; // null -> recorrência infinita
+    date: Date
     parentId: string
 }

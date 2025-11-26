@@ -108,7 +108,7 @@ export const AddTransactionModal = ({ visible, onDismiss, data, isEdit }: Props)
 
 
   const handleSave = async () => {
-  //  console.log('new', params)
+    //  console.log('new', params)
     if (!params.description.trim() || !params.value) return;
 
     try {
@@ -120,7 +120,7 @@ export const AddTransactionModal = ({ visible, onDismiss, data, isEdit }: Props)
           date: params.date,
         } as Transaction
 
-       
+
 
 
         if (isEdit) {
@@ -142,7 +142,8 @@ export const AddTransactionModal = ({ visible, onDismiss, data, isEdit }: Props)
           type: params.type,
           description: params.description,
           amount: parseFloat(params.value),
-          startDate: params.date,
+          date: new Date(params.date),
+          startDate: new Date(params.date.getFullYear(), params.date.getMonth(), 1),
           recurrence: params.recurrence,
           endDate: params.endDate
         } as RecurringTransaction

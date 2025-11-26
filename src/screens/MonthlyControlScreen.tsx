@@ -62,7 +62,6 @@ export default function MonthlyControlScreen() {
 
     let total = 0;
 
-    // mesma query que você usava: somar partialBalance de meses ANTERIORES ao target
     balances
       .filtered('year < $0 OR (year == $0 AND month < $1)', targetYear, targetMonth)
       .forEach((b: any) => (total += b.partialBalance));
@@ -129,19 +128,14 @@ export default function MonthlyControlScreen() {
 
 
   function occursInMonth(rec: RecurringTransaction, month: number, year: number): boolean {
-    const start = rec.startDate;
-    const end = rec.endDate;
+    const startYM = rec.startDate.getFullYear() * 12 + rec.startDate.getMonth();
+    const endYM = rec.endDate
+      ? rec.endDate.getFullYear() * 12 + rec.endDate.getMonth()
+      : Infinity;
 
-    const monthStart = new Date(year, month, 1);
-    const monthEnd = new Date(year, month + 1, 0, 23, 59, 59);
+    const currentYM = year * 12 + month;
 
-    // Não começou ainda
-    if (start > monthEnd) return false;
-
-    // Já acabou
-    if (end && end < monthStart) return false;
-
-    return true;
+    return currentYM >= startYM && currentYM <= endYM;
   }
 
   function generateRecurringTransactionInstance(
@@ -150,9 +144,8 @@ export default function MonthlyControlScreen() {
     year: number
   ): Transaction {
 
-    // Use o mesmo dia da startDate (limite no último dia do mês)
     const day = Math.min(
-      rec.startDate.getDate(),
+      rec.date.getDate(),
       new Date(year, month + 1, 0).getDate()
     );
 
@@ -180,7 +173,10 @@ export default function MonthlyControlScreen() {
       .slice(); // copia para array JS
 
     // 2. Recorrentes
-    const recurrents = realm.objects<RecurringTransaction>('RecurringTransaction');
+    const recurrents = realm.objects<RecurringTransaction>('RecurringTransaction')
+      .filtered('startDate <= $0 AND (endDate == null OR endDate >= $1)', end, start);
+
+
     let monthRecurring = recurrents
       .filter((rec) => occursInMonth(rec, month, year))
       .map((rec) => generateRecurringTransactionInstance(rec, month, year));
@@ -195,7 +191,7 @@ export default function MonthlyControlScreen() {
 
     const accumulatedBalance = {
       _id: 'accumulatedBalance',
-      date: new Date(),
+      date: new Date(year, month, 1),
       description: "Saldo acumulado",
       type: "income",
       value: getAccumulatedBalance(currentYear, currentMonth)
@@ -234,12 +230,12 @@ export default function MonthlyControlScreen() {
         console.log('data', data)
         updateItem('RecurringTransaction', paramsRec.id, data)
 
-        //criar nova recorrencia iniciando hoje até a data escolhida.
+        //criar nova recorrencia 
         const newRecurrence = {
           ...recWithoutId,
           description: paramsRec.description,
           amount: parseFloat(paramsRec.amount),
-          startDate: currentDate,
+          startDate: new Date(currentYear, (currentMonth - 1), 1),
           endDate: paramsRec.endDate || null,
           parentId: paramsRec.id
         }
@@ -352,6 +348,7 @@ export default function MonthlyControlScreen() {
         <Text style={styles.sectionTitle}>Entradas</Text>
         <DataTable>
           <DataTable.Header>
+            <DataTable.Title style={{ maxWidth: 70 }}>Data</DataTable.Title>
             <DataTable.Title>Descrição</DataTable.Title>
             <DataTable.Title numeric>Valor</DataTable.Title>
           </DataTable.Header>
@@ -361,6 +358,7 @@ export default function MonthlyControlScreen() {
               onLongPress={() => selecTransaction(item)}
 
             >
+              <DataTable.Cell style={{ maxWidth: 70 }}>{dayjs(item.date).format('DD/MM')}</DataTable.Cell>
               <DataTable.Cell>{item.description}</DataTable.Cell>
               <DataTable.Cell numeric>R$ {item.value.toFixed(2)}</DataTable.Cell>
             </DataTable.Row>
@@ -371,11 +369,13 @@ export default function MonthlyControlScreen() {
         <Text style={styles.sectionTitle}>Saídas à vista</Text>
         <DataTable>
           <DataTable.Header>
+            <DataTable.Title style={{ maxWidth: 70 }} >Data</DataTable.Title>
             <DataTable.Title>Descrição</DataTable.Title>
             <DataTable.Title numeric>Valor</DataTable.Title>
           </DataTable.Header>
           {expenses.map((item: Transaction) => (
             <DataTable.Row key={item._id.toString()}>
+              <DataTable.Cell style={{ maxWidth: 70 }}>{dayjs(item.date).format('DD/MM')}</DataTable.Cell>
               <DataTable.Cell>{item.description}</DataTable.Cell>
               <DataTable.Cell numeric>R$ {item.value.toFixed(2)}</DataTable.Cell>
             </DataTable.Row>
