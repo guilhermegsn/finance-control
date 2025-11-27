@@ -7,11 +7,12 @@ import dayjs from "dayjs";
 import { realm } from "../database/realm";
 import { getAllItems, getItemById, insertItem, updateItem } from "../database/realmHelpers";
 import { RecurringTransaction } from "../interface/RecurringTransaction";
-import { useNavigation } from "@react-navigation/native";
 import { generateRandomId } from "../service/function";
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Override } from "../interface/Override";
 
 type DateType = 'startDate' | 'endDate' | null
+type EditTransaction = 'all' | 'onlyMonth' | 'unique' | null
 interface ParamsRec {
   id: string,
   description: string,
@@ -26,7 +27,7 @@ export default function MonthlyControlScreen() {
   const [transactions, setTransactions] = useState<any>([])
   const [selectedTransaction, setSelectedTransaction] = useState({})
   const [isEdit, setIsEdit] = useState(false)
-  const [isEditRecurrence, setIsEditRecurrence] = useState(false)
+  const [isEditRecurrence, setIsEditRecurrence] = useState<EditTransaction>(null)
   const [emptyParamsRec] = useState<ParamsRec>({
     id: '',
     description: '',
@@ -164,43 +165,70 @@ export default function MonthlyControlScreen() {
   }
 
   function getTransactionsByMonth(month: number, year: number) {
-    const start = new Date(year, month, 1);
-    const end = new Date(year, month + 1, 0, 23, 59, 59);
+    try {
+      const start = new Date(year, month, 1);
+      const end = new Date(year, month + 1, 0, 23, 59, 59);
 
-    // 1. Transações normais
-    const normal = realm.objects<Transaction>('Transaction')
-      .filtered('date >= $0 && date <= $1', start, end)
-      .slice(); // copia para array JS
+      // 1. Transações normais
+      const normal = realm.objects<Transaction>('Transaction')
+        .filtered('date >= $0 && date <= $1', start, end)
+        .slice(); // copia para array JS
 
-    // 2. Recorrentes
-    const recurrents = realm.objects<RecurringTransaction>('RecurringTransaction')
-      .filtered('startDate <= $0 AND (endDate == null OR endDate >= $1)', end, start);
+      // 2. Recorrentes
+      const recurrents = realm.objects<RecurringTransaction>('RecurringTransaction')
+        .filtered('startDate <= $0 AND (endDate == null OR endDate >= $1)', end, start);
 
+      // 3. Overrides do mês atual
+      const overrides = realm.objects<Override>('Override')
+        .filtered('year == $0 AND month == $1', year, month)
+        .slice();
 
-    let monthRecurring = recurrents
-      .filter((rec) => occursInMonth(rec, month, year))
-      .map((rec) => generateRecurringTransactionInstance(rec, month, year));
+      // Transforma Overrides em transações normais
+      const overrideTransactions = overrides.map((o) => ({
+        _id: o._id,
+        parentId: o.parentId,
+        date: new Date(year, month, 1),
+        description: o.description,
+        value: o.value,
+        type: o.type
+      }));
 
-    const itemsWithParentId = monthRecurring.filter((item: Transaction) => item.parentId);
+      let monthRecurring = recurrents
+        .filter((rec) => occursInMonth(rec, month, year))
+        .map((rec) => generateRecurringTransactionInstance(rec, month, year));
 
-    // Excluindo as transações que têm um parentId correspondente
-    monthRecurring = monthRecurring.filter((transaction: Transaction) => {
-      const hasParentId = itemsWithParentId.some((parent: Transaction) => transaction._id === parent.parentId);
-      return !hasParentId;
-    });
+      const itemsWithParentId = monthRecurring.filter((item: Transaction) => item.parentId);
 
-    const accumulatedBalance = {
-      _id: 'accumulatedBalance',
-      date: new Date(year, month, 1),
-      description: "Saldo acumulado",
-      type: "income",
-      value: getAccumulatedBalance(currentYear, currentMonth)
+      // Excluindo as transações que têm um parentId correspondente
+      monthRecurring = monthRecurring.filter((transaction: Transaction) => {
+        const hasParentId = itemsWithParentId.some((parent: Transaction) => transaction._id === parent.parentId);
+        return !hasParentId;
+      })
+
+      // Remove recorrentes que possuem override
+      const overriddenParentIds = new Set(
+        overrides.map((o) => o.parentId)
+      )
+
+      monthRecurring = monthRecurring.filter(
+        (rec) => !overriddenParentIds.has(rec._id)
+      );
+
+      const accumulatedBalance = {
+        _id: 'accumulatedBalance',
+        date: new Date(year, month, 1),
+        description: "Saldo acumulado",
+        type: "income",
+        value: getAccumulatedBalance(currentYear, currentMonth)
+      }
+
+      // 3. Combinar ambos
+      const all = [accumulatedBalance, ...normal, ...overrideTransactions, ...monthRecurring];
+
+      return all;
+    } catch (e) {
+      console.error('erro', e)
     }
-
-    // 3. Combinar ambos
-    const all = [accumulatedBalance, ...normal, ...monthRecurring];
-
-    return all;
   }
 
 
@@ -210,7 +238,6 @@ export default function MonthlyControlScreen() {
   }, [isOpenModal])
 
   const editRecurrence = (transaction: any) => {
-    setIsEditRecurrence(true)
     setParamsRec({
       id: transaction._id,
       description: transaction.description,
@@ -220,16 +247,16 @@ export default function MonthlyControlScreen() {
   }
 
   const save = () => {
-    if (isEditRecurrence) {
-      //obtendo dados completos da sequencia
-      const rec = getItemById('RecurringTransaction', paramsRec.id)
-      if (rec) {
-        const { _id, ...recWithoutId } = rec
-        const data = { ...recWithoutId, endDate: currentDate }
-        //fecho recorrencia atual com a data do mes.
-        console.log('data', data)
-        updateItem('RecurringTransaction', paramsRec.id, data)
 
+    const rec = getItemById('RecurringTransaction', paramsRec.id) as RecurringTransaction
+    if (rec) {
+      const { _id, ...recWithoutId } = rec
+
+
+
+      if (isEditRecurrence === 'all') {
+        const data = { ...recWithoutId, endDate: currentDate }
+        updateItem('RecurringTransaction', paramsRec.id, data)
         //criar nova recorrencia 
         const newRecurrence = {
           ...recWithoutId,
@@ -237,16 +264,25 @@ export default function MonthlyControlScreen() {
           amount: parseFloat(paramsRec.amount),
           startDate: new Date(currentYear, (currentMonth - 1), 1),
           endDate: paramsRec.endDate || null,
-          parentId: paramsRec.id
-        }
-
-        console.log(newRecurrence)
-
+          parentId: paramsRec.id,
+        } as RecurringTransaction
         insertItem('RecurringTransaction', newRecurrence)
+
+      } else if (isEditRecurrence === 'onlyMonth') {
+        const newOverride = {
+          _id: generateRandomId(),
+          parentId: paramsRec.id,
+          year: currentYear,
+          month: (currentMonth - 1),
+          description: paramsRec.description,
+          value: parseFloat(paramsRec.amount),
+          type: rec.type
+        }
+        insertItem('Override', newOverride)
       }
-      setIsEditRecurrence(false)
-      loadTransactions(currentDate)
     }
+    setIsEditRecurrence(null)
+    loadTransactions(currentDate)
   }
 
 
@@ -263,11 +299,17 @@ export default function MonthlyControlScreen() {
           },
           {
             text: 'Editar sequência',
-            onPress: () => editRecurrence(transaction),
+            onPress: () => {
+              editRecurrence(transaction)
+              setIsEditRecurrence('all')
+            },
           },
           {
             text: 'Editar somente este mês',
-            onPress: () => console.log('Somente neste mês'),
+            onPress: () => {
+              editRecurrence(transaction)
+              setIsEditRecurrence('onlyMonth')
+            },
           },
 
         ],
@@ -374,7 +416,9 @@ export default function MonthlyControlScreen() {
             <DataTable.Title numeric>Valor</DataTable.Title>
           </DataTable.Header>
           {expenses.map((item: Transaction) => (
-            <DataTable.Row key={item._id.toString()}>
+            <DataTable.Row
+              onLongPress={() => selecTransaction(item)}
+              key={item._id.toString()}>
               <DataTable.Cell style={{ maxWidth: 70 }}>{dayjs(item.date).format('DD/MM')}</DataTable.Cell>
               <DataTable.Cell>{item.description}</DataTable.Cell>
               <DataTable.Cell numeric>R$ {item.value.toFixed(2)}</DataTable.Cell>
@@ -435,8 +479,8 @@ export default function MonthlyControlScreen() {
 
       <Portal>
         <Modal
-          visible={isEditRecurrence}
-          onDismiss={() => setIsEditRecurrence(false)}
+          visible={isEditRecurrence !== null}
+          onDismiss={() => setIsEditRecurrence(null)}
           contentContainerStyle={{
             backgroundColor: 'white',
             margin: 20,
@@ -519,7 +563,7 @@ export default function MonthlyControlScreen() {
             <Button
               mode="outlined"
 
-              onPress={() => setIsEditRecurrence(false)}
+              onPress={() => setIsEditRecurrence(null)}
               style={{ marginBottom: 16, width: '48%' }}
             >
               Cancelar
