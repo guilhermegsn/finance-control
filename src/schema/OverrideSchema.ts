@@ -10,6 +10,7 @@ export const OverrideSchema: ObjectSchema = {
         month: 'int',
         description: 'string',
         value: 'double', 
-        type: 'string'
+        type: 'string',
+        date: 'date'
     },
 };

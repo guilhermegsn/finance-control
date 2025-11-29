@@ -43,10 +43,9 @@ export default function MonthlyControlScreen() {
 
   // Função que busca os dados do mês atual
   const loadTransactions = async (date: Date) => {
-    const month = date.getMonth()
+    const month = date.getMonth() + 1
     const year = date.getFullYear()
-
-    const data = getTransactionsByMonth(month, year)// usando seu método baseado no Realm
+    const data = getTransactionsByMonth(month, year)
     setTransactions(data)
   }
 
@@ -92,8 +91,23 @@ export default function MonthlyControlScreen() {
 
       // iterar linearmente em ym reduz comparações complexas
       for (let ym = startYM; ym <= upper; ym++) {
-        const y = Math.floor(ym / 12); // ano
-        const m1 = ym - y * 12; // mês 1-based
+        // const y = Math.floor(ym / 12); // ano
+        // const m1 = ym - y * 12; // mês 1-based
+
+        const y = Math.floor((ym - 1) / 12);
+        const m1 = ym - y * 12;
+
+        console.log('m1', m1)
+
+
+        const override = realm.objects<Override>('Override')
+          .filtered('parentId == $0 AND month == $1 AND year == $2', rt._id, m1, y)[0];
+        if (override) {
+          // soma valor substituto
+          if (override.type === 'income') total += override.value;
+          else total -= override.value;
+          continue; // pula recorrente normal
+        }
 
         // ocorreInMonth verifica a regra (dia, frequência, etc)
         if (occursInMonth(rt, m1, y)) {
@@ -166,8 +180,8 @@ export default function MonthlyControlScreen() {
 
   function getTransactionsByMonth(month: number, year: number) {
     try {
-      const start = new Date(year, month, 1);
-      const end = new Date(year, month + 1, 0, 23, 59, 59);
+      const start = new Date(year, month , 1);
+      const end = new Date(year, month , 0, 23, 59, 59);
 
       // 1. Transações normais
       const normal = realm.objects<Transaction>('Transaction')
@@ -273,10 +287,11 @@ export default function MonthlyControlScreen() {
           _id: generateRandomId(),
           parentId: paramsRec.id,
           year: currentYear,
-          month: (currentMonth - 1),
+          month: currentMonth,
           description: paramsRec.description,
           value: parseFloat(paramsRec.amount),
-          type: rec.type
+          type: rec.type,
+          date: rec.date
         }
         insertItem('Override', newOverride)
       }
@@ -462,12 +477,7 @@ export default function MonthlyControlScreen() {
           style={styles.fab}>
           <Icon source="plus" size={24} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => console.log(getAllItems('RecurringTransaction'))} style={styles.fab}>
-          <Icon source="plus" size={24} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => console.log(getAllItems('Balance'))} style={styles.fab}>
-          <Icon source="plus" size={24} color="#fff" />
-        </TouchableOpacity>
+        <Button onPress={() => console.log(transactions)}>transactions</Button>
       </View>
 
 

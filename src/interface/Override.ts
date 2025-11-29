@@ -6,5 +6,7 @@ export interface Override {
     month: number,
     description: string,
     value: number,
-    type: string
+    type: string,
+    date: Date,
+    deleted: boolean
 }

@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { MaterialIcons } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen';
 import MonthlyControlScreen from '../screens/MonthlyControlScreen';
+import SettingScreen from '../screens/SettingScreen';
 
 const Tab = createBottomTabNavigator()
 export default function BottomNavigator() {
@@ -33,7 +34,7 @@ export default function BottomNavigator() {
       />
       <Tab.Screen
         name='Config'
-        component={MonthlyControlScreen}
+        component={SettingScreen}
         options={{
           tabBarLabel: 'Configurações',
           title: 'Configurações',
