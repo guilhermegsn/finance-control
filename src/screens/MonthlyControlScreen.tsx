@@ -5,7 +5,7 @@ import { AddTransactionModal } from "../components/AddTransactionModal";
 import { Transaction } from "../interface/Transaction";
 import dayjs from "dayjs";
 import { realm } from "../database/realm";
-import { getAllItems, getItemById, insertItem, updateItem } from "../database/realmHelpers";
+import { getItemById, insertItem, updateItem } from "../database/realmHelpers";
 import { RecurringTransaction } from "../interface/RecurringTransaction";
 import { generateRandomId } from "../service/function";
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -43,7 +43,7 @@ export default function MonthlyControlScreen() {
 
   // Função que busca os dados do mês atual
   const loadTransactions = async (date: Date) => {
-    const month = date.getMonth() + 1
+    const month = date.getMonth()
     const year = date.getFullYear()
     const data = getTransactionsByMonth(month, year)
     setTransactions(data)
@@ -91,17 +91,13 @@ export default function MonthlyControlScreen() {
 
       // iterar linearmente em ym reduz comparações complexas
       for (let ym = startYM; ym <= upper; ym++) {
-        // const y = Math.floor(ym / 12); // ano
-        // const m1 = ym - y * 12; // mês 1-based
 
-        const y = Math.floor((ym - 1) / 12);
-        const m1 = ym - y * 12;
-
-        console.log('m1', m1)
+        const y = Math.floor(ym / 12);
+        const m0 = ym % 12;
 
 
         const override = realm.objects<Override>('Override')
-          .filtered('parentId == $0 AND month == $1 AND year == $2', rt._id, m1, y)[0];
+          .filtered('parentId == $0 AND month == $1 AND year == $2', rt._id, m0, y)[0];
         if (override) {
           // soma valor substituto
           if (override.type === 'income') total += override.value;
@@ -110,7 +106,7 @@ export default function MonthlyControlScreen() {
         }
 
         // ocorreInMonth verifica a regra (dia, frequência, etc)
-        if (occursInMonth(rt, m1, y)) {
+        if (occursInMonth(rt, m0, y)) {
           if (rt.type === 'income') total += rt.amount;
           else if (rt.type === 'expense' || rt.type === 'credit') total -= rt.amount;
         }
@@ -142,7 +138,7 @@ export default function MonthlyControlScreen() {
   };
 
 
-  function occursInMonth(rec: RecurringTransaction, month: number, year: number): boolean {
+  function occursInMonth(rec: RecurringTransaction, month: number, year: number): boolean { //Base 0 (Jan = 0, Fev = 1)
     const startYM = rec.startDate.getFullYear() * 12 + rec.startDate.getMonth();
     const endYM = rec.endDate
       ? rec.endDate.getFullYear() * 12 + rec.endDate.getMonth()
@@ -178,15 +174,26 @@ export default function MonthlyControlScreen() {
     } as Transaction;
   }
 
-  function getTransactionsByMonth(month: number, year: number) {
+  function getTransactionsByMonth(month: number, year: number) { // Base 0 (Jan = 0, Fev = 1)
     try {
-      const start = new Date(year, month , 1);
-      const end = new Date(year, month , 0, 23, 59, 59);
+
+      //Primeiro dia do mês 
+      const start = new Date(Date.UTC(year, month, 1))
+      start.setUTCHours(0, 0, 0, 0);
+
+      //Último dia do mês (com 23:59:59.999)
+      const end = new Date(Date.UTC(year, (month + 1), 0))
+      end.setUTCHours(23, 59, 59, 999);
+
+      console.log('start', start)
+      console.log('end', end)
 
       // 1. Transações normais
       const normal = realm.objects<Transaction>('Transaction')
         .filtered('date >= $0 && date <= $1', start, end)
-        .slice(); // copia para array JS
+        .slice();
+
+      console.log('normal', normal)
 
       // 2. Recorrentes
       const recurrents = realm.objects<RecurringTransaction>('RecurringTransaction')
@@ -194,7 +201,7 @@ export default function MonthlyControlScreen() {
 
       // 3. Overrides do mês atual
       const overrides = realm.objects<Override>('Override')
-        .filtered('year == $0 AND month == $1', year, month)
+        .filtered('year == $0 AND month == $1', year, (month + 1))
         .slice();
 
       // Transforma Overrides em transações normais
