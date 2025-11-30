@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, AlertButton } from "react-native";
 import { Button, Checkbox, DataTable, Icon, Modal, Portal, TextInput } from "react-native-paper";
 import { AddTransactionModal } from "../components/AddTransactionModal";
 import { Transaction } from "../interface/Transaction";
@@ -7,7 +7,7 @@ import dayjs from "dayjs";
 import { realm } from "../database/realm";
 import { getItemById, insertItem, updateItem } from "../database/realmHelpers";
 import { RecurringTransaction } from "../interface/RecurringTransaction";
-import { generateRandomId } from "../service/function";
+import { generateRandomId, getMonthName } from "../service/function";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Override } from "../interface/Override";
 
@@ -17,21 +17,30 @@ interface ParamsRec {
   id: string,
   description: string,
   amount: string,
+  date: Date,
   startDate?: Date | null,
   endDate?: Date | null
 }
 export default function MonthlyControlScreen() {
 
+  const now = new Date();
+  const todayMonth = now.getMonth()    // 0–11
+  const todayYear = now.getFullYear()
+
+
+
   const [currentDate, setCurrentDate] = useState(new Date())
   const [isOpenModal, setIsOpenModal] = useState(false)
   const [transactions, setTransactions] = useState<any>([])
-  const [selectedTransaction, setSelectedTransaction] = useState({})
+  const [selectedTransaction, setSelectedTransaction] = useState<any>({})
+  const [selectedRecTransaction, setSelectedRecTransaction] = useState<any>({})
   const [isEdit, setIsEdit] = useState(false)
   const [isEditRecurrence, setIsEditRecurrence] = useState<EditTransaction>(null)
   const [emptyParamsRec] = useState<ParamsRec>({
     id: '',
     description: '',
     amount: '',
+    date: new Date(),
     startDate: new Date(),
     endDate: new Date()
   })
@@ -49,7 +58,14 @@ export default function MonthlyControlScreen() {
     setTransactions(data)
   }
 
+  const isPast =
+    currentYear < todayYear ||
+    (currentYear === todayYear && (currentMonth - 1) < todayMonth)
 
+
+  // const disableEdit = (transaction: any) => {
+  //   if(isPast || transaction?.isRe)
+  // }
 
   function getAccumulatedBalance(
     targetYear: number,
@@ -92,12 +108,15 @@ export default function MonthlyControlScreen() {
       // iterar linearmente em ym reduz comparações complexas
       for (let ym = startYM; ym <= upper; ym++) {
 
-        const y = Math.floor(ym / 12);
-        const m0 = ym % 12;
+        // const y = Math.floor(ym / 12);
+        // const m0 = ym % 12;
 
+        const y = Math.floor((ym - 1) / 12);
+        const m1 = ((ym - 1) % 12) + 1; // mês em base 1 (1..12)
+        const m0 = m1 - 1; // mês em base 0 (0..11)
 
         const override = realm.objects<Override>('Override')
-          .filtered('parentId == $0 AND month == $1 AND year == $2', rt._id, m0, y)[0];
+          .filtered('parentId == $0 AND month == $1 AND year == $2', rt._id, (m0 + 1), y)[0]
         if (override) {
           // soma valor substituto
           if (override.type === 'income') total += override.value;
@@ -258,10 +277,16 @@ export default function MonthlyControlScreen() {
       loadTransactions(currentDate)
   }, [isOpenModal])
 
-  const editRecurrence = (transaction: any) => {
+  const editRecurrence = async (transaction: any) => {
+    const data = getItemById('RecurringTransaction', transaction._id)
+    if (data) {
+      setSelectedRecTransaction(data)
+    }
+
     setParamsRec({
       id: transaction._id,
       description: transaction.description,
+      date: transaction.date,
       amount: transaction.value.toString(),
       endDate: transaction.end
     })
@@ -307,38 +332,43 @@ export default function MonthlyControlScreen() {
     loadTransactions(currentDate)
   }
 
-
+  //console.log('ssssss', (selectedTransaction), currentMonth)
   const selecTransaction = (transaction: any) => {
     if (transaction?.isRecurrence) {
-      Alert.alert(
-        'Editar Transação recorrente',
-        'Como deseja editar essa transação?',
-        [
-          {
-            text: 'Cancelar',
-            onPress: () => console.log('Cancelado'),
-            style: 'cancel',
-          },
-          {
-            text: 'Editar sequência',
-            onPress: () => {
-              editRecurrence(transaction)
-              setIsEditRecurrence('all')
-            },
-          },
-          {
-            text: 'Editar somente este mês',
-            onPress: () => {
-              editRecurrence(transaction)
-              setIsEditRecurrence('onlyMonth')
-            },
-          },
 
-        ],
-        { cancelable: false }
-      )
+
+      const buttons: AlertButton[] = [
+        {
+          text: 'Cancelar',
+          onPress: () => {
+            setParamsRec(emptyParamsRec)
+          },
+          style: 'cancel',
+        },
+        {
+          text: 'Editar somente este mês',
+          onPress: () => {
+            editRecurrence(transaction)
+            setIsEditRecurrence('onlyMonth')
+          },
+        },
+      ]
+      if (!isPast) {
+        buttons.push({
+          text: 'Editar sequência',
+          onPress: () => {
+            editRecurrence(transaction)
+            setIsEditRecurrence('all')
+          },
+        })
+      }
+
+
+
+      Alert.alert('Editar Transação recorrente', 'Como deseja editar?', buttons)
+
     } else {
-      edit(transaction)
+      edit(transaction);
     }
 
   }
@@ -354,6 +384,10 @@ export default function MonthlyControlScreen() {
   const add = () => {
     // navigation.navigate('AddTransaction')
     setIsOpenModal(true)
+  }
+
+  const del = (transaction: any) => {
+    console.log(transaction)
   }
 
   const handleDateChange = (event: any, selectedDate: Date | undefined) => {
@@ -429,6 +463,13 @@ export default function MonthlyControlScreen() {
           ))}
         </DataTable>
 
+        <View style={{ alignItems: 'flex-end' }}>
+          <TouchableOpacity
+            onPress={add}
+            style={styles.addButton}>
+            <Icon source="plus" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
         {/* Saídas */}
         <Text style={styles.sectionTitle}>Saídas à vista</Text>
         <DataTable>
@@ -447,6 +488,13 @@ export default function MonthlyControlScreen() {
             </DataTable.Row>
           ))}
         </DataTable>
+        <View style={{ alignItems: 'flex-end' }}>
+          <TouchableOpacity
+            onPress={add}
+            style={styles.addButton}>
+            <Icon source="plus" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
 
         {/* Cartões */}
         {/* {creditCards.map((card) => (
@@ -513,7 +561,11 @@ export default function MonthlyControlScreen() {
               onChange={handleDateChange}  // Passa o evento e a data selecionada para a função
             />
           )}
-          <Text style={{ marginBottom: 10, fontSize: 20 }}>Editando toda a sequência</Text>
+          <Text style={{ marginBottom: 10, fontSize: 20 }}>
+            {isEditRecurrence === 'onlyMonth' ?
+              'Editando somente este mês' :
+              `Editando sequência\n(${getMonthName(currentMonth)}/${currentYear} em diante)`}
+          </Text>
           <TextInput
             label="Descrição"
             value={paramsRec.description}
@@ -543,7 +595,7 @@ export default function MonthlyControlScreen() {
 
 
 
-          {paramsRec.endDate &&
+          {paramsRec.endDate && isEditRecurrence !== 'onlyMonth' &&
             <Button
               mode="outlined"
               onPress={() => setActivePicker('endDate')}
@@ -552,28 +604,35 @@ export default function MonthlyControlScreen() {
               Fim: {paramsRec?.endDate?.toLocaleDateString('pt-BR')}
             </Button>
           }
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-            <Checkbox
-              status={!paramsRec.endDate ? 'checked' : 'unchecked'}
-              onPress={() => {
-                !paramsRec.endDate ?
-                  setParamsRec(prev => ({ ...prev, endDate: new Date() })) :
-                  setParamsRec(prev => ({ ...prev, endDate: null }))
-              }}
-            />
-            <Text>Sem data fim</Text>
-          </View>
+
+          {isEditRecurrence !== 'onlyMonth' &&
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+              <Checkbox
+                status={!paramsRec.endDate ? 'checked' : 'unchecked'}
+                onPress={() => {
+                  !paramsRec.endDate ?
+                    setParamsRec(prev => ({ ...prev, endDate: new Date() })) :
+                    setParamsRec(prev => ({ ...prev, endDate: null }))
+                }}
+              />
+              <Text>Sem data fim</Text>
+            </View>
+          }
 
 
-
-          <Button
-            mode="contained"
-            onPress={() => setActivePicker('endDate')}
-            buttonColor="#A50C36"
-            style={{ marginBottom: 16 }}
-          >
-            Excluir
-          </Button>
+          {isEditRecurrence === 'onlyMonth' ||
+            ((selectedTransaction?.date?.getMonth() + 1) === currentMonth) ||
+            (selectedRecTransaction?.date?.getMonth() + 1) === currentMonth &&
+            <Button
+              mode="contained"
+              onPress={() => del(selectedTransaction)}
+              buttonColor="#A50C36"
+              style={{ marginBottom: 16 }}
+            >
+              Excluir
+            </Button>
+          }
 
 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -596,6 +655,9 @@ export default function MonthlyControlScreen() {
 
           </View>
 
+          <Button onPress={() => console.log(paramsRec)}>ParamsRec</Button>
+          <Button onPress={() => console.log(selectedRecTransaction)}>selectedRecTransaction</Button>
+          <Button onPress={() => console.log(selectedTransaction)}>selectedTransaction</Button>
         </Modal>
       </Portal>
 
@@ -658,5 +720,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     elevation: 5,
+  },
+  addButton: {
+    backgroundColor: "#007bff",
+    borderRadius: 50,
+    width: 28,
+    height: 28,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 5,
+    margin: 5
   },
 });
