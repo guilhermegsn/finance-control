@@ -83,7 +83,7 @@ export default function MonthlyControlScreen() {
       .forEach((b: any) => (total += b.partialBalance));
 
     // ----------------------------
-    // 2. Somar transações recorrentes (virtual)
+    // 2. Somar transações recorrentes 
     // ----------------------------
     const recurring = realm.objects<RecurringTransaction>('RecurringTransaction')
 
@@ -93,16 +93,15 @@ export default function MonthlyControlScreen() {
 
     recurring.forEach((rt: RecurringTransaction) => {
       const start = new Date(rt.startDate);
-      const startYM = start.getFullYear() * 12 + (start.getMonth() + 1); // 1-based month
+      const startYM = start.getFullYear() * 12 + (start.getMonth())
 
       // se a recorrência começa depois do limite, pula
       if (startYM > targetLimitYM) return;
 
       const end = rt.endDate ? new Date(rt.endDate) : null;
-      const endYM = end ? end.getFullYear() * 12 + (end.getMonth() + 1) : Infinity;
+      const endYM = end ? end.getFullYear() * 12 + (end.getMonth()) : Infinity;
 
       // itera de startYM até o mês anterior ao target (inclusive), respeitando endYM
-      // isso preserva exatamente a semântica da sua função original
       const upper = Math.min(targetLimitYM, endYM);
 
       // iterar linearmente em ym reduz comparações complexas
@@ -112,16 +111,19 @@ export default function MonthlyControlScreen() {
         // const m0 = ym % 12;
 
         const y = Math.floor((ym - 1) / 12);
-        const m1 = ((ym - 1) % 12) + 1; // mês em base 1 (1..12)
-        const m0 = m1 - 1; // mês em base 0 (0..11)
+        const m1 = ym - y * 12;  // 1 a 12
+        const m0 = m1 - 1;       // 0 a 11
+
 
         const override = realm.objects<Override>('Override')
-          .filtered('parentId == $0 AND month == $1 AND year == $2', rt._id, (m0 + 1), y)[0]
+          .filtered('parentId == $0 AND month == $1 AND year == $2', rt._id, m1, y)[0]
         if (override) {
           // soma valor substituto
           if (override.type === 'income') total += override.value;
           else total -= override.value;
           continue; // pula recorrente normal
+        } else {
+          console.log('sem override!')
         }
 
         // ocorreInMonth verifica a regra (dia, frequência, etc)
