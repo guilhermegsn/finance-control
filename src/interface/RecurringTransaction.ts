@@ -5,7 +5,7 @@ export interface RecurringTransaction {
     _id: string;
     type: Type;
     description: string;
-    amount: number;
+    value: number;
     startDate: Date;
     recurrence: Recurrence;
     installments: number | null; // só se recurrence = 'installments'

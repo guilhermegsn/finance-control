@@ -7,7 +7,7 @@ export const RecurringTransactionSchema: ObjectSchema = {
     _id: 'string',
     type:  'string',
     description: 'string',
-    amount: 'double',
+    value: 'double',
     startDate: 'date',
     recurrence: 'string',
     installments: 'int?',

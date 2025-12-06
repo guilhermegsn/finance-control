@@ -1,54 +1,57 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, AlertButton } from "react-native";
-import { Button, Checkbox, DataTable, Icon, Modal, Portal, TextInput } from "react-native-paper";
-import { AddTransactionModal } from "../components/AddTransactionModal";
-import { Transaction } from "../interface/Transaction";
+import { Button, Checkbox, DataTable, Divider, Icon, Modal, Portal, TextInput } from "react-native-paper";
+import { Transaction, TransactionType } from "../interface/Transaction";
 import dayjs from "dayjs";
 import { realm } from "../database/realm";
 import { getItemById, insertItem, updateItem } from "../database/realmHelpers";
-import { RecurringTransaction } from "../interface/RecurringTransaction";
+import { RecurringTransaction, Type } from "../interface/RecurringTransaction";
 import { generateRandomId, getMonthName } from "../service/function";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Override } from "../interface/Override";
+import { WinButton } from "../components/WinButton";
+import { Balance } from "../interface/Balance";
 
-type DateType = 'startDate' | 'endDate' | null
-type EditTransaction = 'all' | 'onlyMonth' | 'unique' | null
-interface ParamsRec {
+type DateType = 'startDate' | 'endDate' | 'date' | null
+type Operation = 'add' | 'editAll' | 'editOnly' | null
+interface Params {
   id: string,
   description: string,
-  amount: string,
+  value: string,
   date: Date,
   startDate?: Date | null,
-  endDate?: Date | null
+  endDate?: Date | null,
+  type: TransactionType | null,
+  isRecurrence: boolean
 }
 export default function MonthlyControlScreen() {
 
   const now = new Date();
   const todayMonth = now.getMonth()    // 0–11
   const todayYear = now.getFullYear()
-
-
-
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [isOpenModal, setIsOpenModal] = useState(false)
-  const [transactions, setTransactions] = useState<any>([])
-  const [selectedTransaction, setSelectedTransaction] = useState<any>({})
-  const [selectedRecTransaction, setSelectedRecTransaction] = useState<any>({})
-  const [isEdit, setIsEdit] = useState(false)
-  const [isEditRecurrence, setIsEditRecurrence] = useState<EditTransaction>(null)
-  const [emptyParamsRec] = useState<ParamsRec>({
-    id: '',
-    description: '',
-    amount: '',
-    date: new Date(),
-    startDate: new Date(),
-    endDate: new Date()
-  })
-  const [paramsRec, setParamsRec] = useState(emptyParamsRec)
-  const [activePicker, setActivePicker] = useState<DateType>(null)
 
   const currentMonth = currentDate.getMonth() + 1
   const currentYear = currentDate.getFullYear()
+
+
+  const [transactions, setTransactions] = useState<any>([])
+  const [selectedTransaction, setSelectedTransaction] = useState<any>({})
+  const [operation, setOperation] = useState<Operation>(null)
+  const [emptyParams] = useState<Params>({
+    id: '',
+    description: '',
+    value: '',
+    date: new Date(),
+    startDate: null,
+    endDate: null,
+    type: null,
+    isRecurrence: false,
+  })
+  const [params, setParams] = useState(emptyParams)
+  const [activePicker, setActivePicker] = useState<DateType>(null)
+
+
 
   // Função que busca os dados do mês atual
   const loadTransactions = async (date: Date) => {
@@ -128,8 +131,8 @@ export default function MonthlyControlScreen() {
 
         // ocorreInMonth verifica a regra (dia, frequência, etc)
         if (occursInMonth(rt, m0, y)) {
-          if (rt.type === 'income') total += rt.amount;
-          else if (rt.type === 'expense' || rt.type === 'credit') total -= rt.amount;
+          if (rt.type === 'income') total += rt.value;
+          else if (rt.type === 'expense' || rt.type === 'credit') total -= rt.value;
         }
       }
     });
@@ -186,7 +189,7 @@ export default function MonthlyControlScreen() {
     return {
       _id: rec._id,
       description: rec.description,
-      value: rec.amount,
+      value: rec.value,
       type: rec.type,
       date,
       end: rec.endDate,
@@ -273,68 +276,149 @@ export default function MonthlyControlScreen() {
     }
   }
 
+  const updateBalanceAfterTransaction = (transaction: Transaction, previousTransaction?: Transaction) => {
+    if (!transaction.date) return
+    const monthKey = `${transaction.date.getFullYear()}-${String(transaction.date.getMonth() + 1).padStart(2, '0')}`;
 
-  useEffect(() => {
-    if (!isOpenModal)
-      loadTransactions(currentDate)
-  }, [isOpenModal])
+    realm.write(() => {
+      let balance = realm.objectForPrimaryKey('Balance', monthKey) as Balance
 
-  const editRecurrence = async (transaction: any) => {
-    const data = getItemById('RecurringTransaction', transaction._id)
-    if (data) {
-      setSelectedRecTransaction(data)
+      if (!balance) {
+        if (!transaction.date) return
+        balance = realm.create('Balance', {
+          id: monthKey,
+          month: transaction.date.getMonth() + 1,
+          year: transaction.date.getFullYear(),
+          income: 0,
+          expense: 0,
+          credit: 0,
+          partialBalance: 0,
+        });
+      }
+
+
+
+      if (transaction.type === 'income') {
+        if (previousTransaction) {
+          balance.income -= previousTransaction.value;
+          balance.income += transaction.value
+        } else {
+          balance.income += transaction.value;
+        }
+      }
+      if (transaction.type === 'expense') balance.expense += transaction.value;
+      if (transaction.type === 'credit') balance.credit += transaction.value;
+
+      balance.partialBalance = balance.income - balance.expense - balance.credit;
+    });
+  }
+
+
+  const edit = async (transaction: any) => {
+
+    let schema = 'Transaction'
+
+    if (transaction.isRecurrence) {
+      schema = 'RecurringTransaction'
     }
 
-    setParamsRec({
-      id: transaction._id,
-      description: transaction.description,
-      date: transaction.date,
-      amount: transaction.value.toString(),
-      endDate: transaction.end
-    })
+    const data = getItemById(schema, transaction._id)
+    if (data) {
+      setSelectedTransaction(data)
+      setParams({
+        id: data._id,
+        description: data.description,
+        date: data.date,
+        value: data.value.toString(),
+        startDate: data.startDate,
+        endDate: data.endDate || null,
+        type: data.type,
+        isRecurrence: true
+      })
+    }
   }
 
   const save = () => {
+    console.log('salvando..')
+    try {
+      if (operation === 'add') {
+        if (params.isRecurrence) {
+          const newRecurrencyTransaction = {
+            type: params.type,
+            description: params.description,
+            value: parseFloat(params.value),
+            date: new Date(params.date),
+            //startDate: new Date(params.date.getFullYear(), params.date.getMonth(), 1),
+            startDate: params.startDate,
+            recurrence: 'monthly',
+            endDate: params.endDate
+          } as RecurringTransaction
 
-    const rec = getItemById('RecurringTransaction', paramsRec.id) as RecurringTransaction
-    if (rec) {
-      const { _id, ...recWithoutId } = rec
+          console.log('neww', newRecurrencyTransaction)
 
-
-
-      if (isEditRecurrence === 'all') {
-        const data = { ...recWithoutId, endDate: currentDate }
-        updateItem('RecurringTransaction', paramsRec.id, data)
-        //criar nova recorrencia 
-        const newRecurrence = {
-          ...recWithoutId,
-          description: paramsRec.description,
-          amount: parseFloat(paramsRec.amount),
-          startDate: new Date(currentYear, (currentMonth - 1), 1),
-          endDate: paramsRec.endDate || null,
-          parentId: paramsRec.id,
-        } as RecurringTransaction
-        insertItem('RecurringTransaction', newRecurrence)
-
-      } else if (isEditRecurrence === 'onlyMonth') {
-        const newOverride = {
-          _id: generateRandomId(),
-          parentId: paramsRec.id,
-          year: currentYear,
-          month: currentMonth,
-          description: paramsRec.description,
-          value: parseFloat(paramsRec.amount),
-          type: rec.type,
-          date: rec.date
+          insertItem('RecurringTransaction', newRecurrencyTransaction)
+        } else {
+          const newTransaction = {
+            description: params.description,
+            value: parseFloat(params.value),
+            type: params.type,
+            date: params.date,
+          } as Transaction
+          insertItem('Transaction', newTransaction)
+          updateBalanceAfterTransaction(newTransaction)
         }
-        insertItem('Override', newOverride)
+
+      } else {
+        // Salvando edição - Transações recorrentes
+        const rec = getItemById('RecurringTransaction', params.id) as RecurringTransaction
+        if (rec) {
+          const { _id, ...recWithoutId } = rec
+          if (operation === 'editAll') {
+            const data = { ...recWithoutId, endDate: currentDate }
+            updateItem('RecurringTransaction', params.id, data)
+            //criar nova recorrencia 
+            const newRecurrence = {
+              ...recWithoutId,
+              description: params.description,
+              value: parseFloat(params.value),
+              startDate: new Date(currentYear, (currentMonth - 1), 1),
+              endDate: params.endDate || null,
+              parentId: params.id,
+            } as RecurringTransaction
+            insertItem('RecurringTransaction', newRecurrence)
+
+          } else if (operation === 'editOnly') {
+            const newOverride = {
+              _id: generateRandomId(),
+              parentId: params.id,
+              year: currentYear,
+              month: currentMonth,
+              description: params.description,
+              value: parseFloat(params.value),
+              type: rec.type,
+              date: rec.date
+            }
+            insertItem('Override', newOverride)
+          }
+        }
+        setOperation(null)
+        loadTransactions(currentDate)
+
       }
+      setOperation(null)
+      setParams(emptyParams)
+      loadTransactions(currentDate)
+    } catch (e) {
+      console.error(e)
     }
-    setIsEditRecurrence(null)
-    loadTransactions(currentDate)
+
   }
 
-  //console.log('ssssss', (selectedTransaction), currentMonth)
+
+
+
+
+
   const selecTransaction = (transaction: any) => {
     if (transaction?.isRecurrence) {
 
@@ -343,15 +427,15 @@ export default function MonthlyControlScreen() {
         {
           text: 'Cancelar',
           onPress: () => {
-            setParamsRec(emptyParamsRec)
+            setParams(emptyParams)
           },
           style: 'cancel',
         },
         {
           text: 'Editar somente este mês',
           onPress: () => {
-            editRecurrence(transaction)
-            setIsEditRecurrence('onlyMonth')
+            edit(transaction)
+            setOperation('editOnly')
           },
         },
       ]
@@ -359,8 +443,8 @@ export default function MonthlyControlScreen() {
         buttons.push({
           text: 'Editar sequência',
           onPress: () => {
-            editRecurrence(transaction)
-            setIsEditRecurrence('all')
+            edit(transaction)
+            setOperation('editAll')
           },
         })
       }
@@ -375,34 +459,43 @@ export default function MonthlyControlScreen() {
 
   }
 
-  const edit = (transaction: any) => {
-    setIsEdit(true)
-    const data = getItemById('Transaction', transaction._id)
-    if (data) {
-      setSelectedTransaction(data)
+  const add = () => {
+    if ((currentYear !== todayYear) || ((currentMonth - 1) !== todayMonth)) {
+      setActivePicker('date')
     }
+
+    setOperation('add')
   }
 
-  const add = () => {
-    // navigation.navigate('AddTransaction')
-    setIsOpenModal(true)
-  }
+
 
   const del = (transaction: any) => {
     console.log(transaction)
   }
 
   const handleDateChange = (event: any, selectedDate: Date | undefined) => {
-    const currentDate = selectedDate || paramsRec[activePicker!];  // Use o valor anterior se não tiver seleção
-    setParamsRec(prevData => ({
+    const currentDate = selectedDate || params[activePicker!];  // Use o valor anterior se não tiver seleção
+    setParams(prevData => ({
       ...prevData,
       [activePicker!]: currentDate,  // Atualiza a data correspondente ao activePicker
-      noEndDate: prevData.endDate ? true : false
     }));
 
     // Fecha o picker depois da seleção
     setActivePicker(null);
   };
+
+
+  const selectType = (type: Type) => {
+    setParams(p => ({
+      ...p,
+      type: type,
+      date: (currentYear !== todayYear) || (currentMonth - 1 !== todayMonth) ?
+        new Date(currentYear, (currentMonth - 1), 1) : new Date()
+    }))
+    // if ((currentYear !== todayYear) || ((currentMonth - 1) !== todayMonth)) {
+    //   setActivePicker('date')
+    // }
+  }
 
   //ErdV/?6N%Mibd36
 
@@ -415,18 +508,6 @@ export default function MonthlyControlScreen() {
 
   return (
     <View style={styles.container}>
-
-
-      <AddTransactionModal
-        visible={isOpenModal || isEdit}
-        data={selectedTransaction!}
-        onDismiss={() => {
-          setIsOpenModal(false)
-          setIsEdit(false)
-        }}
-        isEdit={isEdit}
-      />
-
 
       {/* HEADER */}
       <View style={styles.header}>
@@ -465,13 +546,6 @@ export default function MonthlyControlScreen() {
           ))}
         </DataTable>
 
-        <View style={{ alignItems: 'flex-end' }}>
-          <TouchableOpacity
-            onPress={add}
-            style={styles.addButton}>
-            <Icon source="plus" size={24} color="#fff" />
-          </TouchableOpacity>
-        </View>
         {/* Saídas */}
         <Text style={styles.sectionTitle}>Saídas à vista</Text>
         <DataTable>
@@ -490,13 +564,6 @@ export default function MonthlyControlScreen() {
             </DataTable.Row>
           ))}
         </DataTable>
-        <View style={{ alignItems: 'flex-end' }}>
-          <TouchableOpacity
-            onPress={add}
-            style={styles.addButton}>
-            <Icon source="plus" size={24} color="#fff" />
-          </TouchableOpacity>
-        </View>
 
         {/* Cartões */}
         {/* {creditCards.map((card) => (
@@ -534,7 +601,7 @@ export default function MonthlyControlScreen() {
           style={styles.fab}>
           <Icon source="plus" size={24} color="#fff" />
         </TouchableOpacity>
-        <Button onPress={() => console.log(transactions)}>transactions</Button>
+        {/* <Button onPress={() => console.log(transactions)}>transactions</Button> */}
       </View>
 
 
@@ -546,8 +613,8 @@ export default function MonthlyControlScreen() {
 
       <Portal>
         <Modal
-          visible={isEditRecurrence !== null}
-          onDismiss={() => setIsEditRecurrence(null)}
+          visible={operation !== null}
+          onDismiss={() => setOperation(null)}
           contentContainerStyle={{
             backgroundColor: 'white',
             margin: 20,
@@ -555,111 +622,248 @@ export default function MonthlyControlScreen() {
             padding: 16,
           }}
         >
-          {activePicker && (
-            <DateTimePicker
-              value={paramsRec[activePicker] || new Date()}  // Mostra a data correspondente (startDate ou endDate)
-              mode="date"  // Pode ser 'date', 'time', ou 'datetime'
-              display="default"
-              onChange={handleDateChange}  // Passa o evento e a data selecionada para a função
-            />
-          )}
-          <Text style={{ marginBottom: 10, fontSize: 20 }}>
-            {isEditRecurrence === 'onlyMonth' ?
-              'Editando somente este mês' :
-              `Editando sequência\n(${getMonthName(currentMonth)}/${currentYear} em diante)`}
-          </Text>
-          <TextInput
-            label="Descrição"
-            value={paramsRec.description}
-            onChangeText={(text) => setParamsRec(prev => ({ ...prev, description: text }))}
-            keyboardType="numeric"
-            mode="outlined"
-            style={{ marginBottom: 16 }}
-          />
-          <TextInput
-            label="Valor"
-            value={paramsRec.amount}
-            onChangeText={(text) => setParamsRec(prev => ({ ...prev, amount: text }))}
-            keyboardType="numeric"
-            mode="outlined"
-            style={{ marginBottom: 16 }}
-          />
 
-
-          {/* <Button
-            mode="outlined"
-            onPress={() => setActivePicker('startDate')}
-            style={{ marginBottom: 16 }}
-          >
-            Início: {paramsRec?.startDate?.toLocaleDateString('pt-BR')}
-          </Button>
- */}
-
-
-
-          {paramsRec.endDate && isEditRecurrence !== 'onlyMonth' &&
-            <Button
-              mode="outlined"
-              onPress={() => setActivePicker('endDate')}
-              style={{ marginBottom: 16 }}
-            >
-              Fim: {paramsRec?.endDate?.toLocaleDateString('pt-BR')}
-            </Button>
-          }
-
-          {isEditRecurrence !== 'onlyMonth' &&
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-              <Checkbox
-                status={!paramsRec.endDate ? 'checked' : 'unchecked'}
-                onPress={() => {
-                  !paramsRec.endDate ?
-                    setParamsRec(prev => ({ ...prev, endDate: new Date() })) :
-                    setParamsRec(prev => ({ ...prev, endDate: null }))
-                }}
+          {params.type === null ?
+            <View style={{ gap: 12 }}>
+              <WinButton
+                label="Receita"
+                color="#2E9E57"
+                selected={params.type === 'income'}
+                onPress={() => selectType('income')}
               />
-              <Text>Sem data fim</Text>
+
+              <WinButton
+                label="Despesa (à vista)"
+                color="#CC4A4A"
+                selected={params.type === 'expense'}
+                onPress={() => selectType('expense')}
+              />
+
+              <WinButton
+                label="Despesa (Crédito)"
+                color="#2F80ED"
+                selected={params.type === 'credit'}
+                onPress={() => selectType('credit')}
+              />
+
+            </View>
+
+            :
+
+            <View>
+              {activePicker && (
+                <DateTimePicker
+                  value={params[activePicker] || new Date(currentYear, currentMonth, 1)}
+                  mode="date"  // Pode ser 'date', 'time', ou 'datetime'
+                  display="default"
+                  onChange={handleDateChange}  // Passa o evento e a data selecionada para a função
+
+
+
+
+                  minimumDate={operation === 'add' ? new Date(Date.UTC(currentYear, currentMonth - 1, 1, 23, 59, 59)) : undefined}
+
+                  maximumDate={operation === 'add' &&
+                    activePicker === 'startDate' || activePicker === 'date' ?
+                    new Date(Date.UTC(currentYear, currentMonth, 0, 23, 59, 59)) : undefined}
+                />
+              )}
+              {/* <View>
+                <Text style={{ fontSize: 20 }}>
+                  {operation === 'add' ? 'Adicionando' : 'editOnly' ?
+                    'Editando somente este mês' :
+                    `Editando sequência\n(${getMonthName(currentMonth)}/${currentYear} em diante)`}
+                </Text>
+                <Text style={{ marginBottom: 10, fontSize: 20 }}>
+                  {params.type === 'income' ? 'Receita' : params.type === 'expense' ?
+                    'Saída à vista' : 'Crédito'}
+                </Text>
+              </View> */}
+              <View>
+                <Text style={{ fontSize: 20 }}>
+                  {operation === 'add'
+                    ? 'Adicionando nova transação'
+                    : (operation === 'editOnly'
+                      ? 'Editando este mês apenas'
+                      : `Editando sequência a partir de ${getMonthName(currentMonth)}/${currentYear}`)}
+                </Text>
+
+              </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
+                <View style={{ width: '48%' }}>
+                  <Text style={{ marginLeft: 5 }}>Transação</Text>
+                  <Button
+                    mode="contained-tonal"
+                    onPress={() => setActivePicker('date')}
+                    style={{ marginBottom: 16 }}
+                  >
+                    {params.type === 'income'
+                      ? 'Receita'
+                      : (params.type === 'expense'
+                        ? 'Despesa à vista'
+                        : 'Crédito')}
+                  </Button>
+
+                </View>
+                <View style={{ width: '48%' }}>
+                  <Text style={{ marginLeft: 5 }}>Data</Text>
+                  <Button
+                    mode="contained-tonal"
+                    onPress={() => setActivePicker('date')}
+                    style={{ marginBottom: 16 }}
+                  >
+                    {params?.date?.toLocaleDateString('pt-BR')}
+                  </Button>
+                </View>
+
+              </View>
+              <TextInput
+                label="Descrição"
+                value={params.description}
+                onChangeText={(text) => setParams(prev => ({ ...prev, description: text }))}
+                keyboardType="default"
+                mode="outlined"
+                style={{ marginBottom: 16 }}
+              />
+              <TextInput
+                label="Valor"
+                value={params.value}
+                onChangeText={(text) => setParams(prev => ({ ...prev, value: text }))}
+                keyboardType="numeric"
+                mode="outlined"
+                style={{ marginBottom: 16 }}
+              />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Checkbox
+                  status={params.isRecurrence ? 'checked' : 'unchecked'}
+                  onPress={() => {
+                    setParams(prevParams => ({
+                      ...prevParams,
+                      isRecurrence: !params.isRecurrence,
+                      startDate: params.isRecurrence ? null : new Date(params.date),
+                      endDate: params.isRecurrence ? null : prevParams.endDate,
+                    }))
+
+                  }}
+                />
+                <Text>Transação recorrente</Text>
+              </View>
+
+              {params.isRecurrence &&
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 5 }}>
+                  <View style={{ width: '48%' }}>
+                    <Text style={{ marginLeft: 5 }}>Início</Text>
+                    <Button
+                      disabled={operation !== 'add'}
+                      mode="contained-tonal"
+                      onPress={() => setActivePicker('startDate')}
+                    >
+                      {params?.startDate?.toLocaleDateString('pt-BR')}
+                    </Button>
+
+                  </View>
+
+                  <View style={{ width: '48%' }}>
+                    <Text style={{ marginLeft: 5 }}>Fim</Text>
+                    <Button
+                      mode="contained-tonal"
+                      onPress={() => setActivePicker('endDate')}
+                    >
+                      {params?.endDate?.toLocaleDateString('pt-BR') || 'Sem fim'}
+                    </Button>
+                  </View>
+                </View>
+              }
+
+              {params.isRecurrence && params.endDate &&
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Checkbox
+                    status={params.endDate === null ? 'checked' : 'unchecked'}
+                    onPress={() => {
+                      setParams(prevParams => ({
+                        ...prevParams,
+                        endDate: params.endDate ? null : new Date(currentYear, currentMonth, new Date().getDay())
+                      }))
+                    }}
+                  />
+                  <Text>Sem data fim</Text>
+                </View>
+              }
+
+
+
+
+              {operation === 'editOnly' || operation === 'editAll' &&
+                ((selectedTransaction?.date?.getMonth() + 1) === currentMonth) &&
+
+                <Button
+                  mode="contained"
+                  onPress={() => del(selectedTransaction)}
+                  buttonColor="#A50C36"
+                  style={{ marginBottom: 16 }}
+                >
+                  Excluir
+                </Button>
+              }
+
+
+
+
+
+
+
+
+              {/* <Button onPress={() => console.log(params)}>Params</Button>
+              <Button onPress={() => console.log(selectedTransaction)}>selectedTransaction</Button> */}
             </View>
           }
 
+          <Divider style={{ marginTop: 20 }} />
 
-          {isEditRecurrence === 'onlyMonth' ||
-            ((selectedTransaction?.date?.getMonth() + 1) === currentMonth) ||
-            (selectedRecTransaction?.date?.getMonth() + 1) === currentMonth &&
-            <Button
-              mode="contained"
-              onPress={() => del(selectedTransaction)}
-              buttonColor="#A50C36"
-              style={{ marginBottom: 16 }}
-            >
-              Excluir
-            </Button>
-          }
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 }}>
+            {/* Botão Cancelar */}
+            <View style={{ width: params.type ? '48%' : '100%' }}>
+              <Button
+                mode="outlined"
+                onPress={() => {
+                  setOperation(null);
+                  setTimeout(() => {
+                    setParams(emptyParams);
+                  }, 200);
+                }}
+              >
+                Cancelar
+              </Button>
+            </View>
 
-
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Button
-              mode="outlined"
-
-              onPress={() => setIsEditRecurrence(null)}
-              style={{ marginBottom: 16, width: '48%' }}
-            >
-              Cancelar
-            </Button>
-            <Button
-              mode="contained"
-
-              onPress={save}
-              style={{ marginBottom: 16, width: '48%' }}
-            >
-              Salvar
-            </Button>
-
+            {/* Botão Salvar */}
+            {params.type && (
+              <View style={{ width: '48%' }}>
+                <Button mode="contained" onPress={save}>
+                  Salvar
+                </Button>
+              </View>
+            )}
           </View>
 
-          <Button onPress={() => console.log(paramsRec)}>ParamsRec</Button>
-          <Button onPress={() => console.log(selectedRecTransaction)}>selectedRecTransaction</Button>
-          <Button onPress={() => console.log(selectedTransaction)}>selectedTransaction</Button>
+          {/* <Button onPress={() => console.log(params)}>Params</Button> */}
+
         </Modal>
       </Portal>
 
