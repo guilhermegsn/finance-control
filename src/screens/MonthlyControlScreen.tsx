@@ -13,7 +13,7 @@ import { WinButton } from "../components/WinButton";
 import { Balance } from "../interface/Balance";
 
 type DateType = 'startDate' | 'endDate' | 'date' | null
-type Operation = 'add' | 'editAll' | 'editOnly' | null
+type Operation = 'add' | 'editAll' | 'editOnlyMonth' | 'editUnique' | null
 interface Params {
   id: string,
   description: string,
@@ -95,7 +95,9 @@ export default function MonthlyControlScreen() {
     const targetLimitYM = targetYear * 12 + (targetMonth - 1);
 
     recurring.forEach((rt: RecurringTransaction) => {
-      const start = new Date(rt.startDate);
+
+
+      const start = new Date(rt.startDate)
       const startYM = start.getFullYear() * 12 + (start.getMonth())
 
       // se a recorrência começa depois do limite, pula
@@ -125,8 +127,6 @@ export default function MonthlyControlScreen() {
           if (override.type === 'income') total += override.value;
           else total -= override.value;
           continue; // pula recorrente normal
-        } else {
-          console.log('sem override!')
         }
 
         // ocorreInMonth verifica a regra (dia, frequência, etc)
@@ -179,12 +179,14 @@ export default function MonthlyControlScreen() {
     year: number
   ): Transaction {
 
-    const day = Math.min(
-      rec.date.getDate(),
-      new Date(year, month + 1, 0).getDate()
-    );
+    const baseDate = rec.startDate ?? rec.date
 
-    const date = new Date(year, month, day);
+    const day = Math.min(
+      baseDate.getDate(),
+      new Date(year, month + 1, 0).getDate()
+    )
+
+    const date = new Date(year, month, day)
 
     return {
       _id: rec._id,
@@ -209,15 +211,11 @@ export default function MonthlyControlScreen() {
       const end = new Date(Date.UTC(year, (month + 1), 0))
       end.setUTCHours(23, 59, 59, 999);
 
-      console.log('start', start)
-      console.log('end', end)
-
       // 1. Transações normais
       const normal = realm.objects<Transaction>('Transaction')
         .filtered('date >= $0 && date <= $1', start, end)
         .slice();
 
-      console.log('normal', normal)
 
       // 2. Recorrentes
       const recurrents = realm.objects<RecurringTransaction>('RecurringTransaction')
@@ -315,7 +313,6 @@ export default function MonthlyControlScreen() {
 
 
   const edit = async (transaction: any) => {
-
     let schema = 'Transaction'
 
     if (transaction.isRecurrence) {
@@ -368,6 +365,22 @@ export default function MonthlyControlScreen() {
           updateBalanceAfterTransaction(newTransaction)
         }
 
+      } else if (operation === 'editUnique') {
+        console.log('pareamss', params)
+        const previousData = getItemById('Transaction', params.id) as Transaction
+
+        const { _id, ...newTransactionData } = previousData
+
+        const newTransaction = {
+          ...newTransactionData,
+          description: params.description,
+          value: parseFloat(params.value)
+        } as Transaction
+        console.log('newwww-->>', newTransaction)
+        updateBalanceAfterTransaction(newTransaction, previousData)
+        updateItem('Transaction', params.id, newTransaction)
+
+
       } else {
         // Salvando edição - Transações recorrentes
         const rec = getItemById('RecurringTransaction', params.id) as RecurringTransaction
@@ -381,13 +394,14 @@ export default function MonthlyControlScreen() {
               ...recWithoutId,
               description: params.description,
               value: parseFloat(params.value),
-              startDate: new Date(currentYear, (currentMonth - 1), 1),
+              startDate: new Date(currentYear, (currentMonth - 1),
+                params?.startDate ? new Date(params?.startDate).getDay() : 1),
               endDate: params.endDate || null,
               parentId: params.id,
             } as RecurringTransaction
             insertItem('RecurringTransaction', newRecurrence)
 
-          } else if (operation === 'editOnly') {
+          } else if (operation === 'editOnlyMonth') {
             const newOverride = {
               _id: generateRandomId(),
               parentId: params.id,
@@ -420,9 +434,8 @@ export default function MonthlyControlScreen() {
 
 
   const selecTransaction = (transaction: any) => {
+    if (transaction._id === 'accumulatedBalance') return
     if (transaction?.isRecurrence) {
-
-
       const buttons: AlertButton[] = [
         {
           text: 'Cancelar',
@@ -435,7 +448,7 @@ export default function MonthlyControlScreen() {
           text: 'Editar somente este mês',
           onPress: () => {
             edit(transaction)
-            setOperation('editOnly')
+            setOperation('editOnlyMonth')
           },
         },
       ]
@@ -449,12 +462,23 @@ export default function MonthlyControlScreen() {
         })
       }
 
-
-
       Alert.alert('Editar Transação recorrente', 'Como deseja editar?', buttons)
 
     } else {
-      edit(transaction);
+      Alert.alert('Editar transação', 'Deseja editar essa transação?', [
+        {
+          text: 'Cancel',
+          onPress: () => console.log('Cancel Pressed'),
+          style: 'cancel',
+        },
+        {
+          text: 'Editar',
+          onPress: () => {
+            setOperation('editUnique')
+            edit(transaction)
+          }
+        },
+      ]);
     }
 
   }
@@ -496,6 +520,20 @@ export default function MonthlyControlScreen() {
     //   setActivePicker('date')
     // }
   }
+
+  const closeModal = () => {
+    setOperation(null)
+    setParams(emptyParams)
+    setActivePicker(null)
+  }
+
+  const isInvalisForm = () => {
+    if (!params.description || !params.value || !params.date || isNaN(parseFloat(params.value))) {
+      return true
+    }
+    return false
+  }
+
 
   //ErdV/?6N%Mibd36
 
@@ -566,23 +604,23 @@ export default function MonthlyControlScreen() {
         </DataTable>
 
         {/* Cartões */}
-        {/* {creditCards.map((card) => (
-          <View key={card.id}>
-            <Text style={styles.sectionTitle}>Cartão: {card.name}</Text>
-            <DataTable>
-              <DataTable.Header>
-                <DataTable.Title>Descrição</DataTable.Title>
-                <DataTable.Title numeric>Valor</DataTable.Title>
-              </DataTable.Header>
-              {card.items.map((item) => (
-                <DataTable.Row key={item.id}>
-                  <DataTable.Cell>{item.desc}</DataTable.Cell>
-                  <DataTable.Cell numeric>R$ {item.value.toFixed(2)}</DataTable.Cell>
-                </DataTable.Row>
-              ))}
-            </DataTable>
-          </View>
-        ))} */}
+        <Text style={styles.sectionTitle}>Cartão de crédito</Text>
+        <DataTable>
+          <DataTable.Header>
+            <DataTable.Title style={{ maxWidth: 70 }} >Data</DataTable.Title>
+            <DataTable.Title>Descrição</DataTable.Title>
+            <DataTable.Title numeric>Valor</DataTable.Title>
+          </DataTable.Header>
+          {credits.map((item: Transaction) => (
+            <DataTable.Row
+              onLongPress={() => selecTransaction(item)}
+              key={item._id.toString()}>
+              <DataTable.Cell style={{ maxWidth: 70 }}>{dayjs(item.date).format('DD/MM')}</DataTable.Cell>
+              <DataTable.Cell>{item.description}</DataTable.Cell>
+              <DataTable.Cell numeric>R$ {item.value.toFixed(2)}</DataTable.Cell>
+            </DataTable.Row>
+          ))}
+        </DataTable>
 
         {/* Espaço para o resumo fixo */}
         <View style={{ height: 130 }} />
@@ -601,7 +639,7 @@ export default function MonthlyControlScreen() {
           style={styles.fab}>
           <Icon source="plus" size={24} color="#fff" />
         </TouchableOpacity>
-        {/* <Button onPress={() => console.log(transactions)}>transactions</Button> */}
+        <Button onPress={() => console.log(transactions)}>transactions</Button>
       </View>
 
 
@@ -614,7 +652,7 @@ export default function MonthlyControlScreen() {
       <Portal>
         <Modal
           visible={operation !== null}
-          onDismiss={() => setOperation(null)}
+          onDismiss={closeModal}
           contentContainerStyle={{
             backgroundColor: 'white',
             margin: 20,
@@ -670,7 +708,7 @@ export default function MonthlyControlScreen() {
               )}
               {/* <View>
                 <Text style={{ fontSize: 20 }}>
-                  {operation === 'add' ? 'Adicionando' : 'editOnly' ?
+                  {operation === 'add' ? 'Adicionando' : 'editOnlyMonth' ?
                     'Editando somente este mês' :
                     `Editando sequência\n(${getMonthName(currentMonth)}/${currentYear} em diante)`}
                 </Text>
@@ -683,7 +721,7 @@ export default function MonthlyControlScreen() {
                 <Text style={{ fontSize: 20 }}>
                   {operation === 'add'
                     ? 'Adicionando nova transação'
-                    : (operation === 'editOnly'
+                    : (operation === 'editOnlyMonth'
                       ? 'Editando este mês apenas'
                       : `Editando sequência a partir de ${getMonthName(currentMonth)}/${currentYear}`)}
                 </Text>
@@ -694,8 +732,9 @@ export default function MonthlyControlScreen() {
                 <View style={{ width: '48%' }}>
                   <Text style={{ marginLeft: 5 }}>Transação</Text>
                   <Button
+                    disabled={operation !== 'add'}
                     mode="contained-tonal"
-                    onPress={() => setActivePicker('date')}
+                    onPress={() => setParams((prevParams) => ({ ...prevParams, type: null }))}
                     style={{ marginBottom: 16 }}
                   >
                     {params.type === 'income'
@@ -709,6 +748,7 @@ export default function MonthlyControlScreen() {
                 <View style={{ width: '48%' }}>
                   <Text style={{ marginLeft: 5 }}>Data</Text>
                   <Button
+                    disabled={operation !== 'add'}
                     mode="contained-tonal"
                     onPress={() => setActivePicker('date')}
                     style={{ marginBottom: 16 }}
@@ -736,87 +776,79 @@ export default function MonthlyControlScreen() {
               />
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Checkbox
-                  status={params.isRecurrence ? 'checked' : 'unchecked'}
-                  onPress={() => {
-                    setParams(prevParams => ({
-                      ...prevParams,
-                      isRecurrence: !params.isRecurrence,
-                      startDate: params.isRecurrence ? null : new Date(params.date),
-                      endDate: params.isRecurrence ? null : prevParams.endDate,
-                    }))
-
-                  }}
-                />
-                <Text>Transação recorrente</Text>
-              </View>
-
-              {params.isRecurrence &&
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 5 }}>
-                  <View style={{ width: '48%' }}>
-                    <Text style={{ marginLeft: 5 }}>Início</Text>
-                    <Button
+              {operation !== "editUnique" && operation !== 'editOnlyMonth' &&
+                <View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Checkbox
                       disabled={operation !== 'add'}
-                      mode="contained-tonal"
-                      onPress={() => setActivePicker('startDate')}
-                    >
-                      {params?.startDate?.toLocaleDateString('pt-BR')}
-                    </Button>
+                      status={params.isRecurrence ? 'checked' : 'unchecked'}
+                      onPress={() => {
+                        setParams(prevParams => ({
+                          ...prevParams,
+                          isRecurrence: !params.isRecurrence,
+                          startDate: params.isRecurrence ? null : new Date(params.date),
+                          endDate: params.isRecurrence ? null : prevParams.endDate,
+                        }))
 
+                      }}
+                    />
+                    <Text>Transação recorrente</Text>
                   </View>
 
-                  <View style={{ width: '48%' }}>
-                    <Text style={{ marginLeft: 5 }}>Fim</Text>
-                    <Button
-                      mode="contained-tonal"
-                      onPress={() => setActivePicker('endDate')}
-                    >
-                      {params?.endDate?.toLocaleDateString('pt-BR') || 'Sem fim'}
-                    </Button>
-                  </View>
+                  {params.isRecurrence &&
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 5 }}>
+                      <View style={{ width: '48%' }}>
+                        <Text style={{ marginLeft: 5 }}>Início</Text>
+                        <Button
+                          disabled={operation !== 'add'}
+                          mode="contained-tonal"
+                          onPress={() => setActivePicker('startDate')}
+                        >
+                          {params?.startDate?.toLocaleDateString('pt-BR')}
+                        </Button>
+
+                      </View>
+
+                      <View style={{ width: '48%' }}>
+                        <Text style={{ marginLeft: 5 }}>Fim</Text>
+                        <Button
+                          mode="contained-tonal"
+                          onPress={() => setActivePicker('endDate')}
+                        >
+                          {params?.endDate?.toLocaleDateString('pt-BR') || 'Sem fim'}
+                        </Button>
+                      </View>
+                    </View>
+                  }
+
+                  {params.isRecurrence && params.endDate &&
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Checkbox
+                        status={params.endDate === null ? 'checked' : 'unchecked'}
+                        onPress={() => {
+                          setParams(prevParams => ({
+                            ...prevParams,
+                            endDate: params.endDate ? null : new Date(currentYear, currentMonth, new Date().getDay())
+                          }))
+                        }}
+                      />
+                      <Text>Sem data fim</Text>
+                    </View>
+                  }
+
                 </View>
               }
 
-              {params.isRecurrence && params.endDate &&
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Checkbox
-                    status={params.endDate === null ? 'checked' : 'unchecked'}
-                    onPress={() => {
-                      setParams(prevParams => ({
-                        ...prevParams,
-                        endDate: params.endDate ? null : new Date(currentYear, currentMonth, new Date().getDay())
-                      }))
-                    }}
-                  />
-                  <Text>Sem data fim</Text>
-                </View>
-              }
 
 
-
-
-              {operation === 'editOnly' || operation === 'editAll' &&
+              {operation === 'editOnlyMonth' || operation === 'editAll' &&
                 ((selectedTransaction?.date?.getMonth() + 1) === currentMonth) &&
 
                 <Button
                   mode="contained"
                   onPress={() => del(selectedTransaction)}
                   buttonColor="#A50C36"
-                  style={{ marginBottom: 16 }}
+                  style={{ marginTop: 20 }}
                 >
                   Excluir
                 </Button>
@@ -855,7 +887,7 @@ export default function MonthlyControlScreen() {
             {/* Botão Salvar */}
             {params.type && (
               <View style={{ width: '48%' }}>
-                <Button mode="contained" onPress={save}>
+                <Button mode="contained" onPress={save} disabled={isInvalisForm()}>
                   Salvar
                 </Button>
               </View>
