@@ -9,7 +9,7 @@ export interface Transaction {
     value: number;
     category: string;
     recurrence: Recurrence;
-    date?: Date;
+    date: Date;
     start?: Date;
     end?: Date | null;
     isRecurrence: boolean;

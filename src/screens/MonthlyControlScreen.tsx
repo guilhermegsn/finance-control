@@ -4,7 +4,7 @@ import { Button, Checkbox, DataTable, Divider, Icon, Modal, Portal, TextInput } 
 import { Transaction, TransactionType } from "../interface/Transaction";
 import dayjs from "dayjs";
 import { realm } from "../database/realm";
-import { getItemById, insertItem, updateItem } from "../database/realmHelpers";
+import { deleteItem, getItemById, insertItem, updateItem } from "../database/realmHelpers";
 import { RecurringTransaction, Type } from "../interface/RecurringTransaction";
 import { generateRandomId, getMonthName } from "../service/function";
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -12,8 +12,11 @@ import { Override } from "../interface/Override";
 import { WinButton } from "../components/WinButton";
 import { Balance } from "../interface/Balance";
 
+
+
 type DateType = 'startDate' | 'endDate' | 'date' | null
 type Operation = 'add' | 'editAll' | 'editOnlyMonth' | 'editUnique' | null
+type BalanceOperation = 'create' | 'update' | 'delete'
 interface Params {
   id: string,
   description: string,
@@ -50,6 +53,7 @@ export default function MonthlyControlScreen() {
   })
   const [params, setParams] = useState(emptyParams)
   const [activePicker, setActivePicker] = useState<DateType>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
 
 
@@ -138,6 +142,28 @@ export default function MonthlyControlScreen() {
     });
 
     return total;
+  }
+
+  function getCreditTransactions(targetYear: number, targetMonth: number) {
+    // calcula mês anterior
+    let previousMonth = targetMonth - 1
+    let previousYear = targetYear
+
+    if (previousMonth < 0) {
+      previousMonth = 11
+      previousYear--
+    }
+
+    // intervalo de datas
+    const start = new Date(previousYear, previousMonth, 1)
+    start.setHours(0, 0, 0, 0)
+
+    const end = new Date(previousYear, previousMonth + 1, 0)
+    end.setHours(23, 59, 59, 999)
+
+    return realm.objects<Transaction>('Transaction')
+      .filtered('type == "credit" AND date >= $0 AND date <= $1', start, end)
+      .reduce((acc, t: any) => acc + t.value, 0)
   }
 
 
@@ -257,16 +283,33 @@ export default function MonthlyControlScreen() {
         (rec) => !overriddenParentIds.has(rec._id)
       );
 
+      const totalCredit = getCreditTransactions(currentYear, (currentMonth - 1))
+      const totalAccumulated = getAccumulatedBalance(currentYear, currentMonth) +
+        getCreditTransactions(currentYear, (currentMonth - 1))
+
+      const credit = {
+        _id: 'statement',
+        date: new Date(year, month, 1),
+        description: "Fatura crédito",
+        type: "expense",
+        value: totalCredit
+      }
+
       const accumulatedBalance = {
         _id: 'accumulatedBalance',
         date: new Date(year, month, 1),
         description: "Saldo acumulado",
         type: "income",
-        value: getAccumulatedBalance(currentYear, currentMonth)
+        value: totalAccumulated
       }
 
       // 3. Combinar ambos
-      const all = [accumulatedBalance, ...normal, ...overrideTransactions, ...monthRecurring];
+      const all = [
+        totalCredit > 0 && credit,
+        totalAccumulated > 0 && accumulatedBalance,
+        ...normal,
+        ...overrideTransactions,
+        ...monthRecurring];
 
       return all;
     } catch (e) {
@@ -274,15 +317,60 @@ export default function MonthlyControlScreen() {
     }
   }
 
-  const updateBalanceAfterTransaction = (transaction: Transaction, previousTransaction?: Transaction) => {
+  // const updateBalanceAfterTransaction = (transaction: Transaction, previousTransaction?: Transaction) => {
+  //   if (!transaction.date) return
+  //   const monthKey = `${transaction.date.getFullYear()}-${String(transaction.date.getMonth() + 1).padStart(2, '0')}`;
+
+  //   realm.write(() => {
+  //     let balance = realm.objectForPrimaryKey('Balance', monthKey) as Balance
+
+  //     if (!balance) {
+  //       if (!transaction.date) return
+  //       balance = realm.create('Balance', {
+  //         id: monthKey,
+  //         month: transaction.date.getMonth() + 1,
+  //         year: transaction.date.getFullYear(),
+  //         income: 0,
+  //         expense: 0,
+  //         credit: 0,
+  //         partialBalance: 0,
+  //       });
+  //     }
+
+
+
+  //     if (transaction.type === 'income') {
+  //       if (previousTransaction) {
+  //         balance.income -= previousTransaction.value;
+  //         balance.income += transaction.value
+  //       } else {
+  //         balance.income += transaction.value;
+  //       }
+  //     }
+  //     if (transaction.type === 'expense') balance.expense += transaction.value;
+  //     if (transaction.type === 'credit') balance.credit += transaction.value;
+
+  //     balance.partialBalance = balance.income - balance.expense - balance.credit;
+  //   });
+  // }
+
+
+
+  const updateBalanceAfterTransaction = (
+    transaction: Transaction,
+    previousTransaction?: Transaction,
+    operation: BalanceOperation = 'create'
+  ) => {
     if (!transaction.date) return
-    const monthKey = `${transaction.date.getFullYear()}-${String(transaction.date.getMonth() + 1).padStart(2, '0')}`;
+
+    const monthKey = `${transaction.date.getFullYear()}-${String(
+      transaction.date.getMonth() + 1
+    ).padStart(2, '0')}`
 
     realm.write(() => {
       let balance = realm.objectForPrimaryKey('Balance', monthKey) as Balance
 
       if (!balance) {
-        if (!transaction.date) return
         balance = realm.create('Balance', {
           id: monthKey,
           month: transaction.date.getMonth() + 1,
@@ -291,25 +379,40 @@ export default function MonthlyControlScreen() {
           expense: 0,
           credit: 0,
           partialBalance: 0,
-        });
+        })
       }
 
-
-
-      if (transaction.type === 'income') {
-        if (previousTransaction) {
-          balance.income -= previousTransaction.value;
-          balance.income += transaction.value
-        } else {
-          balance.income += transaction.value;
-        }
+      // 🔴 DELETE
+      if (operation === 'delete') {
+        if (transaction.type === 'income') balance.income -= transaction.value
+        if (transaction.type === 'expense') balance.expense -= transaction.value
+        if (transaction.type === 'credit') balance.credit -= transaction.value
       }
-      if (transaction.type === 'expense') balance.expense += transaction.value;
-      if (transaction.type === 'credit') balance.credit += transaction.value;
 
-      balance.partialBalance = balance.income - balance.expense - balance.credit;
-    });
+      // 🟡 UPDATE
+      if (operation === 'update' && previousTransaction) {
+        if (previousTransaction.type === 'income') balance.income -= previousTransaction.value
+        if (previousTransaction.type === 'expense') balance.expense -= previousTransaction.value
+        if (previousTransaction.type === 'credit') balance.credit -= previousTransaction.value
+
+        if (transaction.type === 'income') balance.income += transaction.value
+        if (transaction.type === 'expense') balance.expense += transaction.value
+        if (transaction.type === 'credit') balance.credit += transaction.value
+      }
+
+      // 🟢 CREATE
+      if (operation === 'create') {
+        if (transaction.type === 'income') balance.income += transaction.value
+        if (transaction.type === 'expense') balance.expense += transaction.value
+        if (transaction.type === 'credit') balance.credit += transaction.value
+      }
+
+      balance.partialBalance = balance.income - balance.expense - balance.credit
+    })
   }
+
+
+
 
 
   const edit = async (transaction: any) => {
@@ -330,7 +433,7 @@ export default function MonthlyControlScreen() {
         startDate: data.startDate,
         endDate: data.endDate || null,
         type: data.type,
-        isRecurrence: true
+        isRecurrence: transaction?.isRecurrence ? true : false
       })
     }
   }
@@ -361,8 +464,11 @@ export default function MonthlyControlScreen() {
             type: params.type,
             date: params.date,
           } as Transaction
+          // insertItem('Transaction', newTransaction)
+          // updateBalanceAfterTransaction(newTransaction)
+          updateBalanceAfterTransaction(newTransaction, undefined, 'create')
           insertItem('Transaction', newTransaction)
-          updateBalanceAfterTransaction(newTransaction)
+
         }
 
       } else if (operation === 'editUnique') {
@@ -377,7 +483,7 @@ export default function MonthlyControlScreen() {
           value: parseFloat(params.value)
         } as Transaction
         console.log('newwww-->>', newTransaction)
-        updateBalanceAfterTransaction(newTransaction, previousData)
+        updateBalanceAfterTransaction(newTransaction, previousData, 'update')
         updateItem('Transaction', params.id, newTransaction)
 
 
@@ -492,20 +598,33 @@ export default function MonthlyControlScreen() {
   }
 
 
-
   const del = (transaction: any) => {
+    console.log('paramms', params)
     console.log(transaction)
+    if (params.isRecurrence) {
+
+    } else {
+
+      updateBalanceAfterTransaction(transaction, transaction, 'delete')
+      deleteItem('Transaction', transaction._id)
+
+      loadTransactions(currentDate)
+      closeModal()
+    }
   }
 
   const handleDateChange = (event: any, selectedDate: Date | undefined) => {
     const currentDate = selectedDate || params[activePicker!];  // Use o valor anterior se não tiver seleção
-    setParams(prevData => ({
-      ...prevData,
-      [activePicker!]: currentDate,  // Atualiza a data correspondente ao activePicker
-    }));
+    if (currentDate) {
+      const correctedDate = new Date(currentDate.setHours(0, 0, 0, 0));
+      setParams(prevData => ({
+        ...prevData,
+        [activePicker!]: correctedDate,  // Atualiza a data correspondente ao activePicker
+      }));
 
-    // Fecha o picker depois da seleção
-    setActivePicker(null);
+      // Fecha o picker depois da seleção
+      setActivePicker(null);
+    }
   };
 
 
@@ -523,7 +642,10 @@ export default function MonthlyControlScreen() {
 
   const closeModal = () => {
     setOperation(null)
-    setParams(emptyParams)
+    setTimeout(() => {
+      setParams(emptyParams)
+      setIsDeleting(false)
+    }, 300);
     setActivePicker(null)
   }
 
@@ -537,12 +659,22 @@ export default function MonthlyControlScreen() {
 
   //ErdV/?6N%Mibd36
 
-  const entries = transactions.filter((t: Transaction) => t.type === 'income');
-  const expenses = transactions.filter((t: Transaction) => t.type === 'expense');
-  const credits = transactions.filter((t: Transaction) => t.type === 'credit');
+  const entries = transactions.filter((t: Transaction) => t.type === 'income')
+    .sort((a: any, b: any) => a.date.getTime() - b.date.getTime())
+
+  const expenses = transactions.filter((t: Transaction) => t.type === 'expense')
+    .sort((a: any, b: any) => a.date.getTime() - b.date.getTime())
+
+  const credits = transactions.filter((t: Transaction) => t.type === 'credit')
+    .sort((a: any, b: any) => a.date.getTime() - b.date.getTime())
+
+
   const totalEntries = entries.reduce((acc: number, t: Transaction) => acc + t.value, 0)
   const totalExpenses = expenses.reduce((acc: number, t: Transaction) => acc + t.value, 0)
   const saldoParcial = (totalEntries - totalExpenses)
+
+  const totalCredit = getCreditTransactions(currentYear, currentMonth)
+  const totalBalance = (totalEntries - totalExpenses - totalCredit)
 
   return (
     <View style={styles.container}>
@@ -573,15 +705,20 @@ export default function MonthlyControlScreen() {
           </DataTable.Header>
           {entries.map((item: Transaction) => (
             <DataTable.Row
-              key={item._id.toString()}
+              key={item._id}
               onLongPress={() => selecTransaction(item)}
-
             >
               <DataTable.Cell style={{ maxWidth: 70 }}>{dayjs(item.date).format('DD/MM')}</DataTable.Cell>
               <DataTable.Cell>{item.description}</DataTable.Cell>
               <DataTable.Cell numeric>R$ {item.value.toFixed(2)}</DataTable.Cell>
             </DataTable.Row>
           ))}
+          <DataTable.Row key={`totalEntries`}>
+            <DataTable.Cell>TOTAL</DataTable.Cell>
+            <DataTable.Cell numeric>
+              <Text style={{ fontWeight: 'bold' }}> R${totalEntries.toFixed(2)} </Text>
+            </DataTable.Cell>
+          </DataTable.Row>
         </DataTable>
 
         {/* Saídas */}
@@ -601,6 +738,12 @@ export default function MonthlyControlScreen() {
               <DataTable.Cell numeric>R$ {item.value.toFixed(2)}</DataTable.Cell>
             </DataTable.Row>
           ))}
+          <DataTable.Row key={`totalExpenses`}>
+            <DataTable.Cell>TOTAL</DataTable.Cell>
+            <DataTable.Cell numeric>
+              <Text style={{ fontWeight: 'bold' }}> R${totalExpenses.toFixed(2)} </Text>
+            </DataTable.Cell>
+          </DataTable.Row>
         </DataTable>
 
         {/* Cartões */}
@@ -620,6 +763,12 @@ export default function MonthlyControlScreen() {
               <DataTable.Cell numeric>R$ {item.value.toFixed(2)}</DataTable.Cell>
             </DataTable.Row>
           ))}
+          <DataTable.Row key={`totalCredits`}>
+            <DataTable.Cell>TOTAL</DataTable.Cell>
+            <DataTable.Cell numeric>
+              <Text style={{ fontWeight: 'bold' }}> R${totalCredit.toFixed(2)} </Text>
+            </DataTable.Cell>
+          </DataTable.Row>
         </DataTable>
 
         {/* Espaço para o resumo fixo */}
@@ -628,9 +777,17 @@ export default function MonthlyControlScreen() {
 
       {/* RESUMO FIXO */}
       <View style={styles.summaryContainer}>
+        <View style={styles.gradientLayer} />
         <View>
-          <Text style={styles.summaryText}>Total entradas: R$ {totalEntries}</Text>
-          <Text style={styles.summaryText}>Saldo parcial: R$ {saldoParcial}</Text>
+          <View style={{ flexDirection: 'row' }}>
+            <Text style={styles.summaryText}>Saldo parcial: </Text>
+            <Text style={styles.summaryTextBold}> R${saldoParcial.toFixed(2)}</Text>
+          </View>
+          <View style={{ flexDirection: 'row' }}>
+            <Text style={styles.summaryText}>Saldo Total:</Text>
+            <Text style={styles.summaryText}> R${totalBalance.toFixed(2)}</Text>
+          </View>
+
         </View>
 
         {/* Botão flutuante */}
@@ -639,7 +796,7 @@ export default function MonthlyControlScreen() {
           style={styles.fab}>
           <Icon source="plus" size={24} color="#fff" />
         </TouchableOpacity>
-        <Button onPress={() => console.log(transactions)}>transactions</Button>
+        {/* <Button onPress={() => console.log(params)}>params</Button> */}
       </View>
 
 
@@ -664,21 +821,21 @@ export default function MonthlyControlScreen() {
           {params.type === null ?
             <View style={{ gap: 12 }}>
               <WinButton
-                label="Receita"
+                label="Entrada"
                 color="#2E9E57"
                 selected={params.type === 'income'}
                 onPress={() => selectType('income')}
               />
 
               <WinButton
-                label="Despesa (à vista)"
+                label="Saída - À vista"
                 color="#CC4A4A"
                 selected={params.type === 'expense'}
                 onPress={() => selectType('expense')}
               />
 
               <WinButton
-                label="Despesa (Crédito)"
+                label="Saída - Crédito"
                 color="#2F80ED"
                 selected={params.type === 'credit'}
                 onPress={() => selectType('credit')}
@@ -723,7 +880,8 @@ export default function MonthlyControlScreen() {
                     ? 'Adicionando nova transação'
                     : (operation === 'editOnlyMonth'
                       ? 'Editando este mês apenas'
-                      : `Editando sequência a partir de ${getMonthName(currentMonth)}/${currentYear}`)}
+                      : operation === 'editUnique' ? 'Editando transação'
+                        : `Editando sequência\n(${getMonthName(currentMonth)}/${currentYear} em diante)`)}
                 </Text>
 
               </View>
@@ -765,6 +923,7 @@ export default function MonthlyControlScreen() {
                 keyboardType="default"
                 mode="outlined"
                 style={{ marginBottom: 16 }}
+                disabled={isDeleting}
               />
               <TextInput
                 label="Valor"
@@ -773,6 +932,7 @@ export default function MonthlyControlScreen() {
                 keyboardType="numeric"
                 mode="outlined"
                 style={{ marginBottom: 16 }}
+                disabled={isDeleting}
               />
 
 
@@ -793,6 +953,7 @@ export default function MonthlyControlScreen() {
                       }}
                     />
                     <Text>Transação recorrente</Text>
+                    <Button onPress={() => console.log(params)}>psrams</Button>
                   </View>
 
                   {params.isRecurrence &&
@@ -841,18 +1002,29 @@ export default function MonthlyControlScreen() {
 
 
 
-              {operation === 'editOnlyMonth' || operation === 'editAll' &&
+              {operation !== 'add' && !isDeleting &&
                 ((selectedTransaction?.date?.getMonth() + 1) === currentMonth) &&
+
 
                 <Button
                   mode="contained"
-                  onPress={() => del(selectedTransaction)}
+                  onPress={() => {
+                    setIsDeleting(true)
+                  }}
                   buttonColor="#A50C36"
                   style={{ marginTop: 20 }}
                 >
                   Excluir
                 </Button>
               }
+
+              {isDeleting &&
+                <View style={styles.confirmDel}>
+                  <Text style={styles.textWarning}>Confirma a exclusão? </Text>
+                  <Text style={styles.textWarning}>Esta operação não poderá ser desfeita.</Text>
+                </View>
+              }
+
 
 
 
@@ -873,23 +1045,28 @@ export default function MonthlyControlScreen() {
             <View style={{ width: params.type ? '48%' : '100%' }}>
               <Button
                 mode="outlined"
-                onPress={() => {
-                  setOperation(null);
-                  setTimeout(() => {
-                    setParams(emptyParams);
-                  }, 200);
-                }}
+                onPress={closeModal}
               >
                 Cancelar
               </Button>
             </View>
 
-            {/* Botão Salvar */}
+            {/* Botão Salvar / Excluir */}
             {params.type && (
               <View style={{ width: '48%' }}>
-                <Button mode="contained" onPress={save} disabled={isInvalisForm()}>
-                  Salvar
-                </Button>
+                {isDeleting ?
+                  <Button
+                    onPress={() => del(selectedTransaction)}
+                    mode="contained"
+                    buttonColor="#A50C36">Excluir
+
+                  </Button> :
+                  <Button
+                    mode="contained"
+                    onPress={save} disabled={isInvalisForm()}>
+                    Salvar
+                  </Button>
+                }
               </View>
             )}
           </View>
@@ -919,6 +1096,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 16,
   },
+  confirmDel: {
+    backgroundColor: '#FFB86A',
+    padding: 14
+  },
   monthText: {
     fontSize: 18,
     fontWeight: "bold",
@@ -926,6 +1107,10 @@ const styles = StyleSheet.create({
   },
   scrollArea: {
     flex: 1,
+  },
+  textWarning: {
+    fontSize: 16,
+    color: "#A50C36"
   },
   sectionTitle: {
     fontSize: 16,
@@ -935,6 +1120,7 @@ const styles = StyleSheet.create({
   },
   summaryContainer: {
     position: "absolute",
+    backgroundColor: '#fff',
     left: 0,
     right: 0,
     bottom: 0,
@@ -949,6 +1135,11 @@ const styles = StyleSheet.create({
   summaryText: {
     fontSize: 14,
     marginVertical: 2,
+  },
+  summaryTextBold: {
+    fontSize: 14,
+    marginVertical: 2,
+    fontWeight: 'bold'
   },
   fab: {
     backgroundColor: "#007bff",
@@ -968,5 +1159,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     elevation: 5,
     margin: 5
+  },
+  gradientLayer: {
+    position: 'absolute',
+    top: -30,
+    left: 0,
+    right: 0,
+    height: 30, // Ajuste o valor conforme necessário para o efeito
+    backgroundColor: 'rgba(255, 255, 255, 0.7)', // Gradiente de branco transparente
+    zIndex: 1, // Coloca o efeito na frente do conteúdo
   },
 });
