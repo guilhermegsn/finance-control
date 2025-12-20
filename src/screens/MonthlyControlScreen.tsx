@@ -30,12 +30,12 @@ interface Params {
 export default function MonthlyControlScreen() {
 
   const now = new Date();
-  const todayMonth = now.getMonth()    // 0–11
-  const todayYear = now.getFullYear()
+  const todayMonth = now.getUTCMonth()    // 0–11
+  const todayYear = now.getUTCFullYear()
   const [currentDate, setCurrentDate] = useState(new Date())
 
-  const currentMonth = currentDate.getMonth() + 1
-  const currentYear = currentDate.getFullYear()
+  const currentMonth = currentDate.getUTCMonth() + 1
+  const currentYear = currentDate.getUTCFullYear()
 
 
   const [transactions, setTransactions] = useState<any>([])
@@ -59,8 +59,8 @@ export default function MonthlyControlScreen() {
 
   // Função que busca os dados do mês atual
   const loadTransactions = async (date: Date) => {
-    const month = date.getMonth()
-    const year = date.getFullYear()
+    const month = date.getUTCMonth()
+    const year = date.getUTCFullYear()
     const data = getTransactionsByMonth(month, year)
     setTransactions(data)
   }
@@ -102,13 +102,13 @@ export default function MonthlyControlScreen() {
 
 
       const start = new Date(rt.startDate)
-      const startYM = start.getFullYear() * 12 + (start.getMonth())
+      const startYM = start.getUTCFullYear() * 12 + (start.getUTCMonth())
 
       // se a recorrência começa depois do limite, pula
       if (startYM > targetLimitYM) return;
 
       const end = rt.endDate ? new Date(rt.endDate) : null;
-      const endYM = end ? end.getFullYear() * 12 + (end.getMonth()) : Infinity;
+      const endYM = end ? end.getUTCFullYear() * 12 + (end.getUTCMonth()) : Infinity;
 
       // itera de startYM até o mês anterior ao target (inclusive), respeitando endYM
       const upper = Math.min(targetLimitYM, endYM);
@@ -144,27 +144,86 @@ export default function MonthlyControlScreen() {
     return total;
   }
 
-  function getCreditTransactions(targetYear: number, targetMonth: number) {
-    // calcula mês anterior
-    let previousMonth = targetMonth - 1
-    let previousYear = targetYear
+  // function getCreditTransactions(targetYear: number, targetMonth: number) {
+  //   // calcula mês anterior
+  //   let previousMonth = targetMonth - 1
+  //   let previousYear = targetYear
 
-    if (previousMonth < 0) {
-      previousMonth = 11
-      previousYear--
+  //   if (previousMonth < 0) {
+  //     previousMonth = 11
+  //     previousYear--
+  //   }
+
+  //   // intervalo de datas
+  //   const start = new Date(previousYear, previousMonth, 1)
+
+  //   const end = new Date(previousYear, previousMonth + 1, 0)
+
+  //   return realm.objects<Transaction>('Transaction')
+  //     .filtered('type == "credit" AND date >= $0 AND date <= $1', start, end)
+  //     .reduce((acc, t: any) => acc + t.value, 0)
+  // }
+
+
+  function getCreditTransactions(targetYear: number, targetMonth: number) {
+    // ----------------------------
+    // 1. Mês anterior (base 0)
+    // ----------------------------
+    let m0 = targetMonth - 1
+    let y = targetYear
+
+    if (m0 < 0) {
+      m0 = 11
+      y--
     }
 
-    // intervalo de datas
-    const start = new Date(previousYear, previousMonth, 1)
-    start.setHours(0, 0, 0, 0)
+    const start = new Date(Date.UTC(y, m0, 1))
+    const end = new Date(Date.UTC(y, m0 + 1, 1))
 
-    const end = new Date(previousYear, previousMonth + 1, 0)
-    end.setHours(23, 59, 59, 999)
+    let total = 0
 
-    return realm.objects<Transaction>('Transaction')
-      .filtered('type == "credit" AND date >= $0 AND date <= $1', start, end)
-      .reduce((acc, t: any) => acc + t.value, 0)
+    // ----------------------------
+    // 2. Créditos normais
+    // ----------------------------
+    realm.objects<Transaction>('Transaction')
+      .filtered('type == "credit" AND date >= $0 AND date < $1', start, end)
+      .forEach((t) => {
+        total += t.value
+      })
+
+    // ----------------------------
+    // 3. Overrides do mês
+    // ----------------------------
+    const overrides = realm.objects<Override>('Override')
+      .filtered('type == "credit" AND month == $0 AND year == $1', m0, y)
+      .slice()
+
+    overrides.forEach((o) => {
+      total += o.value
+    })
+
+    // ----------------------------
+    // 4. Créditos recorrentes (virtual)
+    // ----------------------------
+    const recurring = realm.objects<RecurringTransaction>('RecurringTransaction')
+      .filtered('type == "credit"')
+
+    recurring.forEach((rt) => {
+      // existe override para este mês? então não soma recorrente
+      const hasOverride = overrides.some(
+        (o) => o.parentId === rt._id
+      )
+
+      if (hasOverride) return
+
+      if (occursInMonth(rt, m0, y)) {
+        total += rt.value
+      }
+    })
+
+    return total
   }
+
 
 
   // Carrega ao iniciar e sempre que currentDate mudar
@@ -174,7 +233,7 @@ export default function MonthlyControlScreen() {
 
   const goToPreviousMonth = () => {
     const prev = new Date(currentDate)
-    prev.setMonth(prev.getMonth() - 1)
+    prev.setMonth(prev.getUTCMonth() - 1)
     setCurrentDate(prev)
     loadTransactions(prev)
   };
@@ -182,16 +241,16 @@ export default function MonthlyControlScreen() {
 
   const goToNextMonth = () => {
     const next = new Date(currentDate)
-    next.setMonth(next.getMonth() + 1)
+    next.setMonth(next.getUTCMonth() + 1)
     setCurrentDate(next)
     loadTransactions(next)
   };
 
 
   function occursInMonth(rec: RecurringTransaction, month: number, year: number): boolean { //Base 0 (Jan = 0, Fev = 1)
-    const startYM = rec.startDate.getFullYear() * 12 + rec.startDate.getMonth();
+    const startYM = rec.startDate.getUTCFullYear() * 12 + rec.startDate.getUTCMonth();
     const endYM = rec.endDate
-      ? rec.endDate.getFullYear() * 12 + rec.endDate.getMonth()
+      ? rec.endDate.getUTCFullYear() * 12 + rec.endDate.getUTCMonth()
       : Infinity;
 
     const currentYM = year * 12 + month;
@@ -229,13 +288,12 @@ export default function MonthlyControlScreen() {
   function getTransactionsByMonth(month: number, year: number) { // Base 0 (Jan = 0, Fev = 1)
     try {
 
-      //Primeiro dia do mês 
-      const start = new Date(Date.UTC(year, month, 1))
-      start.setUTCHours(0, 0, 0, 0);
+      // Primeiro dia do mês (00:00 UTC do primeiro dia)
+      const start = new Date(Date.UTC(year, month, 1));  // 00:00 UTC
 
-      //Último dia do mês (com 23:59:59.999)
-      const end = new Date(Date.UTC(year, (month + 1), 0))
-      end.setUTCHours(23, 59, 59, 999);
+      // Último dia do mês (23:59:59.999 UTC do último dia)
+      const end = new Date(Date.UTC(year, month + 1, 0));  // último dia do mês
+      end.setUTCHours(23, 59, 59, 999);  // 23:59:59.999 UTC
 
       // 1. Transações normais
       const normal = realm.objects<Transaction>('Transaction')
@@ -319,7 +377,7 @@ export default function MonthlyControlScreen() {
 
   // const updateBalanceAfterTransaction = (transaction: Transaction, previousTransaction?: Transaction) => {
   //   if (!transaction.date) return
-  //   const monthKey = `${transaction.date.getFullYear()}-${String(transaction.date.getMonth() + 1).padStart(2, '0')}`;
+  //   const monthKey = `${transaction.date.getUTCFullYear()}-${String(transaction.date.getUTCMonth() + 1).padStart(2, '0')}`;
 
   //   realm.write(() => {
   //     let balance = realm.objectForPrimaryKey('Balance', monthKey) as Balance
@@ -328,8 +386,8 @@ export default function MonthlyControlScreen() {
   //       if (!transaction.date) return
   //       balance = realm.create('Balance', {
   //         id: monthKey,
-  //         month: transaction.date.getMonth() + 1,
-  //         year: transaction.date.getFullYear(),
+  //         month: transaction.date.getUTCMonth() + 1,
+  //         year: transaction.date.getUTCFullYear(),
   //         income: 0,
   //         expense: 0,
   //         credit: 0,
@@ -363,8 +421,8 @@ export default function MonthlyControlScreen() {
   ) => {
     if (!transaction.date) return
 
-    const monthKey = `${transaction.date.getFullYear()}-${String(
-      transaction.date.getMonth() + 1
+    const monthKey = `${transaction.date.getUTCFullYear()}-${String(
+      transaction.date.getUTCMonth() + 1
     ).padStart(2, '0')}`
 
     realm.write(() => {
@@ -373,8 +431,8 @@ export default function MonthlyControlScreen() {
       if (!balance) {
         balance = realm.create('Balance', {
           id: monthKey,
-          month: transaction.date.getMonth() + 1,
-          year: transaction.date.getFullYear(),
+          month: transaction.date.getUTCMonth() + 1,
+          year: transaction.date.getUTCFullYear(),
           income: 0,
           expense: 0,
           credit: 0,
@@ -439,7 +497,6 @@ export default function MonthlyControlScreen() {
   }
 
   const save = () => {
-    console.log('salvando..')
     try {
       if (operation === 'add') {
         if (params.isRecurrence) {
@@ -448,13 +505,10 @@ export default function MonthlyControlScreen() {
             description: params.description,
             value: parseFloat(params.value),
             date: new Date(params.date),
-            //startDate: new Date(params.date.getFullYear(), params.date.getMonth(), 1),
             startDate: params.startDate,
             recurrence: 'monthly',
             endDate: params.endDate
           } as RecurringTransaction
-
-          console.log('neww', newRecurrencyTransaction)
 
           insertItem('RecurringTransaction', newRecurrencyTransaction)
         } else {
@@ -462,10 +516,8 @@ export default function MonthlyControlScreen() {
             description: params.description,
             value: parseFloat(params.value),
             type: params.type,
-            date: params.date,
+            date: new Date(params.date)
           } as Transaction
-          // insertItem('Transaction', newTransaction)
-          // updateBalanceAfterTransaction(newTransaction)
           updateBalanceAfterTransaction(newTransaction, undefined, 'create')
           insertItem('Transaction', newTransaction)
 
@@ -495,16 +547,15 @@ export default function MonthlyControlScreen() {
           if (operation === 'editAll') {
             const data = { ...recWithoutId, endDate: currentDate }
             updateItem('RecurringTransaction', params.id, data)
-            //criar nova recorrencia 
             const newRecurrence = {
               ...recWithoutId,
               description: params.description,
               value: parseFloat(params.value),
-              startDate: new Date(currentYear, (currentMonth - 1),
-                params?.startDate ? new Date(params?.startDate).getDay() : 1),
+              startDate: params.startDate,
               endDate: params.endDate || null,
               parentId: params.id,
-            } as RecurringTransaction
+            }
+
             insertItem('RecurringTransaction', newRecurrence)
 
           } else if (operation === 'editOnlyMonth') {
@@ -614,9 +665,9 @@ export default function MonthlyControlScreen() {
   }
 
   const handleDateChange = (event: any, selectedDate: Date | undefined) => {
-    const currentDate = selectedDate || params[activePicker!];  // Use o valor anterior se não tiver seleção
+    const currentDate = selectedDate || params[activePicker!]
     if (currentDate) {
-      const correctedDate = new Date(currentDate.setHours(0, 0, 0, 0));
+      const correctedDate = new Date(currentDate.setHours(0, 0, 0, 0))
       setParams(prevData => ({
         ...prevData,
         [activePicker!]: correctedDate,  // Atualiza a data correspondente ao activePicker
@@ -953,7 +1004,7 @@ export default function MonthlyControlScreen() {
                       }}
                     />
                     <Text>Transação recorrente</Text>
-                    <Button onPress={() => console.log(params)}>psrams</Button>
+                    {/* <Button onPress={() => console.log(params)}>psrams</Button> */}
                   </View>
 
                   {params.isRecurrence &&
@@ -1003,7 +1054,7 @@ export default function MonthlyControlScreen() {
 
 
               {operation !== 'add' && !isDeleting &&
-                ((selectedTransaction?.date?.getMonth() + 1) === currentMonth) &&
+                ((selectedTransaction?.date?.getUTCMonth() + 1) === currentMonth) &&
 
 
                 <Button
