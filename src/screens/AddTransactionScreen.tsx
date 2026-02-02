@@ -106,7 +106,7 @@ export default function AddTransactionScreen() {
         startDate: params.date,
         recurrence: params.recurrency,
         endDate: params.endDate
-      } as RecurringTransaction
+      } 
 
       insertItem('RecurringTransaction', newRecurrencyTransaction)
 

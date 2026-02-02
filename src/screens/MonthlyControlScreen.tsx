@@ -1,21 +1,22 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, AlertButton } from "react-native";
-import { Button, Checkbox, DataTable, Divider, Icon, Modal, Portal, TextInput } from "react-native-paper";
-import { Transaction, TransactionType } from "../interface/Transaction";
+import DateTimePicker from '@react-native-community/datetimepicker';
 import dayjs from "dayjs";
+import React, { useEffect, useState } from "react";
+import { Alert, AlertButton, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Button, Checkbox, DataTable, Divider, Icon, Modal, Portal, TextInput } from "react-native-paper";
+import { WinButton } from "../components/WinButton";
 import { realm } from "../database/realm";
 import { deleteItem, getItemById, insertItem, updateItem } from "../database/realmHelpers";
-import { RecurringTransaction, Type } from "../interface/RecurringTransaction";
-import { generateRandomId, getMonthName } from "../service/function";
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { Override } from "../interface/Override";
-import { WinButton } from "../components/WinButton";
 import { Balance } from "../interface/Balance";
+import { Credit } from "../interface/Credit";
+import { Override } from "../interface/Override";
+import { RecurringTransaction, Type } from "../interface/RecurringTransaction";
+import { Transaction, TransactionType } from "../interface/Transaction";
+import { generateRandomId, getMonthName } from "../service/function";
 
 
 
 type DateType = 'startDate' | 'endDate' | 'date' | null
-type Operation = 'add' | 'editAll' | 'editOnlyMonth' | 'editUnique' | null
+type Operation = 'add' | 'editAll' | 'editOnlyMonth' | 'editUnique' | 'editCredit' | 'editOverride' | null
 type BalanceOperation = 'create' | 'update' | 'delete'
 interface Params {
   id: string,
@@ -25,7 +26,8 @@ interface Params {
   startDate?: Date | null,
   endDate?: Date | null,
   type: TransactionType | null,
-  isRecurrence: boolean
+  isRecurrence: boolean,
+  installments?: string
 }
 export default function MonthlyControlScreen() {
 
@@ -50,10 +52,15 @@ export default function MonthlyControlScreen() {
     endDate: null,
     type: null,
     isRecurrence: false,
+    installments: "1"
   })
   const [params, setParams] = useState(emptyParams)
   const [activePicker, setActivePicker] = useState<DateType>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  const safeStartDay = selectedTransaction?.startDate ?
+    Math.min(selectedTransaction?.startDate.getDate(), new Date(currentYear, currentMonth, 0).getDate()) :
+    new Date().getDate()
 
 
 
@@ -144,87 +151,6 @@ export default function MonthlyControlScreen() {
     return total;
   }
 
-  // function getCreditTransactions(targetYear: number, targetMonth: number) {
-  //   // calcula mês anterior
-  //   let previousMonth = targetMonth - 1
-  //   let previousYear = targetYear
-
-  //   if (previousMonth < 0) {
-  //     previousMonth = 11
-  //     previousYear--
-  //   }
-
-  //   // intervalo de datas
-  //   const start = new Date(previousYear, previousMonth, 1)
-
-  //   const end = new Date(previousYear, previousMonth + 1, 0)
-
-  //   return realm.objects<Transaction>('Transaction')
-  //     .filtered('type == "credit" AND date >= $0 AND date <= $1', start, end)
-  //     .reduce((acc, t: any) => acc + t.value, 0)
-  // }
-
-
-  function getCreditTransactions(targetYear: number, targetMonth: number) {
-    // ----------------------------
-    // 1. Mês anterior (base 0)
-    // ----------------------------
-    let m0 = targetMonth - 1
-    let y = targetYear
-
-    if (m0 < 0) {
-      m0 = 11
-      y--
-    }
-
-    const start = new Date(Date.UTC(y, m0, 1))
-    const end = new Date(Date.UTC(y, m0 + 1, 1))
-
-    let total = 0
-
-    // ----------------------------
-    // 2. Créditos normais
-    // ----------------------------
-    realm.objects<Transaction>('Transaction')
-      .filtered('type == "credit" AND date >= $0 AND date < $1', start, end)
-      .forEach((t) => {
-        total += t.value
-      })
-
-    // ----------------------------
-    // 3. Overrides do mês
-    // ----------------------------
-    const overrides = realm.objects<Override>('Override')
-      .filtered('type == "credit" AND month == $0 AND year == $1', m0, y)
-      .slice()
-
-    overrides.forEach((o) => {
-      total += o.value
-    })
-
-    // ----------------------------
-    // 4. Créditos recorrentes (virtual)
-    // ----------------------------
-    const recurring = realm.objects<RecurringTransaction>('RecurringTransaction')
-      .filtered('type == "credit"')
-
-    recurring.forEach((rt) => {
-      // existe override para este mês? então não soma recorrente
-      const hasOverride = overrides.some(
-        (o) => o.parentId === rt._id
-      )
-
-      if (hasOverride) return
-
-      if (occursInMonth(rt, m0, y)) {
-        total += rt.value
-      }
-    })
-
-    return total
-  }
-
-
 
   // Carrega ao iniciar e sempre que currentDate mudar
   useEffect(() => {
@@ -285,73 +211,214 @@ export default function MonthlyControlScreen() {
     } as Transaction;
   }
 
-  function getTransactionsByMonth(month: number, year: number) { // Base 0 (Jan = 0, Fev = 1)
+
+  // function getCreditsByMonth(month: number, year: number) {
+  //   const start = new Date(Date.UTC(year, month, 1))
+  //   const end = new Date(Date.UTC(year, month + 1, 1))
+
+  //   return realm
+  //     .objects<Credit>('Credit')
+  //     .filtered('startDate >= $0 AND startDate < $1', start, end)
+  //     .slice()
+  //     .map((c) => ({
+  //       _id: c._id,
+  //       date: c.startDate,
+  //       description: c.description, // colocar (Parcela 1 de 10)
+  //       type: 'credit',
+  //       value: c.value / c.installments, //valor da parcela
+  //       installments: c.installments,
+  //     }))
+  // }
+
+  function getCreditsByMonth(month: number, year: number) {
+    const credits = realm.objects<Credit>('Credit')
+
+    return credits
+      .filter((c) => {
+        const start = c.date
+        const startMonth = start.getUTCMonth()
+        const startYear = start.getUTCFullYear()
+
+        const diff =
+          (year - startYear) * 12 +
+          (month - startMonth)
+
+        // Parcela válida para este mês
+        return diff >= 0 && diff < c.installments
+      })
+      .map((c) => {
+        const startMonth = c.date.getUTCMonth()
+        const startYear = c.date.getUTCFullYear()
+
+        const diff =
+          (year - startYear) * 12 +
+          (month - startMonth)
+
+        const parcelNumber = diff + 1
+        const parcelValue = c.value / c.installments
+
+        return {
+          _id: c._id,
+          date: new Date(Date.UTC(year, month, c.date.getUTCDate())),
+          description: `${c.description} ${c.installments > 1 ? `(${parcelNumber}/${c.installments})` : ''}`,
+          type: 'credit',
+          value: parcelValue,
+          installment: parcelNumber,
+          installments: c.installments
+        }
+      })
+  }
+
+
+
+  function getTotalCreditsByMonth(year: number, month: number): number {
+    return getCreditsByMonth(month, year)
+      .reduce((sum, c) => sum + c.value, 0)
+  }
+
+
+  function getCreditInvoiceForMonth(year: number, month: number) {
+    // fatura do mês anterior
+    let m0 = month - 1
+    let y = year
+
+    if (m0 < 0) {
+      m0 = 11
+      y--
+    }
+
+    const start = new Date(Date.UTC(y, m0, 1))
+    const end = new Date(Date.UTC(y, m0 + 1, 1))
+
+    let total = 0
+
+    realm.objects<Credit>('Credit').forEach((c) => {
+      const installmentValue = c.value / c.installments
+
+      for (let i = 0; i < c.installments; i++) {
+        const due = new Date(Date.UTC(
+          c.date.getUTCFullYear(),
+          c.date.getUTCMonth() + i,
+          1
+        ))
+
+        if (due >= start && due < end) {
+          total += installmentValue
+        }
+      }
+    })
+
+    return total
+  }
+
+  function isParentInvalidForMonth(
+    rec: RecurringTransaction,
+    month: number,
+    year: number,
+    all: Map<string, RecurringTransaction>
+  ): boolean {
+    // se não tem filho, nunca é inválido
+    const hasChild = Array.from(all.values())
+      .some(r => r.parentId === rec._id)
+
+    if (!hasChild) return false
+
+    // se não tem endDate, nunca deveria acontecer, mas protege
+    if (!rec.endDate) return false
+
+    const currentYM = year * 12 + month
+    const endYM =
+      rec.endDate.getUTCFullYear() * 12 +
+      rec.endDate.getUTCMonth()
+
+    // pai só morre APÓS o endDate
+    return currentYM > endYM
+  }
+
+
+
+
+
+  function getTransactionsByMonth(month: number, year: number) {
     try {
+      const start = new Date(Date.UTC(year, month, 1))
+      const end = new Date(Date.UTC(year, month + 1, 1))
 
-      // Primeiro dia do mês (00:00 UTC do primeiro dia)
-      const start = new Date(Date.UTC(year, month, 1));  // 00:00 UTC
+      // 1. Income / Expense normais
+      const normal = realm
+        .objects<Transaction>('Transaction')
+        .filtered('date >= $0 AND date < $1', start, end)
+        .slice()
 
-      // Último dia do mês (23:59:59.999 UTC do último dia)
-      const end = new Date(Date.UTC(year, month + 1, 0));  // último dia do mês
-      end.setUTCHours(23, 59, 59, 999);  // 23:59:59.999 UTC
+      const recurrents = realm
+        .objects<RecurringTransaction>('RecurringTransaction')
+        .filtered(
+          'startDate < $0 AND (endDate == null OR endDate >= $1)',
+          end,
+          start
+        )
 
-      // 1. Transações normais
-      const normal = realm.objects<Transaction>('Transaction')
-        .filtered('date >= $0 && date <= $1', start, end)
-        .slice();
+      const recurrentsById = new Map<string, RecurringTransaction>(
+        recurrents.map((r) => [r._id, r])
+      )
 
 
-      // 2. Recorrentes
-      const recurrents = realm.objects<RecurringTransaction>('RecurringTransaction')
-        .filtered('startDate <= $0 AND (endDate == null OR endDate >= $1)', end, start);
+      const overrides = realm
+        .objects<Override>('Override')
+        .filtered('year == $0 AND month == $1', year, month + 1)
+        .slice()
 
-      // 3. Overrides do mês atual
-      const overrides = realm.objects<Override>('Override')
-        .filtered('year == $0 AND month == $1', year, (month + 1))
-        .slice();
+      // const overriddenParentIds = new Set(overrides.map((o) => o.parentId))
 
-      // Transforma Overrides em transações normais
       const overrideTransactions = overrides.map((o) => ({
         _id: o._id,
         parentId: o.parentId,
-        date: new Date(year, month, 1),
+        date: o.date,
         description: o.description,
         value: o.value,
-        type: o.type
-      }));
+        type: o.type,
+      }))
 
-      let monthRecurring = recurrents
-        .filter((rec) => occursInMonth(rec, month, year))
-        .map((rec) => generateRecurringTransactionInstance(rec, month, year));
-
-      const itemsWithParentId = monthRecurring.filter((item: Transaction) => item.parentId);
-
-      // Excluindo as transações que têm um parentId correspondente
-      monthRecurring = monthRecurring.filter((transaction: Transaction) => {
-        const hasParentId = itemsWithParentId.some((parent: Transaction) => transaction._id === parent.parentId);
-        return !hasParentId;
-      })
-
-      // Remove recorrentes que possuem override
       const overriddenParentIds = new Set(
         overrides.map((o) => o.parentId)
       )
 
-      monthRecurring = monthRecurring.filter(
-        (rec) => !overriddenParentIds.has(rec._id)
-      );
 
-      const totalCredit = getCreditTransactions(currentYear, (currentMonth - 1))
-      const totalAccumulated = getAccumulatedBalance(currentYear, currentMonth) +
-        getCreditTransactions(currentYear, (currentMonth - 1))
 
-      const credit = {
-        _id: 'statement',
-        date: new Date(year, month, 1),
-        description: "Fatura crédito",
-        type: "expense",
-        value: totalCredit
-      }
+      const recurringTx = recurrents
+        .filter((rec) => occursInMonth(rec, month, year))
+        .filter(
+          (rec) =>
+            !isParentInvalidForMonth(rec, month, year, recurrentsById)
+        )
+        .filter(
+          (rec) => !overriddenParentIds.has(rec._id)
+        )
+        .map((rec) =>
+          generateRecurringTransactionInstance(rec, month, year)
+        )
+
+
+
+      // 3. Créditos do mês (visual)
+      const credits = getCreditsByMonth(month, year)
+
+      const totalAccumulated = getAccumulatedBalance(currentYear, currentMonth)
+
+      // 4. Fatura do cartão (despesa)
+      const invoiceValue = getCreditInvoiceForMonth(year, month)
+
+      const invoiceLine =
+        invoiceValue > 0
+          ? {
+            _id: `invoiceCredit`,
+            date: new Date(Date.UTC(year, month, 1)),
+            description: 'Fatura - C. Crédito',
+            type: 'expense',
+            value: invoiceValue,
+          }
+          : null
+
 
       const accumulatedBalance = {
         _id: 'accumulatedBalance',
@@ -361,57 +428,21 @@ export default function MonthlyControlScreen() {
         value: totalAccumulated
       }
 
-      // 3. Combinar ambos
-      const all = [
-        totalCredit > 0 && credit,
+
+      // 5. Combinação final
+      return [
+        invoiceLine,
         totalAccumulated > 0 && accumulatedBalance,
+        ...credits,
         ...normal,
         ...overrideTransactions,
-        ...monthRecurring];
-
-      return all;
+        ...recurringTx,
+      ].filter(Boolean)
     } catch (e) {
-      console.error('erro', e)
+      console.error(e)
+      return []
     }
   }
-
-  // const updateBalanceAfterTransaction = (transaction: Transaction, previousTransaction?: Transaction) => {
-  //   if (!transaction.date) return
-  //   const monthKey = `${transaction.date.getUTCFullYear()}-${String(transaction.date.getUTCMonth() + 1).padStart(2, '0')}`;
-
-  //   realm.write(() => {
-  //     let balance = realm.objectForPrimaryKey('Balance', monthKey) as Balance
-
-  //     if (!balance) {
-  //       if (!transaction.date) return
-  //       balance = realm.create('Balance', {
-  //         id: monthKey,
-  //         month: transaction.date.getUTCMonth() + 1,
-  //         year: transaction.date.getUTCFullYear(),
-  //         income: 0,
-  //         expense: 0,
-  //         credit: 0,
-  //         partialBalance: 0,
-  //       });
-  //     }
-
-
-
-  //     if (transaction.type === 'income') {
-  //       if (previousTransaction) {
-  //         balance.income -= previousTransaction.value;
-  //         balance.income += transaction.value
-  //       } else {
-  //         balance.income += transaction.value;
-  //       }
-  //     }
-  //     if (transaction.type === 'expense') balance.expense += transaction.value;
-  //     if (transaction.type === 'credit') balance.credit += transaction.value;
-
-  //     balance.partialBalance = balance.income - balance.expense - balance.credit;
-  //   });
-  // }
-
 
 
   const updateBalanceAfterTransaction = (
@@ -473,93 +504,193 @@ export default function MonthlyControlScreen() {
 
 
 
-  const edit = async (transaction: any) => {
+  const edit = async (transaction: any, operation?: Operation) => {
+    if (operation)
+      setOperation(operation)
+    console.log('operatrion', operation)
     let schema = 'Transaction'
 
     if (transaction.isRecurrence) {
       schema = 'RecurringTransaction'
+    } else if (transaction.type === 'credit') {
+      schema = 'Credit'
+    } else if (transaction.parentId) {
+      schema = 'Override'
     }
 
     const data = getItemById(schema, transaction._id)
+    console.log('data', data)
     if (data) {
+      console.log('alterand')
       setSelectedTransaction(data)
       setParams({
         id: data._id,
         description: data.description,
-        date: data.date,
+        date: operation === 'editOnlyMonth' ?
+          new Date(currentYear, currentMonth - 1, safeStartDay) : new Date(),
         value: data.value.toString(),
-        startDate: data.startDate,
-        endDate: data.endDate || null,
-        type: data.type,
-        isRecurrence: transaction?.isRecurrence ? true : false
+        startDate: transaction?.isRecurrence ? data.startDate : null,
+        endDate: transaction?.isRecurrence ? data.endDate || null : null,
+        type: schema === 'Credit' ? 'credit' : data.type,
+        isRecurrence: transaction?.isRecurrence ? true : false,
+        installments: data?.installments ? data.installments.toString() : "1"
       })
+      console.log('params', params)
     }
   }
 
   const save = () => {
     try {
-      if (operation === 'add') {
-        if (params.isRecurrence) {
-          const newRecurrencyTransaction = {
-            type: params.type,
-            description: params.description,
-            value: parseFloat(params.value),
-            date: new Date(params.date),
-            startDate: params.startDate,
-            recurrence: 'monthly',
-            endDate: params.endDate
-          } as RecurringTransaction
 
-          insertItem('RecurringTransaction', newRecurrencyTransaction)
-        } else {
-          const newTransaction = {
-            description: params.description,
-            value: parseFloat(params.value),
-            type: params.type,
-            date: new Date(params.date)
-          } as Transaction
-          updateBalanceAfterTransaction(newTransaction, undefined, 'create')
-          insertItem('Transaction', newTransaction)
-
+      // =========================
+      // 🟣 CRÉDITO 
+      // =========================
+      if (params.type === 'credit' && operation === 'add') {
+        const credit = {
+          _id: generateRandomId(),
+          description: params.description,
+          value: parseFloat(params.value),
+          installments: params.installments ? parseInt(params.installments) : 1,
+          date: params.date,
         }
 
-      } else if (operation === 'editUnique') {
-        console.log('pareamss', params)
-        const previousData = getItemById('Transaction', params.id) as Transaction
+        insertItem('Credit', credit)
 
-        const { _id, ...newTransactionData } = previousData
+        setOperation(null)
+        setParams(emptyParams)
+        loadTransactions(currentDate)
+        return
+      }
 
-        const newTransaction = {
-          ...newTransactionData,
+      // =========================
+      // 🟢 TRANSAÇÕES NORMAIS
+      // =========================
+      if (operation === 'add') {
+        if (params.isRecurrence) {
+          const rec = {
+            type: params.type,
+            description: params.description,
+            value: parseFloat(params.value),
+            startDate: params.startDate,
+            recurrence: 'monthly',
+            endDate: params.endDate ?? null,
+            date: new Date(params.date),
+          } as RecurringTransaction
+
+          insertItem('RecurringTransaction', rec)
+        } else {
+          const tx = {
+            description: params.description,
+            value: parseFloat(params.value),
+            type: params.type,
+            date: new Date(params.date),
+          } as Transaction
+
+          updateBalanceAfterTransaction(tx, undefined, 'create')
+          insertItem('Transaction', tx)
+        }
+      }
+
+      else if (operation === 'editCredit') {
+        console.log('editando credito')
+        const previous = getItemById('Credit', params.id) as Credit
+        if (!previous) return
+
+        const { _id, ...rest } = previous
+
+        const updated = {
+          ...rest,
           description: params.description,
-          value: parseFloat(params.value)
+          value: parseFloat(params.value),
+          installments: params.installments ? parseInt(params.installments) : 1
+        } as Credit
+        updateItem('Credit', params.id, updated)
+      }
+
+      // =========================
+      // 🟡 EDITAR TRANSAÇÃO ÚNICA
+      // =========================
+      else if (operation === 'editUnique') {
+        const previous = getItemById('Transaction', params.id) as Transaction
+        if (!previous) return
+
+        const { _id, ...rest } = previous
+
+        const updated = {
+          ...rest,
+          description: params.description,
+          value: parseFloat(params.value),
         } as Transaction
-        console.log('newwww-->>', newTransaction)
-        updateBalanceAfterTransaction(newTransaction, previousData, 'update')
-        updateItem('Transaction', params.id, newTransaction)
 
+        updateBalanceAfterTransaction(updated, previous, 'update')
+        updateItem('Transaction', params.id, updated)
+      }
 
-      } else {
-        // Salvando edição - Transações recorrentes
+      else if (operation === 'editOverride') {
+
+        const previous = getItemById('Override', params.id) as Transaction
+        if (!previous) return
+
+        const { _id, ...rest } = previous
+        const updated = {
+          ...rest,
+          description: params.description,
+          value: parseFloat(params.value),
+        } as Transaction
+
+        updateBalanceAfterTransaction(updated, previous, 'update')
+        updateItem('Override', params.id, updated)
+
+      }
+
+      // =========================
+      // 🔵 RECORRÊNCIAS (income/expense)
+      // =========================
+      else {
         const rec = getItemById('RecurringTransaction', params.id) as RecurringTransaction
-        if (rec) {
-          const { _id, ...recWithoutId } = rec
-          if (operation === 'editAll') {
-            const data = { ...recWithoutId, endDate: currentDate }
-            updateItem('RecurringTransaction', params.id, data)
-            const newRecurrence = {
+        if (!rec) return
+
+        const { _id, ...recWithoutId } = rec
+
+        let newEndDate = new Date()
+        if (params.startDate) {
+          newEndDate = new Date(
+            currentYear,
+            currentMonth - 2,
+            params.startDate.getDate(),
+          )
+        }
+
+        if (operation === 'editAll') {
+          updateItem('RecurringTransaction', params.id, {
+            ...recWithoutId,
+            endDate: newEndDate,
+          })
+
+          if (params.startDate) {
+            const safeDay = Math.min(
+              params.startDate.getDate(),
+              new Date(currentYear, currentMonth, 0).getDate()
+            )
+
+            const newStartDate = new Date(currentYear, currentMonth - 1, safeDay)
+
+            insertItem('RecurringTransaction', {
               ...recWithoutId,
               description: params.description,
               value: parseFloat(params.value),
-              startDate: params.startDate,
-              endDate: params.endDate || null,
+              startDate: newStartDate,
+              endDate: params.endDate ?? null,
               parentId: params.id,
-            }
+            })
+          }
 
-            insertItem('RecurringTransaction', newRecurrence)
+        }
 
-          } else if (operation === 'editOnlyMonth') {
-            const newOverride = {
+        if (params.startDate) {
+
+          if (operation === 'editOnlyMonth') {
+            insertItem('Override', {
               _id: generateRandomId(),
               parentId: params.id,
               year: currentYear,
@@ -567,22 +698,21 @@ export default function MonthlyControlScreen() {
               description: params.description,
               value: parseFloat(params.value),
               type: rec.type,
-              date: rec.date
-            }
-            insertItem('Override', newOverride)
+              date: params.date //newDate// rec.startDate,
+            })
           }
         }
-        setOperation(null)
-        loadTransactions(currentDate)
+
 
       }
+
       setOperation(null)
       setParams(emptyParams)
       loadTransactions(currentDate)
+
     } catch (e) {
       console.error(e)
     }
-
   }
 
 
@@ -590,8 +720,13 @@ export default function MonthlyControlScreen() {
 
 
 
+
   const selecTransaction = (transaction: any) => {
-    if (transaction._id === 'accumulatedBalance') return
+    console.log(transaction)
+
+    if (transaction._id === 'accumulatedBalance' ||
+      transaction._id === 'invoiceCredit') return
+
     if (transaction?.isRecurrence) {
       const buttons: AlertButton[] = [
         {
@@ -604,8 +739,8 @@ export default function MonthlyControlScreen() {
         {
           text: 'Editar somente este mês',
           onPress: () => {
-            edit(transaction)
-            setOperation('editOnlyMonth')
+            //setOperation('editOnlyMonth')
+            edit(transaction, 'editOnlyMonth')
           },
         },
       ]
@@ -613,29 +748,48 @@ export default function MonthlyControlScreen() {
         buttons.push({
           text: 'Editar sequência',
           onPress: () => {
-            edit(transaction)
-            setOperation('editAll')
+            edit(transaction, 'editAll')
+            //setOperation('editAll')
           },
         })
       }
 
       Alert.alert('Editar Transação recorrente', 'Como deseja editar?', buttons)
 
+    } else if (transaction.parentId) { //Editar transações comum que já tiveram ediçoes (override)
+
+      
+      edit(transaction, 'editOverride')
+
     } else {
-      Alert.alert('Editar transação', 'Deseja editar essa transação?', [
-        {
-          text: 'Cancel',
-          onPress: () => console.log('Cancel Pressed'),
-          style: 'cancel',
-        },
-        {
-          text: 'Editar',
-          onPress: () => {
-            setOperation('editUnique')
-            edit(transaction)
-          }
-        },
-      ]);
+      if (transaction.type === 'credit') {
+        //setOperation('editCredit')
+        edit({ ...transaction, type: 'credit' }, 'editCredit')
+      }
+      else {
+        //setOperation('editUnique')
+        edit(transaction, 'editUnique')
+      }
+      // Alert.alert('Editar transação', 'Deseja editar essa transação?', [
+      //   {
+      //     text: 'Cancel',
+      //     onPress: () => console.log('Cancel Pressed'),
+      //     style: 'cancel',
+      //   },
+      //   {
+      //     text: 'Editar',
+      //     onPress: () => {
+      //       if (transaction.type === 'credit') {
+      //         //setOperation('editCredit')
+      //         edit({ ...transaction, type: 'credit' }, 'editCredit')
+      //       }
+      //       else {
+      //         //setOperation('editUnique')
+      //         edit(transaction, 'editUnique')
+      //       }
+      //     }
+      //   },
+      // ]);
     }
 
   }
@@ -649,19 +803,29 @@ export default function MonthlyControlScreen() {
   }
 
 
-  const del = (transaction: any) => {
+  const del = (transaction: Transaction) => {
     console.log('paramms', params)
-    console.log(transaction)
+    console.log('transatcion ->',transaction)
+
     if (params.isRecurrence) {
 
+      deleteItem('RecurringTransaction', transaction._id)
+      updateBalanceAfterTransaction(transaction, transaction, 'delete')
+
+    } else if (transaction.type === 'credit') {
+      console.log('excluindom credito')
+      updateBalanceAfterTransaction(transaction, transaction, 'delete')
+      deleteItem('Credit', transaction._id)
+     
     } else {
 
       updateBalanceAfterTransaction(transaction, transaction, 'delete')
       deleteItem('Transaction', transaction._id)
-
-      loadTransactions(currentDate)
-      closeModal()
+      
     }
+
+    loadTransactions(currentDate)
+    closeModal()
   }
 
   const handleDateChange = (event: any, selectedDate: Date | undefined) => {
@@ -724,8 +888,8 @@ export default function MonthlyControlScreen() {
   const totalExpenses = expenses.reduce((acc: number, t: Transaction) => acc + t.value, 0)
   const saldoParcial = (totalEntries - totalExpenses)
 
-  const totalCredit = getCreditTransactions(currentYear, currentMonth)
-  const totalBalance = (totalEntries - totalExpenses - totalCredit)
+  const totalCredit = getTotalCreditsByMonth(currentYear, currentMonth - 1)
+  const totalBalance = totalEntries - totalExpenses - totalCredit
 
   return (
     <View style={styles.container}>
@@ -907,9 +1071,10 @@ export default function MonthlyControlScreen() {
 
 
 
-                  minimumDate={operation === 'add' ? new Date(Date.UTC(currentYear, currentMonth - 1, 1, 23, 59, 59)) : undefined}
+                  minimumDate={operation === 'add' || operation === 'editAll' || operation === 'editOnlyMonth' ?
+                    new Date(Date.UTC(currentYear, currentMonth - 1, 1, 23, 59, 59)) : undefined}
 
-                  maximumDate={operation === 'add' &&
+                  maximumDate={operation === 'add' || operation === 'editAll' &&
                     activePicker === 'startDate' || activePicker === 'date' ?
                     new Date(Date.UTC(currentYear, currentMonth, 0, 23, 59, 59)) : undefined}
                 />
@@ -927,12 +1092,14 @@ export default function MonthlyControlScreen() {
               </View> */}
               <View>
                 <Text style={{ fontSize: 20 }}>
-                  {operation === 'add'
-                    ? 'Adicionando nova transação'
-                    : (operation === 'editOnlyMonth'
-                      ? 'Editando este mês apenas'
-                      : operation === 'editUnique' ? 'Editando transação'
-                        : `Editando sequência\n(${getMonthName(currentMonth)}/${currentYear} em diante)`)}
+                  {operation === 'add' ?
+                    'Adicionando nova transação' :
+                    (operation === 'editOnlyMonth' ?
+                      'Editando este mês apenas' :
+                      operation === 'editAll' ?
+                        `Editando sequência\n(${getMonthName(currentMonth)}/${currentYear} em diante)` :
+                        'Editando transação'
+                    )}
                 </Text>
 
               </View>
@@ -957,7 +1124,7 @@ export default function MonthlyControlScreen() {
                 <View style={{ width: '48%' }}>
                   <Text style={{ marginLeft: 5 }}>Data</Text>
                   <Button
-                    disabled={operation !== 'add'}
+                    disabled={operation !== 'add' && operation !== 'editOnlyMonth'}
                     mode="contained-tonal"
                     onPress={() => setActivePicker('date')}
                     style={{ marginBottom: 16 }}
@@ -988,6 +1155,7 @@ export default function MonthlyControlScreen() {
 
 
               {operation !== "editUnique" && operation !== 'editOnlyMonth' &&
+                operation !== 'editCredit' && params.type !== 'credit' && operation !== 'editOverride' &&
                 <View>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Checkbox
@@ -1012,7 +1180,7 @@ export default function MonthlyControlScreen() {
                       <View style={{ width: '48%' }}>
                         <Text style={{ marginLeft: 5 }}>Início</Text>
                         <Button
-                          disabled={operation !== 'add'}
+                          // disabled={operation !== 'add'}
                           mode="contained-tonal"
                           onPress={() => setActivePicker('startDate')}
                         >
@@ -1051,11 +1219,23 @@ export default function MonthlyControlScreen() {
                 </View>
               }
 
+              {params.type === 'credit' &&
+                <View>
+                  <TextInput
+                    label="N. Parcela"
+                    value={params.installments}
+                    onChangeText={(text) => setParams(prev => ({ ...prev, installments: text }))}
+                    keyboardType="numeric"
+                    mode="outlined"
+                    style={{ marginBottom: 16 }}
+                    disabled={isDeleting}
+                  />
+                </View>
+              }
 
-
-              {operation !== 'add' && !isDeleting &&
+              {operation !== 'add' && !isDeleting && operation !== 'editOverride' &&
+                operation !== 'editOnlyMonth' &&
                 ((selectedTransaction?.date?.getUTCMonth() + 1) === currentMonth) &&
-
 
                 <Button
                   mode="contained"
