@@ -10,7 +10,7 @@ export default function SettingScreen() {
             <Button onPress={() => console.log(getAllItems('Override'))}>Override</Button>
             <Button onPress={() => console.log(getAllItems('Transaction'))}>Transaction</Button>
             <Button onPress={() => console.log(getAllItems('Balance'))}>Balance</Button>
-            <Button onPress={() => console.log(getAllItems('Credit'))}>Credit</Button>
+            <Button onPress={() => console.log(JSON.stringify(getAllItems('Credit')))}>Credit</Button>
         </View>
     )
 }
