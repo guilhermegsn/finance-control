@@ -5,7 +5,7 @@ import { Alert, AlertButton, ScrollView, StyleSheet, Text, TouchableOpacity, Vie
 import { Button, Checkbox, DataTable, Divider, Icon, Modal, Portal, TextInput } from "react-native-paper";
 import { WinButton } from "../components/WinButton";
 import { deleteItem, getItemById, insertItem, updateItem } from "../database/realmHelpers";
-import { TransactionRepository } from "../database/TransactionRepository";
+import { TransactionRepository } from "../database/TransactionRepository"; // Importando o Repository
 import { Credit } from "../interface/Credit";
 import { RecurringTransaction, Type } from "../interface/RecurringTransaction";
 import { Transaction, TransactionType } from "../interface/Transaction";
@@ -76,16 +76,16 @@ export default function MonthlyControlScreen() {
   // --- ACTIONS (SAVE / EDIT / DELETE) ---
   const edit = async (transaction: any, operation?: Operation) => {
     if (operation) setOperation(operation);
-
+    
     let schema = 'Transaction';
     if (transaction.isRecurrence) schema = 'RecurringTransaction';
     else if (transaction.type === 'credit') schema = 'Credit';
     else if (transaction.parentId) schema = 'Override';
 
     const data = getItemById(schema, transaction._id);
-
+    
     if (data) {
-      setSelectedTransaction(schema == 'Credit' ? { ...data, type: 'credit' } : data);
+      setSelectedTransaction(data);
       setParams({
         id: data._id,
         description: data.description,
@@ -104,84 +104,167 @@ export default function MonthlyControlScreen() {
 
   const save = () => {
     try {
-      // Chama o Repository passando os parâmetros e o mês atual (0-11)
-      TransactionRepository.saveTransaction(params, operation, currentMonth - 1, currentYear);
+      // 1. CRÉDITO
+      if (params.type === 'credit' && operation === 'add') {
+        const credit = {
+          _id: generateRandomId(),
+          description: params.description,
+          value: parseFloat(params.value),
+          installments: params.installments ? parseInt(params.installments) : 1,
+          date: params.date,
+        };
+        insertItem('Credit', credit);
+        // Não atualiza balance imediato pois crédito é calculado na hora, 
+        // mas se houver lógica futura de cache, estaria aqui.
+      }
+      
+      // 2. ADICIONAR (Normal ou Recorrente)
+      else if (operation === 'add') {
+        if (params.isRecurrence) {
+          const rec = {
+            type: params.type,
+            description: params.description,
+            value: parseFloat(params.value),
+            startDate: params.startDate,
+            recurrence: 'monthly',
+            endDate: params.endDate ?? null,
+            date: new Date(params.date),
+          } as RecurringTransaction;
+          insertItem('RecurringTransaction', rec);
+        } else {
+          const tx = {
+            description: params.description,
+            value: parseFloat(params.value),
+            type: params.type,
+            date: new Date(params.date),
+          } as Transaction;
+          
+          TransactionRepository.updateBalanceAfterTransaction(tx, undefined, 'create');
+          insertItem('Transaction', tx);
+        }
+      }
 
-      // Reseta estados da tela
+      // 3. EDITAR CRÉDITO
+      else if (operation === 'editCredit') {
+        const previous = getItemById('Credit', params.id) as Credit;
+        if (!previous) return;
+        const { _id, ...rest } = previous;
+        const updated = {
+          ...rest,
+          description: params.description,
+          value: parseFloat(params.value),
+          installments: params.installments ? parseInt(params.installments) : 1
+        } as Credit;
+        updateItem('Credit', params.id, updated);
+      }
+
+      // 4. EDITAR ÚNICA (Normal)
+      else if (operation === 'editUnique') {
+        const previous = getItemById('Transaction', params.id) as Transaction;
+        if (!previous) return;
+        const { _id, ...rest } = previous;
+        const updated = {
+          ...rest,
+          description: params.description,
+          value: parseFloat(params.value),
+        } as Transaction;
+
+        TransactionRepository.updateBalanceAfterTransaction(updated, previous, 'update');
+        updateItem('Transaction', params.id, updated);
+      }
+
+      // 5. EDITAR OVERRIDE
+      else if (operation === 'editOverride') {
+        const previous = getItemById('Override', params.id) as Transaction;
+        if (!previous) return;
+        const { _id, ...rest } = previous;
+        const updated = {
+          ...rest,
+          description: params.description,
+          value: parseFloat(params.value),
+        } as Transaction;
+
+        TransactionRepository.updateBalanceAfterTransaction(updated, previous, 'update');
+        updateItem('Override', params.id, updated);
+      }
+
+      // 6. EDITAR RECORRÊNCIA
+      else {
+        const rec = getItemById('RecurringTransaction', params.id) as RecurringTransaction;
+        if (!rec) return;
+
+        const { _id, ...recWithoutId } = rec;
+
+        // Se editou toda a série, ajusta endDate se necessário ou cria nova série
+        if (operation === 'editAll') {
+          // Lógica original de dividir séries se mudou startDate no meio do caminho
+          // Mantida conforme seu código original
+          let newEndDate = new Date();
+          if (params.startDate) {
+             newEndDate = new Date(currentYear, currentMonth - 2, params.startDate.getDate());
+          }
+          
+          updateItem('RecurringTransaction', params.id, {
+            ...recWithoutId,
+            endDate: newEndDate, // Fecha a anterior
+          });
+
+          if (params.startDate) {
+            const safeDay = Math.min(params.startDate.getDate(), new Date(currentYear, currentMonth, 0).getDate());
+            const newStartDate = new Date(currentYear, currentMonth - 1, safeDay);
+
+            insertItem('RecurringTransaction', {
+              ...recWithoutId,
+              description: params.description,
+              value: parseFloat(params.value),
+              startDate: newStartDate,
+              endDate: params.endDate ?? null,
+              parentId: params.id,
+            });
+          }
+        }
+
+        // Se editou só este mês (Cria Override)
+        if (operation === 'editOnlyMonth') {
+           insertItem('Override', {
+              _id: generateRandomId(),
+              parentId: params.id,
+              year: currentYear,
+              month: currentMonth,
+              description: params.description,
+              value: parseFloat(params.value),
+              type: rec.type,
+              date: params.date
+           });
+        }
+      }
+
       setOperation(null);
       setParams(emptyParams);
-      
-      // Recarrega a lista visual
       loadTransactions(currentDate);
 
     } catch (e) {
       console.error(e);
-      Alert.alert("Erro", "Não foi possível salvar a transação.");
     }
   };
-  // const del = (transaction: Transaction) => {
-  //   console.log(transaction)
-  //   if (params.isRecurrence) {
-  //     deleteItem('RecurringTransaction', transaction._id);
-  //     TransactionRepository.updateBalanceAfterTransaction(transaction, transaction, 'delete');
-  //   } else if (transaction.type === 'credit') {
-  //     console.log('excluindo credito')
-  //     TransactionRepository.updateBalanceAfterTransaction(transaction, transaction, 'delete');
-  //     deleteItem('Credit', transaction._id);
-  //   } else {
-  //     TransactionRepository.updateBalanceAfterTransaction(transaction, transaction, 'delete');
-  //     deleteItem('Transaction', transaction._id);
-  //   }
-  //   loadTransactions(currentDate);
-  //   closeModal();
-  // };
 
-  const del = (transaction: any) => {
-    // 1. Delegamos a exclusão para o Repositório (que sabe lidar com Credit, Recurrence, etc)
-    const result = TransactionRepository.deleteTransaction(transaction);
-
-    if (!result.success) {
-      // Caso a regra de negócio bloqueie (ex: recorrência antiga)
-      Alert.alert("Não é possível excluir", result.error);
-      return;
+  const del = (transaction: Transaction) => {
+    if (params.isRecurrence) {
+      deleteItem('RecurringTransaction', transaction._id);
+      TransactionRepository.updateBalanceAfterTransaction(transaction, transaction, 'delete');
+    } else if (transaction.type === 'credit') {
+      TransactionRepository.updateBalanceAfterTransaction(transaction, transaction, 'delete');
+      deleteItem('Credit', transaction._id);
+    } else {
+      TransactionRepository.updateBalanceAfterTransaction(transaction, transaction, 'delete');
+      deleteItem('Transaction', transaction._id);
     }
-
-    // 2. FORÇAMOS O RECÁLCULO DO SALDO DO MÊS
-    // Isso garante que o saldo "Balance" no banco fique igual à soma das transações que restaram.
-    // É muito mais seguro que tentar subtrair manualmente.
-    TransactionRepository.recalculateBalanceForMonth(currentMonth - 1, currentYear); // Mês 0-11
-
-    // 3. Atualiza a tela
     loadTransactions(currentDate);
     closeModal();
   };
 
-  // const del = (transaction: any) => {
-  //   console.log('excluindoi', transaction)
-  //   // 1. Tenta deletar via Repository
-  //   const result = TransactionRepository.deleteTransaction(transaction);
-  //   console.log('result', result)
-
-  //   if (!result.success) {
-  //     // Se falhou (ex: regra de data da recorrência), avisa o usuário
-  //     Alert.alert("Atenção", result.error);
-  //     // Não fecha o modal para permitir que ele leia
-  //     setIsDeleting(false);
-  //     return;
-  //   }
-
-  //   // 2. Se deu certo, recalcula o saldo deste mês para garantir consistência
-  //   // (Isso substitui o updateBalanceAfterTransaction manual e complexo)
-  //   TransactionRepository.recalculateBalanceForMonth(currentMonth - 1, currentYear); // Passa mês 0-11
-
-  //   // 3. Atualiza UI
-  //   loadTransactions(currentDate);
-  //   closeModal();
-  // };
-
   // --- HELPERS UI ---
   const selecTransaction = (transaction: any) => {
-    console.log(transaction)
     if (transaction._id === 'accumulatedBalance' || transaction._id === 'invoiceCredit') return;
 
     if (transaction?.isRecurrence) {
@@ -196,11 +279,8 @@ export default function MonthlyControlScreen() {
     } else if (transaction.parentId) {
       edit(transaction, 'editOverride');
     } else {
-      console.log('oi')
-      if (transaction.type === 'credit')
-        edit(transaction, 'editCredit');
-      else
-        edit(transaction, 'editUnique');
+      if (transaction.type === 'credit') edit({ ...transaction, type: 'credit' }, 'editCredit');
+      else edit(transaction, 'editUnique');
     }
   };
 
@@ -256,7 +336,7 @@ export default function MonthlyControlScreen() {
 
   // Usando Repository para consistência, ou cálculo local mantido do seu código
   const totalCredit = TransactionRepository.getCreditsByMonth(currentMonth - 1, currentYear)
-    .reduce((sum, c) => sum + c.value, 0);
+      .reduce((sum, c) => sum + c.value, 0);
   const totalBalance = totalEntries - totalExpenses - totalCredit;
 
   return (
@@ -356,8 +436,6 @@ export default function MonthlyControlScreen() {
         <TouchableOpacity onPress={add} style={styles.fab}>
           <Icon source="plus" size={24} color="#fff" />
         </TouchableOpacity>
-
-        <Button mode="contained" onPress={() => console.log(transactions)}>DATA</Button>
       </View>
 
       <Portal>
@@ -387,7 +465,7 @@ export default function MonthlyControlScreen() {
                     new Date(Date.UTC(currentYear, currentMonth, 0, 23, 59, 59)) : undefined}
                 />
               )}
-
+              
               <View>
                 <Text style={{ fontSize: 20 }}>
                   {operation === 'add' ? 'Adicionando nova transação' :
@@ -508,8 +586,6 @@ export default function MonthlyControlScreen() {
               </View>
             )}
           </View>
-          {/* <Button onPress={() => console.log(params)} mode="contained" buttonColor="#A50C36">params</Button>
-          <Button onPress={() => console.log(selectedTransaction)} mode="contained" buttonColor="#A50C36">selected</Button> */}
         </Modal>
       </Portal>
     </View>
@@ -517,80 +593,16 @@ export default function MonthlyControlScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-    paddingHorizontal: 16
-  },
-
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 16
-  },
-
-  confirmDel: {
-    backgroundColor: '#FFB86A',
-    padding: 14
-  },
-
-  monthText: {
-    fontSize: 18,
-    fontWeight: "bold",
-    textTransform: "capitalize"
-  },
+  container: { flex: 1, backgroundColor: "#fff", paddingHorizontal: 16 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 16 },
+  confirmDel: { backgroundColor: '#FFB86A', padding: 14 },
+  monthText: { fontSize: 18, fontWeight: "bold", textTransform: "capitalize" },
   scrollArea: { flex: 1 },
-  textWarning: {
-    fontSize: 16,
-    color: "#A50C36"
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginTop: 20,
-    marginBottom: 8
-  },
-  summaryContainer: {
-    position: "absolute",
-    backgroundColor: '#fff',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderTopWidth: 1,
-    borderColor: "#ddd",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 14
-  },
-  summaryText: {
-    fontSize: 14,
-    marginVertical: 2
-  },
-  summaryTextBold: {
-    fontSize: 14,
-    marginVertical: 2,
-    fontWeight: 'bold'
-  },
-  fab: {
-    backgroundColor: "#007bff",
-    borderRadius: 50,
-    width: 56,
-    height: 56,
-    justifyContent: "center",
-    alignItems: "center",
-    elevation: 5
-  },
-  gradientLayer: {
-    position: 'absolute',
-    top: -30,
-    left: 0,
-    right: 0,
-    height: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    zIndex: 1
-  },
-})
-
+  textWarning: { fontSize: 16, color: "#A50C36" },
+  sectionTitle: { fontSize: 16, fontWeight: "600", marginTop: 20, marginBottom: 8 },
+  summaryContainer: { position: "absolute", backgroundColor: '#fff', left: 0, right: 0, bottom: 0, borderTopWidth: 1, borderColor: "#ddd", flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingVertical: 14 },
+  summaryText: { fontSize: 14, marginVertical: 2 },
+  summaryTextBold: { fontSize: 14, marginVertical: 2, fontWeight: 'bold' },
+  fab: { backgroundColor: "#007bff", borderRadius: 50, width: 56, height: 56, justifyContent: "center", alignItems: "center", elevation: 5 },
+  gradientLayer: { position: 'absolute', top: -30, left: 0, right: 0, height: 30, backgroundColor: 'rgba(255, 255, 255, 0.7)', zIndex: 1 },
+});
