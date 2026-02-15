@@ -5,6 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen';
 import MonthlyControlScreen from '../screens/MonthlyControlScreen';
 import SettingScreen from '../screens/SettingScreen';
+import TestScreen from '../screens/TestScreen';
 
 const Tab = createBottomTabNavigator()
 export default function BottomNavigator() {
@@ -38,6 +39,17 @@ export default function BottomNavigator() {
         options={{
           tabBarLabel: 'Configurações',
           title: 'Configurações',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="settings" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name='TestScreen'
+        component={TestScreen}
+        options={{
+          tabBarLabel: 'teste',
+          title: 'teste',
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="settings" size={size} color={color} />
           ),

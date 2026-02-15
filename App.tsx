@@ -1,20 +1,95 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { StyleSheet, View, ActivityIndicator } from 'react-native';
+import { PaperProvider, Text, Button, Surface } from 'react-native-paper';
 import AppNavigator from './src/navigation/AppNavigator';
-import { PaperProvider } from 'react-native-paper';
+import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 
+// 1. Componente de Login (Simples e Direto)
+const LoginScreen = () => {
+  const { signInWithGoogle } = useAuth();
+
+  return (
+    <View style={styles.loginContainer}>
+      <Surface style={styles.loginCard} elevation={2}>
+        <Text variant="headlineLarge" style={styles.title}>ButterFlow</Text>
+        <Text variant="bodyMedium" style={styles.subtitle}>Gerencie suas finanças com fluidez.</Text>
+        
+        <Button 
+          icon="google" 
+          mode="contained" 
+          onPress={signInWithGoogle}
+          style={styles.button}
+        >
+          Entrar com Google
+        </Button>
+      </Surface>
+    </View>
+  );
+};
+
+// 2. Componente que decide o que mostrar (O "Guarda de Trânsito")
+const RootNavigation = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#6200ee" />
+      </View>
+    );
+  }
+
+  // Se tem usuário, mostra o App Principal. Se não, mostra Login.
+  return user ? <AppNavigator /> : <LoginScreen />;
+};
+
+// 3. App Principal
 export default function App() {
   return (
-    <PaperProvider>
-      <View style={styles.container}>
-        <AppNavigator />
-      </View>
-    </PaperProvider>
+    <AuthProvider>
+      <PaperProvider>
+        <View style={styles.container}>
+          <RootNavigation />
+        </View>
+      </PaperProvider>
+    </AuthProvider>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#f5f5f5',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loginContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+    backgroundColor: '#f0f0f0',
+  },
+  loginCard: {
+    padding: 30,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: 'white',
+  },
+  title: {
+    fontWeight: 'bold',
+    color: '#6200ee',
+    marginBottom: 8,
+  },
+  subtitle: {
+    marginBottom: 32,
+    color: '#666',
+    textAlign: 'center',
+  },
+  button: {
+    width: '100%',
+    paddingVertical: 4,
+  }
 });

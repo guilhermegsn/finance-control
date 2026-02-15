@@ -1,19 +1,10 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import dayjs from "dayjs";
 import React, { useEffect, useState } from "react";
-import { Alert, AlertButton, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { Button, Checkbox, DataTable, Divider, Icon, Modal, Portal, TextInput } from "react-native-paper";
-import { WinButton } from "../components/WinButton";
-import { deleteItem, getItemById, insertItem, updateItem } from "../database/realmHelpers";
-import { TransactionRepository } from "../database/TransactionRepository"; // Importando o Repository
-import { Credit } from "../interface/Credit";
-import { RecurringTransaction, Type } from "../interface/RecurringTransaction";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { DataTable, Icon} from "react-native-paper";
 import { Transaction, TransactionType } from "../interface/Transaction";
-import { generateRandomId, getMonthName } from "../service/function";
-
 // Tipos
-type DateType = 'startDate' | 'endDate' | 'date' | null
-type Operation = 'add' | 'editAll' | 'editOnlyMonth' | 'editUnique' | 'editCredit' | 'editOverride' | null
 interface Params {
   id: string, description: string, value: string, date: Date,
   startDate?: Date | null, endDate?: Date | null,
@@ -22,43 +13,8 @@ interface Params {
 
 export default function MonthlyControlScreen() {
 
-  const now = new Date();
-  const todayMonth = now.getUTCMonth();
-  const todayYear = now.getUTCFullYear();
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  const currentMonth = currentDate.getUTCMonth() + 1;
-  const currentYear = currentDate.getUTCFullYear();
-
-  const [transactions, setTransactions] = useState<any>([]);
-  const [selectedTransaction, setSelectedTransaction] = useState<any>({});
-  const [operation, setOperation] = useState<Operation>(null);
-  const [emptyParams] = useState<Params>({
-    id: '', description: '', value: '', date: new Date(),
-    startDate: null, endDate: null, type: null, isRecurrence: false, installments: "1"
-  });
-  const [params, setParams] = useState(emptyParams);
-  const [activePicker, setActivePicker] = useState<DateType>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  // Lógica original para data segura
-  const safeStartDay = selectedTransaction?.startDate ?
-    Math.min(selectedTransaction?.startDate.getDate(), new Date(currentYear, currentMonth, 0).getDate()) :
-    new Date().getDate();
-
-  const isPast = currentYear < todayYear || (currentYear === todayYear && (currentMonth - 1) < todayMonth);
-
-  // --- CARREGAMENTO (Usando Repository) ---
-  const loadTransactions = async (date: Date) => {
-    const month = date.getUTCMonth();
-    const year = date.getUTCFullYear();
-    const data = TransactionRepository.getTransactionsByMonth(month, year);
-    setTransactions(data);
-  };
-
-  useEffect(() => {
-    loadTransactions(currentDate);
-  }, [currentDate]);
 
   const goToPreviousMonth = () => {
     const prev = new Date(currentDate);
@@ -73,271 +29,6 @@ export default function MonthlyControlScreen() {
     setCurrentDate(next);
   };
 
-  // --- ACTIONS (SAVE / EDIT / DELETE) ---
-  const edit = async (transaction: any, operation?: Operation) => {
-    if (operation) setOperation(operation);
-    
-    let schema = 'Transaction';
-    if (transaction.isRecurrence) schema = 'RecurringTransaction';
-    else if (transaction.type === 'credit') schema = 'Credit';
-    else if (transaction.parentId) schema = 'Override';
-
-    const data = getItemById(schema, transaction._id);
-    
-    if (data) {
-      setSelectedTransaction(data);
-      setParams({
-        id: data._id,
-        description: data.description,
-        value: data.value.toString(),
-        date: operation === 'editOnlyMonth' ?
-          new Date(currentYear, currentMonth - 1, safeStartDay) : new Date(),
-        // startDate/endDate: Mantém original para preencher o formulário corretamente
-        startDate: transaction?.isRecurrence ? data.startDate : null,
-        endDate: transaction?.isRecurrence ? data.endDate || null : null,
-        type: schema === 'Credit' ? 'credit' : data.type,
-        isRecurrence: transaction?.isRecurrence ? true : false,
-        installments: data?.installments ? data.installments.toString() : "1"
-      });
-    }
-  };
-
-  const save = () => {
-    try {
-      // 1. CRÉDITO
-      if (params.type === 'credit' && operation === 'add') {
-        const credit = {
-          _id: generateRandomId(),
-          description: params.description,
-          value: parseFloat(params.value),
-          installments: params.installments ? parseInt(params.installments) : 1,
-          date: params.date,
-        };
-        insertItem('Credit', credit);
-        // Não atualiza balance imediato pois crédito é calculado na hora, 
-        // mas se houver lógica futura de cache, estaria aqui.
-      }
-      
-      // 2. ADICIONAR (Normal ou Recorrente)
-      else if (operation === 'add') {
-        if (params.isRecurrence) {
-          const rec = {
-            type: params.type,
-            description: params.description,
-            value: parseFloat(params.value),
-            startDate: params.startDate,
-            recurrence: 'monthly',
-            endDate: params.endDate ?? null,
-            date: new Date(params.date),
-          } as RecurringTransaction;
-          insertItem('RecurringTransaction', rec);
-        } else {
-          const tx = {
-            description: params.description,
-            value: parseFloat(params.value),
-            type: params.type,
-            date: new Date(params.date),
-          } as Transaction;
-          
-          TransactionRepository.updateBalanceAfterTransaction(tx, undefined, 'create');
-          insertItem('Transaction', tx);
-        }
-      }
-
-      // 3. EDITAR CRÉDITO
-      else if (operation === 'editCredit') {
-        const previous = getItemById('Credit', params.id) as Credit;
-        if (!previous) return;
-        const { _id, ...rest } = previous;
-        const updated = {
-          ...rest,
-          description: params.description,
-          value: parseFloat(params.value),
-          installments: params.installments ? parseInt(params.installments) : 1
-        } as Credit;
-        updateItem('Credit', params.id, updated);
-      }
-
-      // 4. EDITAR ÚNICA (Normal)
-      else if (operation === 'editUnique') {
-        const previous = getItemById('Transaction', params.id) as Transaction;
-        if (!previous) return;
-        const { _id, ...rest } = previous;
-        const updated = {
-          ...rest,
-          description: params.description,
-          value: parseFloat(params.value),
-        } as Transaction;
-
-        TransactionRepository.updateBalanceAfterTransaction(updated, previous, 'update');
-        updateItem('Transaction', params.id, updated);
-      }
-
-      // 5. EDITAR OVERRIDE
-      else if (operation === 'editOverride') {
-        const previous = getItemById('Override', params.id) as Transaction;
-        if (!previous) return;
-        const { _id, ...rest } = previous;
-        const updated = {
-          ...rest,
-          description: params.description,
-          value: parseFloat(params.value),
-        } as Transaction;
-
-        TransactionRepository.updateBalanceAfterTransaction(updated, previous, 'update');
-        updateItem('Override', params.id, updated);
-      }
-
-      // 6. EDITAR RECORRÊNCIA
-      else {
-        const rec = getItemById('RecurringTransaction', params.id) as RecurringTransaction;
-        if (!rec) return;
-
-        const { _id, ...recWithoutId } = rec;
-
-        // Se editou toda a série, ajusta endDate se necessário ou cria nova série
-        if (operation === 'editAll') {
-          // Lógica original de dividir séries se mudou startDate no meio do caminho
-          // Mantida conforme seu código original
-          let newEndDate = new Date();
-          if (params.startDate) {
-             newEndDate = new Date(currentYear, currentMonth - 2, params.startDate.getDate());
-          }
-          
-          updateItem('RecurringTransaction', params.id, {
-            ...recWithoutId,
-            endDate: newEndDate, // Fecha a anterior
-          });
-
-          if (params.startDate) {
-            const safeDay = Math.min(params.startDate.getDate(), new Date(currentYear, currentMonth, 0).getDate());
-            const newStartDate = new Date(currentYear, currentMonth - 1, safeDay);
-
-            insertItem('RecurringTransaction', {
-              ...recWithoutId,
-              description: params.description,
-              value: parseFloat(params.value),
-              startDate: newStartDate,
-              endDate: params.endDate ?? null,
-              parentId: params.id,
-            });
-          }
-        }
-
-        // Se editou só este mês (Cria Override)
-        if (operation === 'editOnlyMonth') {
-           insertItem('Override', {
-              _id: generateRandomId(),
-              parentId: params.id,
-              year: currentYear,
-              month: currentMonth,
-              description: params.description,
-              value: parseFloat(params.value),
-              type: rec.type,
-              date: params.date
-           });
-        }
-      }
-
-      setOperation(null);
-      setParams(emptyParams);
-      loadTransactions(currentDate);
-
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const del = (transaction: Transaction) => {
-    if (params.isRecurrence) {
-      deleteItem('RecurringTransaction', transaction._id);
-      TransactionRepository.updateBalanceAfterTransaction(transaction, transaction, 'delete');
-    } else if (transaction.type === 'credit') {
-      TransactionRepository.updateBalanceAfterTransaction(transaction, transaction, 'delete');
-      deleteItem('Credit', transaction._id);
-    } else {
-      TransactionRepository.updateBalanceAfterTransaction(transaction, transaction, 'delete');
-      deleteItem('Transaction', transaction._id);
-    }
-    loadTransactions(currentDate);
-    closeModal();
-  };
-
-  // --- HELPERS UI ---
-  const selecTransaction = (transaction: any) => {
-    if (transaction._id === 'accumulatedBalance' || transaction._id === 'invoiceCredit') return;
-
-    if (transaction?.isRecurrence) {
-      const buttons: AlertButton[] = [
-        { text: 'Cancelar', onPress: () => setParams(emptyParams), style: 'cancel' },
-        { text: 'Editar somente este mês', onPress: () => edit(transaction, 'editOnlyMonth') },
-      ];
-      if (!isPast) {
-        buttons.push({ text: 'Editar sequência', onPress: () => edit(transaction, 'editAll') });
-      }
-      Alert.alert('Editar Transação recorrente', 'Como deseja editar?', buttons);
-    } else if (transaction.parentId) {
-      edit(transaction, 'editOverride');
-    } else {
-      if (transaction.type === 'credit') edit({ ...transaction, type: 'credit' }, 'editCredit');
-      else edit(transaction, 'editUnique');
-    }
-  };
-
-  const add = () => {
-    if ((currentYear !== todayYear) || ((currentMonth - 1) !== todayMonth)) {
-      setActivePicker('date');
-    }
-    setOperation('add');
-  };
-
-  const handleDateChange = (event: any, selectedDate: Date | undefined) => {
-    const currentDate = selectedDate || params[activePicker!];
-    if (currentDate) {
-      const correctedDate = new Date(currentDate.setHours(0, 0, 0, 0));
-      setParams(prevData => ({ ...prevData, [activePicker!]: correctedDate }));
-      setActivePicker(null);
-    }
-  };
-
-  const selectType = (type: Type) => {
-    setParams(p => ({
-      ...p,
-      type: type,
-      date: (currentYear !== todayYear) || (currentMonth - 1 !== todayMonth) ?
-        new Date(currentYear, (currentMonth - 1), 1) : new Date()
-    }));
-  };
-
-  const closeModal = () => {
-    setOperation(null);
-    setTimeout(() => {
-      setParams(emptyParams);
-      setIsDeleting(false);
-    }, 300);
-    setActivePicker(null);
-  };
-
-  const isInvalisForm = () => {
-    return !params.description || !params.value || !params.date || isNaN(parseFloat(params.value));
-  };
-
-  // --- CÁLCULOS TOTAIS DA VIEW ---
-  const entries = transactions.filter((t: Transaction) => t.type === 'income')
-    .sort((a: any, b: any) => a.date.getTime() - b.date.getTime());
-  const expenses = transactions.filter((t: Transaction) => t.type === 'expense')
-    .sort((a: any, b: any) => a.date.getTime() - b.date.getTime());
-  const credits = transactions.filter((t: Transaction) => t.type === 'credit')
-    .sort((a: any, b: any) => a.date.getTime() - b.date.getTime());
-
-  const totalEntries = entries.reduce((acc: number, t: Transaction) => acc + t.value, 0);
-  const totalExpenses = expenses.reduce((acc: number, t: Transaction) => acc + t.value, 0);
-  const saldoParcial = (totalEntries - totalExpenses);
-
-  // Usando Repository para consistência, ou cálculo local mantido do seu código
-  const totalCredit = TransactionRepository.getCreditsByMonth(currentMonth - 1, currentYear)
-      .reduce((sum, c) => sum + c.value, 0);
-  const totalBalance = totalEntries - totalExpenses - totalCredit;
 
   return (
     <View style={styles.container}>
@@ -361,8 +52,8 @@ export default function MonthlyControlScreen() {
             <DataTable.Title>Descrição</DataTable.Title>
             <DataTable.Title numeric>Valor</DataTable.Title>
           </DataTable.Header>
-          {entries.map((item: Transaction) => (
-            <DataTable.Row key={item._id} onLongPress={() => selecTransaction(item)}>
+          {[].map((item: Transaction) => (
+            <DataTable.Row key={item._id} onLongPress={() => null}>
               <DataTable.Cell style={{ maxWidth: 70 }}>{dayjs(item.date).format('DD/MM')}</DataTable.Cell>
               <DataTable.Cell>{item.description}</DataTable.Cell>
               <DataTable.Cell numeric>R$ {item.value.toFixed(2)}</DataTable.Cell>
@@ -370,7 +61,7 @@ export default function MonthlyControlScreen() {
           ))}
           <DataTable.Row key={`totalEntries`}>
             <DataTable.Cell>TOTAL</DataTable.Cell>
-            <DataTable.Cell numeric><Text style={{ fontWeight: 'bold' }}> R${totalEntries.toFixed(2)} </Text></DataTable.Cell>
+            <DataTable.Cell numeric><Text style={{ fontWeight: 'bold' }}> 00 </Text></DataTable.Cell>
           </DataTable.Row>
         </DataTable>
 
@@ -382,8 +73,8 @@ export default function MonthlyControlScreen() {
             <DataTable.Title>Descrição</DataTable.Title>
             <DataTable.Title numeric>Valor</DataTable.Title>
           </DataTable.Header>
-          {expenses.map((item: Transaction) => (
-            <DataTable.Row onLongPress={() => selecTransaction(item)} key={item._id.toString()}>
+          {[].map((item: Transaction) => (
+            <DataTable.Row onLongPress={() => null} key={item._id.toString()}>
               <DataTable.Cell style={{ maxWidth: 70 }}>{dayjs(item.date).format('DD/MM')}</DataTable.Cell>
               <DataTable.Cell>{item.description}</DataTable.Cell>
               <DataTable.Cell numeric>R$ {item.value.toFixed(2)}</DataTable.Cell>
@@ -391,7 +82,7 @@ export default function MonthlyControlScreen() {
           ))}
           <DataTable.Row key={`totalExpenses`}>
             <DataTable.Cell>TOTAL</DataTable.Cell>
-            <DataTable.Cell numeric><Text style={{ fontWeight: 'bold' }}> R${totalExpenses.toFixed(2)} </Text></DataTable.Cell>
+            <DataTable.Cell numeric><Text style={{ fontWeight: 'bold' }}> 00 </Text></DataTable.Cell>
           </DataTable.Row>
         </DataTable>
 
@@ -403,8 +94,8 @@ export default function MonthlyControlScreen() {
             <DataTable.Title>Descrição</DataTable.Title>
             <DataTable.Title numeric>Valor</DataTable.Title>
           </DataTable.Header>
-          {credits.map((item: Transaction) => (
-            <DataTable.Row onLongPress={() => selecTransaction(item)} key={item._id.toString()}>
+          {[].map((item: Transaction) => (
+            <DataTable.Row onLongPress={() => null} key={item._id.toString()}>
               <DataTable.Cell style={{ maxWidth: 70 }}>{dayjs(item.date).format('DD/MM')}</DataTable.Cell>
               <DataTable.Cell>{item.description}</DataTable.Cell>
               <DataTable.Cell numeric>R$ {item.value.toFixed(2)}</DataTable.Cell>
@@ -412,7 +103,7 @@ export default function MonthlyControlScreen() {
           ))}
           <DataTable.Row key={`totalCredits`}>
             <DataTable.Cell>TOTAL</DataTable.Cell>
-            <DataTable.Cell numeric><Text style={{ fontWeight: 'bold' }}> R${totalCredit.toFixed(2)} </Text></DataTable.Cell>
+            <DataTable.Cell numeric><Text style={{ fontWeight: 'bold' }}> R$00 </Text></DataTable.Cell>
           </DataTable.Row>
         </DataTable>
 
@@ -425,20 +116,20 @@ export default function MonthlyControlScreen() {
         <View>
           <View style={{ flexDirection: 'row' }}>
             <Text style={styles.summaryText}>Saldo parcial: </Text>
-            <Text style={styles.summaryTextBold}> R${saldoParcial.toFixed(2)}</Text>
+            <Text style={styles.summaryTextBold}> R$</Text>
           </View>
           <View style={{ flexDirection: 'row' }}>
             <Text style={styles.summaryText}>Saldo Total:</Text>
-            <Text style={styles.summaryText}> R${totalBalance.toFixed(2)}</Text>
+            <Text style={styles.summaryText}> R$</Text>
           </View>
         </View>
 
-        <TouchableOpacity onPress={add} style={styles.fab}>
+        <TouchableOpacity onPress={()=> null} style={styles.fab}>
           <Icon source="plus" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      <Portal>
+      {/* <Portal>
         <Modal
           visible={operation !== null}
           onDismiss={closeModal}
@@ -587,7 +278,7 @@ export default function MonthlyControlScreen() {
             )}
           </View>
         </Modal>
-      </Portal>
+      </Portal> */}
     </View>
   );
 }

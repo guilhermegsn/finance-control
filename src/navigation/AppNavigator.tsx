@@ -3,7 +3,6 @@ import { DarkTheme, DefaultTheme, NavigationContainer } from "@react-navigation/
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useColorScheme } from "react-native";
 import BottomNavigator from './BottomNavigator';
-import AddTransactionScreen from '../screens/AddTransactionScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -17,12 +16,6 @@ export default function AppNavigator() {
           name="BottomNavigator"
           component={BottomNavigator}
           options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="AddTransaction"
-          options={{title: 'Ola'}}
-          component={AddTransactionScreen}
-          //options={{ headerShown: false }}navigation.navinavi
         />
       </Stack.Navigator>
     </NavigationContainer>
