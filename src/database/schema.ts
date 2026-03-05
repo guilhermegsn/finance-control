@@ -15,6 +15,7 @@ export const mySchema = appSchema({
         { name: 'archived', type: 'boolean' },
         { name: 'created_at', type: 'number' }, // Timestamps no SQLite são números (Unix)
         { name: 'updated_at', type: 'number' },
+        { name: 'deleted_at', type: 'number' },
       ],
     }),
     // 2. CATEGORIES
@@ -29,6 +30,7 @@ export const mySchema = appSchema({
         { name: 'is_system', type: 'boolean' },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
+        { name: 'deleted_at', type: 'number' },
       ],
     }),
     // 3. TRANSACTIONS
@@ -49,6 +51,7 @@ export const mySchema = appSchema({
         { name: 'observation', type: 'string', isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
+        { name: 'deleted_at', type: 'number' },
       ],
     }),
     // 4. CREDIT CARDS
@@ -64,6 +67,7 @@ export const mySchema = appSchema({
         { name: 'color', type: 'string' },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
+        { name: 'deleted_at', type: 'number' },
       ],
     }),
     // As tabelas de Credit Purchases e Installments fazemos depois para não complicar agora
