@@ -4,8 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { MaterialIcons } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen';
 import MonthlyControlScreen from '../screens/MonthlyControlScreen';
-import SettingScreen from '../screens/SettingScreen';
-import TestScreen from '../screens/TestScreen';
+import MenuScreen from '../screens/MenuScreen';
 
 const Tab = createBottomTabNavigator()
 export default function BottomNavigator() {
@@ -22,6 +21,17 @@ export default function BottomNavigator() {
           ),
         }}
       />
+      {/* <Tab.Screen
+        name='AccountsScreen'
+        component={AccountsScreen}
+        options={{
+          tabBarLabel: 'Contas',
+          title: 'Minhas Contas',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="account-balance-wallet" size={size} color={color} />
+          ),
+        }}
+      /> */}
       <Tab.Screen
         name='MonthlyControlScreen'
         component={MonthlyControlScreen}
@@ -35,23 +45,12 @@ export default function BottomNavigator() {
       />
       <Tab.Screen
         name='Config'
-        component={SettingScreen}
+        component={MenuScreen}
         options={{
-          tabBarLabel: 'Configurações',
-          title: 'Configurações',
+          tabBarLabel: 'Menu',
+          title: 'Menu',
           tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="settings" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name='TestScreen'
-        component={TestScreen}
-        options={{
-          tabBarLabel: 'teste',
-          title: 'teste',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="settings" size={size} color={color} />
+            <MaterialIcons name="menu" size={size} color={color} />
           ),
         }}
       />

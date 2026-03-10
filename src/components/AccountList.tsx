@@ -1,26 +1,35 @@
 import React from 'react';
-import { View, FlatList, StyleSheet, ScrollView } from 'react-native';
-import { List, IconButton, Text, Surface, Button } from 'react-native-paper';
+import { View, FlatList, StyleSheet } from 'react-native';
+import { List, IconButton, Text, Surface } from 'react-native-paper';
 import { withObservables } from '@nozbe/watermelondb/react';
 import Account from '../models/Accounts';
 import { AccountService } from '../service/AccountService';
-import { sync } from '../service/sync';
-import { supabase } from '../lib/supabase';
 
 // Componente de Item Individual
-const AccountItem = ({ account }: { account: Account }) => {
+const AccountItem = ({ account, onEdit }: { account: Account; onEdit?: (account: Account) => void }) => {
   const handleDelete = () => {
     AccountService.delete(account.id);
+  };
+
+  const handleEdit = () => {
+    if (onEdit) {
+      onEdit(account);
+    }
   };
 
   return (
     <Surface style={styles.card} elevation={1}>
       <List.Item
         title={account.name}
-        description={`Saldo Inicial: R$ ${account.initialBalance.toFixed(2)}`}
+        description={`Saldo Inicial: R$ ${account.initialBalance.toFixed(2)} | Tipo: ${account.type}`}
         left={props => <List.Icon {...props} icon="wallet" color={account.color} />}
         right={props => (
-          <IconButton {...props} icon="delete" onPress={handleDelete} />
+          <View style={{ flexDirection: 'row' }}>
+            {onEdit && (
+              <IconButton {...props} icon="pencil" onPress={handleEdit} />
+            )}
+            <IconButton {...props} icon="delete" onPress={handleDelete} />
+          </View>
         )}
       />
     </Surface>
@@ -33,7 +42,7 @@ const EnhancedAccountItem = withObservables(['account'], ({ account }) => ({
 }))(AccountItem);
 
 // Componente da Lista
-const AccountList = ({ accounts }: { accounts: Account[] }) => {
+const AccountList = ({ accounts, onEdit }: { accounts: Account[]; onEdit?: (account: Account) => void }) => {
   if (accounts.length === 0) {
     return (
       <View style={styles.empty}>
@@ -43,45 +52,27 @@ const AccountList = ({ accounts }: { accounts: Account[] }) => {
   }
 
   return (
-    <ScrollView>
-      <FlatList
-        data={accounts}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => <EnhancedAccountItem account={item} />}
-        contentContainerStyle={{ padding: 16 }}
-      />
-      <Button
-        mode="contained"
-        onPress={async () => {
-          try {
-
-            const { error } = await supabase.auth.getUser()
-            if (error?.message.includes('expired')) {
-              await supabase.auth.refreshSession();
-            }
-            await sync();
-
-            alert('Sincronizado com sucesso!');
-          } catch (e: any) {
-            alert('Erro no sync: ' + e.message);
-            console.error(e);
-          }
-        }}
-      >
-        Forçar Sync Agora
-      </Button>
-    </ScrollView>
+    <FlatList
+      data={accounts}
+      keyExtractor={item => item.id}
+      renderItem={({ item }) => <EnhancedAccountItem account={item} onEdit={onEdit} />}
+      contentContainerStyle={styles.listContainer}
+    />
   );
 };
 
-// A MAGIA: Conecta a query do banco às props do componente
+// 1. A MAGIA: Conecta a query do banco às props do componente
 const enhance = withObservables([], () => ({
   accounts: AccountService.observeAccounts(),
 }));
 
+
 export default enhance(AccountList);
 
 const styles = StyleSheet.create({
+  listContainer: {
+    padding: 16,
+  },
   card: {
     marginBottom: 8,
     borderRadius: 8,

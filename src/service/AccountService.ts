@@ -3,13 +3,17 @@ import Account from '../models/Accounts';
 
 export const AccountService = {
   // Listar todas as contas ativas (WatermelonDB já filtra as marcadas para deletar)
-
   observeAccounts: () => {
     return database.get<Account>('accounts').query().observe();
   },
 
   fetchAll: async () => {
     return await database.get<Account>('accounts').query().fetch();
+  },
+
+  // Buscar conta por ID
+  findById: async (accountId: string) => {
+    return await database.get<Account>('accounts').find(accountId);
   },
 
   // Criar nova conta
@@ -26,13 +30,25 @@ export const AccountService = {
     });
   },
 
+  // Atualizar conta existente
+  update: async (accountId: string, data: { name?: string; initialBalance?: number; type?: string; color?: string; archived?: boolean; }) => {
+    await database.write(async () => {
+      const account = await database.get<Account>('accounts').find(accountId);
+      
+      await account.update((acc) => {
+        if (data.name !== undefined) acc.name = data.name;
+        if (data.initialBalance !== undefined) acc.initialBalance = data.initialBalance;
+        if (data.type !== undefined) acc.type = data.type;
+        if (data.color !== undefined) acc.color = data.color;
+        if (data.archived !== undefined) acc.archived = data.archived;
+      });
+    });
+  },
+
   // Soft Delete
   delete: async (accountId: string) => {
     await database.write(async () => {
       const account = await database.get<Account>('accounts').find(accountId);
-
-      // markAsDeleted() não apaga do banco local agora. 
-      // Ele apenas esconde o registro das queries e o coloca na "fila de sincronização".
       await account.markAsDeleted();
     });
 

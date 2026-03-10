@@ -6,7 +6,9 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "type-check": "tsc --noEmit",
+    "build": "echo 'Build ignorado no ambiente de dev do Expo'"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

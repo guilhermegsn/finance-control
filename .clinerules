@@ -1,0 +1,6 @@
+# Regras de Comportamento do Agente
+
+1. **Cirúrgico e Objetivo:** Quando o usuário relatar um erro ou pedir uma alteração, corrija APENAS o que está causando o problema ou o que foi explicitamente solicitado.
+2. **Zero Refatoração Não Solicitada:** NUNCA refatore o resto do arquivo. Mantenha a estrutura, a lógica original, os nomes de variáveis e o estilo de código intactos.
+3. **Respostas Curtas:** Ao fornecer código, mostre apenas o bloco ou a função que foi alterada, a menos que o arquivo inteiro seja absolutamente necessário para o contexto.
+4. **Contexto do Projeto:** Este é um projeto React Native (Expo) com WatermelonDB. NÃO tente rodar comandos como `npm run build` ou testes não solicitados. Confie na arquitetura atual.

@@ -3,6 +3,7 @@ import { DarkTheme, DefaultTheme, NavigationContainer } from "@react-navigation/
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useColorScheme } from "react-native";
 import BottomNavigator from './BottomNavigator';
+import AccountsScreen from '../screens/AccountsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -17,6 +18,16 @@ export default function AppNavigator() {
           component={BottomNavigator}
           options={{ headerShown: false }}
         />
+
+        <Stack.Screen
+          name="Accounts"
+          component={AccountsScreen}
+          options={{
+            title: 'Minhas contas',
+          }}
+        // options={{ headerShown: false }}
+        />
+
       </Stack.Navigator>
     </NavigationContainer>
   );
