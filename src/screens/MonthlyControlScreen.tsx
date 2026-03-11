@@ -2,25 +2,52 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import dayjs from "dayjs";
 import React, { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { DataTable, Icon} from "react-native-paper";
-import { Transaction, TransactionType } from "../interface/Transaction";
+import { DataTable, Icon, Portal, Modal, Button, TextInput, Checkbox, Divider } from "react-native-paper";
+import { withObservables } from '@nozbe/watermelondb/react';
+import { TransactionService } from '../service/TransactionService';
+import { AccountService } from '../service/AccountService';
+import { CategoryService } from '../service/CategoryService';
+import Transaction from '../models/Transactions';
+import { Q } from '@nozbe/watermelondb';
+import { database } from '../database';
+import { useAuth } from '../contexts/AuthContext';
+
 // Tipos
 interface Params {
   id: string, description: string, value: string, date: Date,
   startDate?: Date | null, endDate?: Date | null,
-  type: TransactionType | null, isRecurrence: boolean, installments?: string
+  type: 'income' | 'expense' | null, isRecurrence: boolean, installments?: string
 }
 
-export default function MonthlyControlScreen() {
+interface MonthlyControlScreenProps {
+  transactions: Transaction[];
+  accounts: any[];
+  categories: any[];
+}
 
+function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyControlScreenProps) {
+  const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
-
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [activePicker, setActivePicker] = useState<'date' | 'startDate' | 'endDate' | null>(null);
+  
+  const [params, setParams] = useState<Params>({
+    id: '',
+    description: '',
+    value: '',
+    date: new Date(),
+    type: null,
+    isRecurrence: false,
+  });
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
 
   const goToPreviousMonth = () => {
     const prev = new Date(currentDate);
     prev.setMonth(prev.getUTCMonth() - 1);
     setCurrentDate(prev);
-    // loadTransactions chamado pelo useEffect
   };
 
   const goToNextMonth = () => {
@@ -29,6 +56,117 @@ export default function MonthlyControlScreen() {
     setCurrentDate(next);
   };
 
+  const openModal = (transaction?: Transaction) => {
+    if (transaction) {
+      setSelectedTransaction(transaction);
+      setParams({
+        id: transaction.id,
+        description: transaction.description,
+        value: transaction.amount.toString(),
+        date: new Date(transaction.date),
+        type: transaction.type,
+        isRecurrence: false,
+      });
+      // TODO: Preencher conta e categoria da transação
+    } else {
+      setSelectedTransaction(null);
+      setParams({
+        id: '',
+        description: '',
+        value: '',
+        date: new Date(),
+        type: null,
+        isRecurrence: false,
+      });
+      // Selecionar primeira conta e categoria por padrão
+      if (accounts.length > 0) {
+        setSelectedAccountId(accounts[0].id);
+      }
+      if (categories.length > 0) {
+        // Filtrar categorias pelo tipo quando o tipo for selecionado
+        setSelectedCategoryId(categories[0].id);
+      }
+    }
+    setIsDeleting(false);
+    setModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    setSelectedTransaction(null);
+    setIsDeleting(false);
+    setActivePicker(null);
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    if (selectedDate && activePicker) {
+      setParams(prev => ({ ...prev, [activePicker]: selectedDate }));
+    }
+    setActivePicker(null);
+  };
+
+  const selectType = (type: 'income' | 'expense') => {
+    setParams(prev => ({ ...prev, type }));
+  };
+
+  const isInvalidForm = () => {
+    return !params.description.trim() || !params.value.trim() || !params.type || !params.date;
+  };
+
+  const handleSave = async () => {
+    if (!user || !params.type) return;
+    
+    const amount = parseFloat(params.value);
+    if (isNaN(amount)) return;
+
+    // Filtrar categorias pelo tipo selecionado
+    const filteredCategories = categories.filter(cat => cat.type === params.type);
+    const categoryId = filteredCategories.length > 0 ? filteredCategories[0].id : 
+                      (categories.length > 0 ? categories[0].id : '');
+
+    const transactionData = {
+      accountId: selectedAccountId || (accounts.length > 0 ? accounts[0].id : ''),
+      categoryId: categoryId,
+      description: params.description,
+      amount: amount,
+      type: params.type,
+      date: params.date,
+      userId: user.id,
+    };
+
+    try {
+      if (selectedTransaction) {
+        await TransactionService.update(selectedTransaction.id, transactionData);
+      } else {
+        await TransactionService.create(transactionData);
+      }
+      closeModal();
+    } catch (error) {
+      console.error('Erro ao salvar transação:', error);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (selectedTransaction) {
+      try {
+        await TransactionService.delete(selectedTransaction.id);
+        closeModal();
+      } catch (error) {
+        console.error('Erro ao excluir transação:', error);
+      }
+    }
+  };
+
+
+  // Filtrar transações pelo mês atual
+  const filteredTransactions = filterTransactionsByMonth(transactions, currentDate);
+  
+  // Separar transações por tipo
+  const incomeTransactions = filteredTransactions.filter(t => t.type === 'income');
+  const expenseTransactions = filteredTransactions.filter(t => t.type === 'expense');
+  
+  // Calcular totais
+  const totals = calculateTotals(filteredTransactions);
 
   return (
     <View style={styles.container}>
@@ -52,16 +190,16 @@ export default function MonthlyControlScreen() {
             <DataTable.Title>Descrição</DataTable.Title>
             <DataTable.Title numeric>Valor</DataTable.Title>
           </DataTable.Header>
-          {[].map((item: Transaction) => (
-            <DataTable.Row key={item._id} onLongPress={() => null}>
+          {incomeTransactions.map((item) => (
+            <DataTable.Row key={item.id} onLongPress={() => openModal(item)}>
               <DataTable.Cell style={{ maxWidth: 70 }}>{dayjs(item.date).format('DD/MM')}</DataTable.Cell>
               <DataTable.Cell>{item.description}</DataTable.Cell>
-              <DataTable.Cell numeric>R$ {item.value.toFixed(2)}</DataTable.Cell>
+              <DataTable.Cell numeric>R$ {item.amount.toFixed(2)}</DataTable.Cell>
             </DataTable.Row>
           ))}
           <DataTable.Row key={`totalEntries`}>
             <DataTable.Cell>TOTAL</DataTable.Cell>
-            <DataTable.Cell numeric><Text style={{ fontWeight: 'bold' }}> 00 </Text></DataTable.Cell>
+            <DataTable.Cell numeric><Text style={{ fontWeight: 'bold' }}> R$ {totals.totalIncome.toFixed(2)} </Text></DataTable.Cell>
           </DataTable.Row>
         </DataTable>
 
@@ -73,20 +211,20 @@ export default function MonthlyControlScreen() {
             <DataTable.Title>Descrição</DataTable.Title>
             <DataTable.Title numeric>Valor</DataTable.Title>
           </DataTable.Header>
-          {[].map((item: Transaction) => (
-            <DataTable.Row onLongPress={() => null} key={item._id.toString()}>
+          {expenseTransactions.map((item) => (
+            <DataTable.Row onLongPress={() => openModal(item)} key={item.id}>
               <DataTable.Cell style={{ maxWidth: 70 }}>{dayjs(item.date).format('DD/MM')}</DataTable.Cell>
               <DataTable.Cell>{item.description}</DataTable.Cell>
-              <DataTable.Cell numeric>R$ {item.value.toFixed(2)}</DataTable.Cell>
+              <DataTable.Cell numeric>R$ {item.amount.toFixed(2)}</DataTable.Cell>
             </DataTable.Row>
           ))}
           <DataTable.Row key={`totalExpenses`}>
             <DataTable.Cell>TOTAL</DataTable.Cell>
-            <DataTable.Cell numeric><Text style={{ fontWeight: 'bold' }}> 00 </Text></DataTable.Cell>
+            <DataTable.Cell numeric><Text style={{ fontWeight: 'bold' }}> R$ {totals.totalExpense.toFixed(2)} </Text></DataTable.Cell>
           </DataTable.Row>
         </DataTable>
 
-        {/* Cartões */}
+        {/* Cartões - TODO: Implementar quando tiver lógica de cartão de crédito */}
         <Text style={styles.sectionTitle}>Cartão de crédito</Text>
         <DataTable>
           <DataTable.Header>
@@ -94,16 +232,16 @@ export default function MonthlyControlScreen() {
             <DataTable.Title>Descrição</DataTable.Title>
             <DataTable.Title numeric>Valor</DataTable.Title>
           </DataTable.Header>
-          {[].map((item: Transaction) => (
-            <DataTable.Row onLongPress={() => null} key={item._id.toString()}>
-              <DataTable.Cell style={{ maxWidth: 70 }}>{dayjs(item.date).format('DD/MM')}</DataTable.Cell>
-              <DataTable.Cell>{item.description}</DataTable.Cell>
-              <DataTable.Cell numeric>R$ {item.value.toFixed(2)}</DataTable.Cell>
-            </DataTable.Row>
-          ))}
+          <DataTable.Row key={`noCreditCards`}>
+            <DataTable.Cell>
+              <Text style={{ color: '#666', textAlign: 'center' }}>Funcionalidade em desenvolvimento</Text>
+            </DataTable.Cell>
+            <DataTable.Cell><Text></Text></DataTable.Cell>
+            <DataTable.Cell numeric><Text></Text></DataTable.Cell>
+          </DataTable.Row>
           <DataTable.Row key={`totalCredits`}>
             <DataTable.Cell>TOTAL</DataTable.Cell>
-            <DataTable.Cell numeric><Text style={{ fontWeight: 'bold' }}> R$00 </Text></DataTable.Cell>
+            <DataTable.Cell numeric><Text style={{ fontWeight: 'bold' }}> R$ 0,00 </Text></DataTable.Cell>
           </DataTable.Row>
         </DataTable>
 
@@ -116,72 +254,74 @@ export default function MonthlyControlScreen() {
         <View>
           <View style={{ flexDirection: 'row' }}>
             <Text style={styles.summaryText}>Saldo parcial: </Text>
-            <Text style={styles.summaryTextBold}> R$</Text>
+            <Text style={styles.summaryTextBold}> R$ {totals.balance.toFixed(2)}</Text>
           </View>
           <View style={{ flexDirection: 'row' }}>
             <Text style={styles.summaryText}>Saldo Total:</Text>
-            <Text style={styles.summaryText}> R$</Text>
+            <Text style={styles.summaryText}> R$ {totals.balance.toFixed(2)}</Text>
           </View>
         </View>
 
-        <TouchableOpacity onPress={()=> null} style={styles.fab}>
+        <TouchableOpacity onPress={() => openModal()} style={styles.fab}>
           <Icon source="plus" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      {/* <Portal>
+      <Portal>
         <Modal
-          visible={operation !== null}
+          visible={modalVisible}
           onDismiss={closeModal}
           contentContainerStyle={{ backgroundColor: 'white', margin: 20, borderRadius: 12, padding: 16 }}
         >
           {params.type === null ?
             <View style={{ gap: 12 }}>
-              <WinButton label="Entrada" color="#2E9E57" selected={params.type === 'income'} onPress={() => selectType('income')} />
-              <WinButton label="Saída - À vista" color="#CC4A4A" selected={params.type === 'expense'} onPress={() => selectType('expense')} />
-              <WinButton label="Saída - Crédito" color="#2F80ED" selected={params.type === 'credit'} onPress={() => selectType('credit')} />
+              <Button 
+                mode="contained" 
+                buttonColor="#2E9E57" 
+                onPress={() => selectType('income')}
+                style={{ marginBottom: 8 }}
+              >
+                Entrada
+              </Button>
+              <Button 
+                mode="contained" 
+                buttonColor="#CC4A4A" 
+                onPress={() => selectType('expense')}
+              >
+                Saída - À vista
+              </Button>
             </View>
             :
             <View>
               {activePicker && (
                 <DateTimePicker
-                  value={params[activePicker] || new Date(currentYear, currentMonth, 1)}
+                  value={params[activePicker] || new Date()}
                   mode="date"
                   display="default"
                   onChange={handleDateChange}
-                  minimumDate={operation === 'add' || operation === 'editAll' || operation === 'editOnlyMonth' ?
-                    new Date(Date.UTC(currentYear, currentMonth - 1, 1, 23, 59, 59)) : undefined}
-                  maximumDate={operation === 'add' || operation === 'editAll' &&
-                    activePicker === 'startDate' || activePicker === 'date' ?
-                    new Date(Date.UTC(currentYear, currentMonth, 0, 23, 59, 59)) : undefined}
                 />
               )}
               
               <View>
-                <Text style={{ fontSize: 20 }}>
-                  {operation === 'add' ? 'Adicionando nova transação' :
-                    (operation === 'editOnlyMonth' ? 'Editando este mês apenas' :
-                      operation === 'editAll' ? `Editando sequência\n(${getMonthName(currentMonth)}/${currentYear} em diante)` :
-                        'Editando transação')}
+                <Text style={{ fontSize: 20, marginBottom: 16 }}>
+                  {selectedTransaction ? 'Editando transação' : 'Adicionando nova transação'}
                 </Text>
               </View>
 
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
                 <View style={{ width: '48%' }}>
-                  <Text style={{ marginLeft: 5 }}>Transação</Text>
+                  <Text style={{ marginLeft: 5, marginBottom: 4 }}>Transação</Text>
                   <Button
-                    disabled={operation !== 'add'}
                     mode="contained-tonal"
                     onPress={() => setParams((prevParams) => ({ ...prevParams, type: null }))}
                     style={{ marginBottom: 16 }}
                   >
-                    {params.type === 'income' ? 'Receita' : (params.type === 'expense' ? 'Despesa à vista' : 'Crédito')}
+                    {params.type === 'income' ? 'Receita' : 'Despesa'}
                   </Button>
                 </View>
                 <View style={{ width: '48%' }}>
-                  <Text style={{ marginLeft: 5 }}>Data</Text>
+                  <Text style={{ marginLeft: 5, marginBottom: 4 }}>Data</Text>
                   <Button
-                    disabled={operation !== 'add' && operation !== 'editOnlyMonth'}
                     mode="contained-tonal"
                     onPress={() => setActivePicker('date')}
                     style={{ marginBottom: 16 }}
@@ -190,68 +330,35 @@ export default function MonthlyControlScreen() {
                   </Button>
                 </View>
               </View>
-              <TextInput label="Descrição" value={params.description} onChangeText={(text) => setParams(prev => ({ ...prev, description: text }))} keyboardType="default" mode="outlined" style={{ marginBottom: 16 }} disabled={isDeleting} />
-              <TextInput label="Valor" value={params.value} onChangeText={(text) => setParams(prev => ({ ...prev, value: text }))} keyboardType="numeric" mode="outlined" style={{ marginBottom: 16 }} disabled={isDeleting} />
+              <TextInput 
+                label="Descrição" 
+                value={params.description} 
+                onChangeText={(text) => setParams(prev => ({ ...prev, description: text }))} 
+                keyboardType="default" 
+                mode="outlined" 
+                style={{ marginBottom: 16 }} 
+                disabled={isDeleting} 
+              />
+              <TextInput 
+                label="Valor" 
+                value={params.value} 
+                onChangeText={(text) => setParams(prev => ({ ...prev, value: text }))} 
+                keyboardType="numeric" 
+                mode="outlined" 
+                style={{ marginBottom: 16 }} 
+                disabled={isDeleting} 
+              />
 
-              {operation !== "editUnique" && operation !== 'editOnlyMonth' &&
-                operation !== 'editCredit' && params.type !== 'credit' && operation !== 'editOverride' &&
-                <View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Checkbox
-                      disabled={operation !== 'add'}
-                      status={params.isRecurrence ? 'checked' : 'unchecked'}
-                      onPress={() => {
-                        setParams(prevParams => ({
-                          ...prevParams,
-                          isRecurrence: !params.isRecurrence,
-                          startDate: params.isRecurrence ? null : new Date(params.date),
-                          endDate: params.isRecurrence ? null : prevParams.endDate,
-                        }))
-                      }}
-                    />
-                    <Text>Transação recorrente</Text>
-                  </View>
-
-                  {params.isRecurrence &&
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 5 }}>
-                      <View style={{ width: '48%' }}>
-                        <Text style={{ marginLeft: 5 }}>Início</Text>
-                        <Button mode="contained-tonal" onPress={() => setActivePicker('startDate')}>
-                          {params?.startDate?.toLocaleDateString('pt-BR')}
-                        </Button>
-                      </View>
-                      <View style={{ width: '48%' }}>
-                        <Text style={{ marginLeft: 5 }}>Fim</Text>
-                        <Button mode="contained-tonal" onPress={() => setActivePicker('endDate')}>
-                          {params?.endDate?.toLocaleDateString('pt-BR') || 'Sem fim'}
-                        </Button>
-                      </View>
-                    </View>
-                  }
-                  {params.isRecurrence && params.endDate &&
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Checkbox status={params.endDate === null ? 'checked' : 'unchecked'} onPress={() => {
-                        setParams(prevParams => ({
-                          ...prevParams,
-                          endDate: params.endDate ? null : new Date(currentYear, currentMonth, new Date().getDay())
-                        }))
-                      }} />
-                      <Text>Sem data fim</Text>
-                    </View>
-                  }
-                </View>
-              }
-
-              {params.type === 'credit' &&
-                <View>
-                  <TextInput label="N. Parcela" value={params.installments} onChangeText={(text) => setParams(prev => ({ ...prev, installments: text }))} keyboardType="numeric" mode="outlined" style={{ marginBottom: 16 }} disabled={isDeleting} />
-                </View>
-              }
-
-              {operation !== 'add' && !isDeleting && operation !== 'editOverride' &&
-                operation !== 'editOnlyMonth' && ((selectedTransaction?.date?.getUTCMonth() + 1) === currentMonth) &&
-                <Button mode="contained" onPress={() => { setIsDeleting(true) }} buttonColor="#A50C36" style={{ marginTop: 20 }}>Excluir</Button>
-              }
+              {selectedTransaction && !isDeleting && (
+                <Button 
+                  mode="contained" 
+                  onPress={() => { setIsDeleting(true) }} 
+                  buttonColor="#A50C36" 
+                  style={{ marginTop: 20 }}
+                >
+                  Excluir
+                </Button>
+              )}
 
               {isDeleting &&
                 <View style={styles.confirmDel}>
@@ -271,14 +378,14 @@ export default function MonthlyControlScreen() {
             {params.type && (
               <View style={{ width: '48%' }}>
                 {isDeleting ?
-                  <Button onPress={() => del(selectedTransaction)} mode="contained" buttonColor="#A50C36">Excluir</Button> :
-                  <Button mode="contained" onPress={save} disabled={isInvalisForm()}>Salvar</Button>
+                  <Button onPress={handleDelete} mode="contained" buttonColor="#A50C36">Excluir</Button> :
+                  <Button mode="contained" onPress={handleSave} disabled={isInvalidForm()}>Salvar</Button>
                 }
               </View>
             )}
           </View>
         </Modal>
-      </Portal> */}
+      </Portal>
     </View>
   );
 }
@@ -297,3 +404,47 @@ const styles = StyleSheet.create({
   fab: { backgroundColor: "#007bff", borderRadius: 50, width: 56, height: 56, justifyContent: "center", alignItems: "center", elevation: 5 },
   gradientLayer: { position: 'absolute', top: -30, left: 0, right: 0, height: 30, backgroundColor: 'rgba(255, 255, 255, 0.7)', zIndex: 1 },
 });
+
+// Função para filtrar transações por mês/ano
+const filterTransactionsByMonth = (transactions: Transaction[], date: Date) => {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  
+  return transactions.filter(transaction => {
+    const transactionDate = new Date(transaction.date);
+    return transactionDate.getFullYear() === year && transactionDate.getMonth() === month;
+  });
+};
+
+// Função para calcular totais
+const calculateTotals = (transactions: Transaction[]) => {
+  let totalIncome = 0;
+  let totalExpense = 0;
+  
+  transactions.forEach(transaction => {
+    if (transaction.type === 'income') {
+      totalIncome += transaction.amount;
+    } else if (transaction.type === 'expense') {
+      totalExpense += transaction.amount;
+    }
+  });
+  
+  return {
+    totalIncome,
+    totalExpense,
+    balance: totalIncome - totalExpense
+  };
+};
+
+// Configuração do withObservables
+const enhance = withObservables([], () => ({
+  transactions: database.get<Transaction>('transactions')
+    .query(
+      Q.sortBy('date', Q.desc)
+    )
+    .observe(),
+  accounts: AccountService.observeAccounts(),
+  categories: CategoryService.observeCategories(),
+}));
+
+export default enhance(MonthlyControlScreen);
