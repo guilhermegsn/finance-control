@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import { PaperProvider, Text, Button, Surface } from 'react-native-paper';
 import AppNavigator from './src/navigation/AppNavigator';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
+import { CategoryService } from './src/service/CategoryService';
 
 // 1. Componente de Login (Simples e Direto)
 const LoginScreen = () => {
@@ -30,6 +31,15 @@ const LoginScreen = () => {
 // 2. Componente que decide o que mostrar (O "Guarda de Trânsito")
 const RootNavigation = () => {
   const { user, loading } = useAuth();
+
+  // Inicializar categorias padrão quando o usuário estiver logado
+  useEffect(() => {
+    if (user?.id) {
+      CategoryService.initializeDefaults(user.id).catch((error) => {
+        console.error('Erro ao inicializar categorias padrão:', error);
+      });
+    }
+  }, [user?.id]);
 
   if (loading) {
     return (
