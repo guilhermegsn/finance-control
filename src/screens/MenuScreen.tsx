@@ -12,12 +12,13 @@ export default function MenuScreen() {
       nome: 'Contas',
       descricao: 'Gerencie suas contas bancárias',
       icone: 'wallet',
-      onPress: ()=> navigation.navigate('Accounts')
+      onPress: () => navigation.navigate('Accounts')
     },
     {
       nome: 'Categorias',
       descricao: 'Organize suas categorias de gastos',
-      icone: 'tag'
+      icone: 'tag',
+      onPress: () => navigation.navigate('Categories')
     },
     {
       nome: 'Relatórios',
