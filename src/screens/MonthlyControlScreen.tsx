@@ -22,6 +22,22 @@ interface Params {
   recurringEndDate?: Date | null
 }
 
+interface AccountTransactionGroup {
+  accountId: string;
+  accountName: string;
+  accountColor: string;
+  previousBalance: number;
+  totalBalance: number;
+  income: {
+    total: number;
+    transactions: Transaction[];
+  };
+  expense: {
+    total: number;
+    transactions: Transaction[];
+  };
+}
+
 interface GroupedTransaction {
   accountId: string;
   accountName: string;
@@ -214,20 +230,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
   // Filtrar transações pelo mês atual
   const filteredTransactions = filterTransactionsByMonth(transactions, currentDate);
 
-  // Separar transações por tipo
-  const incomeTransactions = filteredTransactions.filter(t => t.type === 'income');
-  const expenseTransactions = filteredTransactions.filter(t => t.type === 'expense');
-
-  // Agrupar transações por tipo e conta
-  const groupedIncomeTransactions = useMemo(() => {
-    return groupTransactionsByAccount(incomeTransactions, accounts);
-  }, [incomeTransactions, accounts]);
-
-  const groupedExpenseTransactions = useMemo(() => {
-    return groupTransactionsByAccount(expenseTransactions, accounts);
-  }, [expenseTransactions, accounts]);
-
-  // Calcular totais
+  // Calcular totais gerais
   const totals = calculateTotals(filteredTransactions);
 
   // Calcular saldo anterior para cada conta (primeiro dia do mês atual)
@@ -255,30 +258,65 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
     calculatePreviousBalances();
   }, [currentDate, accounts, transactions.length]); // Recalcular quando mês ou contas mudarem
 
-  // Calcular saldo total por conta (saldo anterior + transações do mês)
-  const accountTotalBalances = useMemo(() => {
-    const balances: Record<string, number> = {};
+  // Agrupar transações por conta e tipo (nova hierarquia)
+  const accountTransactionGroups = useMemo(() => {
+    const groups: AccountTransactionGroup[] = [];
 
-    // Inicializar com saldos anteriores
-    Object.keys(previousBalances).forEach(accountId => {
-      balances[accountId] = previousBalances[accountId];
-    });
+    // Inicializar grupos para todas as contas
+    accounts.forEach(account => {
+      const previousBalance = previousBalances[account.id] || 0;
+      
+      // Filtrar transações da conta no mês atual
+      const accountTransactions = filteredTransactions.filter(transaction => {
+        // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
+        const transactionAccountId = transaction._raw?.account_id;
+        return transactionAccountId === account.id;
+      });
 
-    // Adicionar transações do mês atual
-    filteredTransactions.forEach(transaction => {
-      // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
-      const accountId = transaction._raw?.account_id;
-      if (accountId && balances[accountId] !== undefined) {
-        if (transaction.type === 'income') {
-          balances[accountId] += transaction.amount;
-        } else if (transaction.type === 'expense') {
-          balances[accountId] -= transaction.amount;
+      // Separar transações por tipo
+      const incomeTransactions = accountTransactions.filter(t => t.type === 'income');
+      const expenseTransactions = accountTransactions.filter(t => t.type === 'expense');
+
+      // Calcular totais por tipo
+      const incomeTotal = incomeTransactions.reduce((sum, t) => sum + t.amount, 0);
+      const expenseTotal = expenseTransactions.reduce((sum, t) => sum + t.amount, 0);
+
+      // Calcular saldo total (saldo anterior + entradas - saídas)
+      const totalBalance = previousBalance + incomeTotal - expenseTotal;
+
+      groups.push({
+        accountId: account.id,
+        accountName: account.name,
+        accountColor: account.color,
+        previousBalance,
+        totalBalance,
+        income: {
+          total: incomeTotal,
+          transactions: incomeTransactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        },
+        expense: {
+          total: expenseTotal,
+          transactions: expenseTransactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
         }
-      }
+      });
     });
 
-    return balances;
-  }, [previousBalances, filteredTransactions]);
+    // Ordenar por saldo total (decrescente)
+    return groups.sort((a, b) => b.totalBalance - a.totalBalance);
+  }, [filteredTransactions, accounts, previousBalances]);
+
+  // Estado para controlar quais contas estão expandidas
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
+
+  const toggleAccountExpansion = (accountId: string) => {
+    const newExpanded = new Set(expandedAccounts);
+    if (newExpanded.has(accountId)) {
+      newExpanded.delete(accountId);
+    } else {
+      newExpanded.add(accountId);
+    }
+    setExpandedAccounts(newExpanded);
+  };
 
   return (
     <View style={styles.container}>
@@ -294,23 +332,16 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
       </View>
 
       <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false}>
-        {/* Entradas */}
-        <Text style={styles.sectionTitle}>Entradas</Text>
+        {/* Lista de Contas (Nova Hierarquia) */}
+        <Text style={styles.sectionTitle}>Contas</Text>
         <DataTable>
-          {/* <DataTable.Header>
-            <DataTable.Title style={{ maxWidth: 70 }}>Data</DataTable.Title>
-            <DataTable.Title>Descrição</DataTable.Title>
-            <DataTable.Title numeric>Valor</DataTable.Title>
-          </DataTable.Header> */}
-
-          {groupedIncomeTransactions.map((group) => {
-            const previousBalance = previousBalances[group.accountId] || 0;
-            const totalBalance = previousBalance + group.total;
+          {accountTransactionGroups.map((group) => {
+            const isExpanded = expandedAccounts.has(group.accountId);
             
             return (
               <View key={group.accountId}>
-                {/* Cabeçalho da conta */}
-                <DataTable.Row onPress={() => toggleIncomeAccountExpansion(group.accountId)}>
+                {/* Nível 1: Cabeçalho da Conta */}
+                <DataTable.Row onPress={() => toggleAccountExpansion(group.accountId)}>
                   <DataTable.Cell>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <View style={{
@@ -325,136 +356,103 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                   </DataTable.Cell>
                   <DataTable.Cell>
                     <Icon
-                      source={expandedIncomeAccounts.has(group.accountId) ? "chevron-up" : "chevron-down"}
+                      source={isExpanded ? "chevron-up" : "chevron-down"}
                       size={16}
                       color="#666"
                     />
                   </DataTable.Cell>
                   <DataTable.Cell numeric>
-                    <Text style={{ fontWeight: 'bold', fontSize: 14 }}>R$ {totalBalance.toFixed(2)}</Text>
+                    <Text style={{ fontWeight: 'bold', fontSize: 14 }}>R$ {group.totalBalance.toFixed(2)}</Text>
                   </DataTable.Cell>
                 </DataTable.Row>
 
-              {/* Transações da conta (se expandida) */}
-              {expandedIncomeAccounts.has(group.accountId) && (
-                <>
-                  {/* Linha especial para saldo inicial do mês */}
-                  {previousBalance !== 0 && (
-                    <DataTable.Row key={`initial-balance-${group.accountId}`}>
-                      <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 20 }}>
-                        <Icon source="history" size={16} color="#666" />
-                      </DataTable.Cell>
-                      <DataTable.Cell style={{ paddingLeft: 20 }}>
-                        <Text style={{ color: '#666', fontStyle: 'italic' }}>Saldo Inicial do Mês</Text>
-                      </DataTable.Cell>
-                      <DataTable.Cell numeric>
-                        <Text style={{ color: '#666', fontStyle: 'italic' }}>R$ {previousBalance.toFixed(2)}</Text>
-                      </DataTable.Cell>
-                    </DataTable.Row>
-                  )}
-                  
-                  {/* Transações do mês */}
-                  {group.transactions.map((item) => (
-                    <DataTable.Row key={item.id} onLongPress={() => openModal(item)}>
-                      <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 20 }}>
-                        {dayjs(item.date).format('DD/MM')}
-                      </DataTable.Cell>
-                      <DataTable.Cell style={{ paddingLeft: 20 }}>{item.description}</DataTable.Cell>
-                      <DataTable.Cell numeric>R$ {item.amount.toFixed(2)}</DataTable.Cell>
-                    </DataTable.Row>
-                  ))}
-                </>
-              )}
-            </View>
+                {/* Nível 2: Conteúdo Expandido da Conta */}
+                {isExpanded && (
+                  <>
+                    {/* Nível 2: Saldo Anterior */}
+                    {group.previousBalance !== 0 && (
+                      <DataTable.Row key={`initial-balance-${group.accountId}`}>
+                        <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 20 }}>
+                          <Icon source="history" size={16} color="#666" />
+                        </DataTable.Cell>
+                        <DataTable.Cell style={{ paddingLeft: 20 }}>
+                          <Text style={{ color: '#666', fontStyle: 'italic' }}>Saldo Inicial do Mês</Text>
+                        </DataTable.Cell>
+                        <DataTable.Cell numeric>
+                          <Text style={{ color: '#666', fontStyle: 'italic' }}>R$ {group.previousBalance.toFixed(2)}</Text>
+                        </DataTable.Cell>
+                      </DataTable.Row>
+                    )}
+
+                    {/* Nível 3: Bloco de Entradas */}
+                    {group.income.transactions.length > 0 && (
+                      <>
+                        <DataTable.Row key={`income-header-${group.accountId}`}>
+                          <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 10 }}>
+                            <Icon source="arrow-up-bold-circle" size={16} color="#2E9E57" />
+                          </DataTable.Cell>
+                          <DataTable.Cell style={{ paddingLeft: 20 }}>
+                            <Text style={{ color: '#2E9E57', fontWeight: '600' }}>Entradas</Text>
+                          </DataTable.Cell>
+                          <DataTable.Cell numeric>
+                            <Text style={{ color: '#2E9E57', fontWeight: '600' }}>R$ {group.income.total.toFixed(2)}</Text>
+                          </DataTable.Cell>
+                        </DataTable.Row>
+                        
+                        {/* Nível 4: Transações de Entrada */}
+                        {group.income.transactions.map((item) => (
+                          <DataTable.Row key={item.id} onLongPress={() => openModal(item)}>
+                            <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 10 }}>
+                              {dayjs(item.date).format('DD/MM')}
+                            </DataTable.Cell>
+                            <DataTable.Cell style={{ paddingLeft: 40 }}>{item.description}</DataTable.Cell>
+                            <DataTable.Cell numeric>R$ {item.amount.toFixed(2)}</DataTable.Cell>
+                          </DataTable.Row>
+                        ))}
+                      </>
+                    )}
+
+                    {/* Nível 3: Bloco de Saídas */}
+                    {group.expense.transactions.length > 0 && (
+                      <>
+                        <DataTable.Row key={`expense-header-${group.accountId}`}>
+                          <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 10 }}>
+                            <Icon source="arrow-down-bold-circle" size={16} color="#CC4A4A" />
+                          </DataTable.Cell>
+                          <DataTable.Cell style={{ paddingLeft: 20 }}>
+                            <Text style={{ color: '#CC4A4A', fontWeight: '600' }}>Saídas</Text>
+                          </DataTable.Cell>
+                          <DataTable.Cell numeric>
+                            <Text style={{ color: '#CC4A4A', fontWeight: '600' }}>R$ {group.expense.total.toFixed(2)}</Text>
+                          </DataTable.Cell>
+                        </DataTable.Row>
+                        
+                        {/* Nível 4: Transações de Saída */}
+                        {group.expense.transactions.map((item) => (
+                          <DataTable.Row key={item.id} onLongPress={() => openModal(item)}>
+                            <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 10 }}>
+                              {dayjs(item.date).format('DD/MM')}
+                            </DataTable.Cell>
+                            <DataTable.Cell style={{ paddingLeft: 40 }}>{item.description}</DataTable.Cell>
+                            <DataTable.Cell numeric>R$ {item.amount.toFixed(2)}</DataTable.Cell>
+                          </DataTable.Row>
+                        ))}
+                      </>
+                    )}
+                  </>
+                )}
+              </View>
             );
           })}
 
-          <DataTable.Row key={`totalEntries`}>
-            <DataTable.Cell>TOTAL</DataTable.Cell>
-            <DataTable.Cell numeric><Text style={{ fontWeight: 'bold' }}> R$ {totals.totalIncome.toFixed(2)} </Text></DataTable.Cell>
-          </DataTable.Row>
-        </DataTable>
-
-        {/* Saídas */}
-        <Text style={styles.sectionTitle}>Saídas à vista</Text>
-        <DataTable>
-          {/* <DataTable.Header>
-            <DataTable.Title style={{ maxWidth: 70 }} >Data</DataTable.Title>
-            <DataTable.Title>Descrição</DataTable.Title>
-            <DataTable.Title numeric>Valor</DataTable.Title>
-          </DataTable.Header> */}
-
-          {groupedExpenseTransactions.map((group) => {
-            const previousBalance = previousBalances[group.accountId] || 0;
-            // Para despesas, o total do mês é negativo (já que são saídas)
-            // O saldo total é: saldo anterior - despesas do mês
-            const totalBalance = previousBalance - group.total;
-            
-            return (
-              <View key={group.accountId}>
-                {/* Cabeçalho da conta */}
-                <DataTable.Row onPress={() => toggleExpenseAccountExpansion(group.accountId)}>
-                  <DataTable.Cell>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <View style={{
-                        width: 12,
-                        height: 12,
-                        borderRadius: 6,
-                        backgroundColor: group.accountColor,
-                        marginRight: 8
-                      }} />
-                      <Text style={{ fontWeight: 'bold' }}>{group.accountName}</Text>
-                    </View>
-                  </DataTable.Cell>
-                  <DataTable.Cell>
-                    <Icon
-                      source={expandedExpenseAccounts.has(group.accountId) ? "chevron-up" : "chevron-down"}
-                      size={16}
-                      color="#666"
-                    />
-                  </DataTable.Cell>
-                  <DataTable.Cell numeric>
-                    <Text style={{ fontWeight: 'bold', fontSize: 14 }}>R$ {totalBalance.toFixed(2)}</Text>
-                  </DataTable.Cell>
-                </DataTable.Row>
-
-              {/* Transações da conta (se expandida) */}
-              {expandedExpenseAccounts.has(group.accountId) && (
-                <>
-                  {/* Linha especial para saldo inicial do mês */}
-                  {previousBalance !== 0 && (
-                    <DataTable.Row key={`initial-balance-${group.accountId}`}>
-                      <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 20 }}>
-                        <Icon source="history" size={16} color="#666" />
-                      </DataTable.Cell>
-                      <DataTable.Cell style={{ paddingLeft: 20 }}>
-                        <Text style={{ color: '#666', fontStyle: 'italic' }}>Saldo Inicial do Mês</Text>
-                      </DataTable.Cell>
-                      <DataTable.Cell numeric>
-                        <Text style={{ color: '#666', fontStyle: 'italic' }}>R$ {previousBalance.toFixed(2)}</Text>
-                      </DataTable.Cell>
-                    </DataTable.Row>
-                  )}
-                  
-                  {/* Transações do mês */}
-                  {group.transactions.map((item) => (
-                    <DataTable.Row key={item.id} onLongPress={() => openModal(item)}>
-                      <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 20 }}>
-                        {dayjs(item.date).format('DD/MM')}
-                      </DataTable.Cell>
-                      <DataTable.Cell style={{ paddingLeft: 20 }}>{item.description}</DataTable.Cell>
-                      <DataTable.Cell numeric>R$ {item.amount.toFixed(2)}</DataTable.Cell>
-                    </DataTable.Row>
-                  ))}
-                </>
-              )}
-            </View>
-            );
-          })}
-
-          <DataTable.Row key={`totalExpenses`}>
-            <DataTable.Cell>TOTAL</DataTable.Cell>
-            <DataTable.Cell numeric><Text style={{ fontWeight: 'bold' }}> R$ {totals.totalExpense.toFixed(2)} </Text></DataTable.Cell>
+          {/* Totais Gerais */}
+          <DataTable.Row key={`total-summary`}>
+            <DataTable.Cell>
+              <Text style={{ fontWeight: 'bold' }}>TOTAL GERAL</Text>
+            </DataTable.Cell>
+            <DataTable.Cell numeric>
+              <Text style={{ fontWeight: 'bold' }}>R$ {totals.balance.toFixed(2)}</Text>
+            </DataTable.Cell>
           </DataTable.Row>
         </DataTable>
 
@@ -479,27 +477,13 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
           </DataTable.Row>
         </DataTable>
 
-        <View style={{ height: 130 }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* RESUMO FIXO */}
-      <View style={styles.summaryContainer}>
-        <View style={styles.gradientLayer} />
-        <View>
-          <View style={{ flexDirection: 'row' }}>
-            <Text style={styles.summaryText}>Saldo parcial: </Text>
-            <Text style={styles.summaryTextBold}> R$ {totals.balance.toFixed(2)}</Text>
-          </View>
-          <View style={{ flexDirection: 'row' }}>
-            <Text style={styles.summaryText}>Saldo Total:</Text>
-            <Text style={styles.summaryText}> R$ {totals.balance.toFixed(2)}</Text>
-          </View>
-        </View>
-
-        <TouchableOpacity onPress={() => openModal()} style={styles.fab}>
-          <Icon source="plus" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
+      {/* FAB para adicionar nova transação */}
+      <TouchableOpacity onPress={() => openModal()} style={styles.fab}>
+        <Icon source="plus" size={24} color="#fff" />
+      </TouchableOpacity>
 
       <Portal>
         <Modal
@@ -727,11 +711,19 @@ const styles = StyleSheet.create({
   scrollArea: { flex: 1 },
   textWarning: { fontSize: 16, color: "#A50C36" },
   sectionTitle: { fontSize: 16, fontWeight: "600", marginTop: 20, marginBottom: 8 },
-  summaryContainer: { position: "absolute", backgroundColor: '#fff', left: 0, right: 0, bottom: 0, borderTopWidth: 1, borderColor: "#ddd", flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingVertical: 14 },
-  summaryText: { fontSize: 14, marginVertical: 2 },
-  summaryTextBold: { fontSize: 14, marginVertical: 2, fontWeight: 'bold' },
-  fab: { backgroundColor: "#007bff", borderRadius: 50, width: 56, height: 56, justifyContent: "center", alignItems: "center", elevation: 5 },
-  gradientLayer: { position: 'absolute', top: -30, left: 0, right: 0, height: 30, backgroundColor: 'rgba(255, 255, 255, 0.7)', zIndex: 1 },
+  fab: { 
+    position: 'absolute', 
+    bottom: 20, 
+    right: 20, 
+    backgroundColor: "#007bff", 
+    borderRadius: 50, 
+    width: 56, 
+    height: 56, 
+    justifyContent: "center", 
+    alignItems: "center", 
+    elevation: 5,
+    zIndex: 10 
+  },
 });
 
 // Função para filtrar transações por mês/ano
