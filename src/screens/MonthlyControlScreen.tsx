@@ -42,7 +42,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
   const [activePicker, setActivePicker] = useState<'date' | 'startDate' | 'endDate' | null>(null);
   const [expandedIncomeAccounts, setExpandedIncomeAccounts] = useState<Set<string>>(new Set());
   const [expandedExpenseAccounts, setExpandedExpenseAccounts] = useState<Set<string>>(new Set());
-  
+
   const [params, setParams] = useState<Params>({
     id: '',
     description: '',
@@ -127,15 +127,15 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
 
   const handleSave = async () => {
     if (!user || !params.type) return;
-    
+
     const amount = parseFloat(params.value);
     if (isNaN(amount)) return;
 
     // Usar categoria selecionada ou primeira categoria do tipo correto
     const filteredCategories = categories.filter(cat => cat.type === params.type);
-    const categoryId = selectedCategoryId || 
-                      (filteredCategories.length > 0 ? filteredCategories[0].id : 
-                       (categories.length > 0 ? categories[0].id : ''));
+    const categoryId = selectedCategoryId ||
+      (filteredCategories.length > 0 ? filteredCategories[0].id :
+        (categories.length > 0 ? categories[0].id : ''));
 
     const transactionData = {
       accountId: selectedAccountId || (accounts.length > 0 ? accounts[0].id : ''),
@@ -193,11 +193,11 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
 
   // Filtrar transações pelo mês atual
   const filteredTransactions = filterTransactionsByMonth(transactions, currentDate);
-  
+
   // Separar transações por tipo
   const incomeTransactions = filteredTransactions.filter(t => t.type === 'income');
   const expenseTransactions = filteredTransactions.filter(t => t.type === 'expense');
-  
+
   // Agrupar transações por tipo e conta
   const groupedIncomeTransactions = useMemo(() => {
     return groupTransactionsByAccount(incomeTransactions, accounts);
@@ -206,7 +206,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
   const groupedExpenseTransactions = useMemo(() => {
     return groupTransactionsByAccount(expenseTransactions, accounts);
   }, [expenseTransactions, accounts]);
-  
+
   // Calcular totais
   const totals = calculateTotals(filteredTransactions);
 
@@ -232,35 +232,35 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
             <DataTable.Title>Descrição</DataTable.Title>
             <DataTable.Title numeric>Valor</DataTable.Title>
           </DataTable.Header> */}
-          
+
           {groupedIncomeTransactions.map((group) => (
             <View key={group.accountId}>
               {/* Cabeçalho da conta */}
               <DataTable.Row onPress={() => toggleIncomeAccountExpansion(group.accountId)}>
                 <DataTable.Cell>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={{ 
-                      width: 12, 
-                      height: 12, 
-                      borderRadius: 6, 
+                    <View style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: 6,
                       backgroundColor: group.accountColor,
-                      marginRight: 8 
+                      marginRight: 8
                     }} />
                     <Text style={{ fontWeight: 'bold' }}>{group.accountName}</Text>
                   </View>
                 </DataTable.Cell>
                 <DataTable.Cell>
-                  <Icon 
-                    source={expandedIncomeAccounts.has(group.accountId) ? "chevron-up" : "chevron-down"} 
-                    size={16} 
-                    color="#666" 
+                  <Icon
+                    source={expandedIncomeAccounts.has(group.accountId) ? "chevron-up" : "chevron-down"}
+                    size={16}
+                    color="#666"
                   />
                 </DataTable.Cell>
                 <DataTable.Cell numeric>
                   <Text style={{ fontWeight: 'bold' }}>R$ {group.total.toFixed(2)}</Text>
                 </DataTable.Cell>
               </DataTable.Row>
-              
+
               {/* Transações da conta (se expandida) */}
               {expandedIncomeAccounts.has(group.accountId) && group.transactions.map((item) => (
                 <DataTable.Row key={item.id} onLongPress={() => openModal(item)}>
@@ -273,7 +273,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
               ))}
             </View>
           ))}
-          
+
           <DataTable.Row key={`totalEntries`}>
             <DataTable.Cell>TOTAL</DataTable.Cell>
             <DataTable.Cell numeric><Text style={{ fontWeight: 'bold' }}> R$ {totals.totalIncome.toFixed(2)} </Text></DataTable.Cell>
@@ -288,35 +288,35 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
             <DataTable.Title>Descrição</DataTable.Title>
             <DataTable.Title numeric>Valor</DataTable.Title>
           </DataTable.Header> */}
-          
+
           {groupedExpenseTransactions.map((group) => (
             <View key={group.accountId}>
               {/* Cabeçalho da conta */}
               <DataTable.Row onPress={() => toggleExpenseAccountExpansion(group.accountId)}>
                 <DataTable.Cell>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={{ 
-                      width: 12, 
-                      height: 12, 
-                      borderRadius: 6, 
+                    <View style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: 6,
                       backgroundColor: group.accountColor,
-                      marginRight: 8 
+                      marginRight: 8
                     }} />
                     <Text style={{ fontWeight: 'bold' }}>{group.accountName}</Text>
                   </View>
                 </DataTable.Cell>
                 <DataTable.Cell>
-                  <Icon 
-                    source={expandedExpenseAccounts.has(group.accountId) ? "chevron-up" : "chevron-down"} 
-                    size={16} 
-                    color="#666" 
+                  <Icon
+                    source={expandedExpenseAccounts.has(group.accountId) ? "chevron-up" : "chevron-down"}
+                    size={16}
+                    color="#666"
                   />
                 </DataTable.Cell>
                 <DataTable.Cell numeric>
                   <Text style={{ fontWeight: 'bold' }}>R$ {group.total.toFixed(2)}</Text>
                 </DataTable.Cell>
               </DataTable.Row>
-              
+
               {/* Transações da conta (se expandida) */}
               {expandedExpenseAccounts.has(group.accountId) && group.transactions.map((item) => (
                 <DataTable.Row key={item.id} onLongPress={() => openModal(item)}>
@@ -329,7 +329,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
               ))}
             </View>
           ))}
-          
+
           <DataTable.Row key={`totalExpenses`}>
             <DataTable.Cell>TOTAL</DataTable.Cell>
             <DataTable.Cell numeric><Text style={{ fontWeight: 'bold' }}> R$ {totals.totalExpense.toFixed(2)} </Text></DataTable.Cell>
@@ -387,17 +387,17 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
         >
           {params.type === null ?
             <View style={{ gap: 12 }}>
-              <Button 
-                mode="contained" 
-                buttonColor="#2E9E57" 
+              <Button
+                mode="contained"
+                buttonColor="#2E9E57"
                 onPress={() => selectType('income')}
                 style={{ marginBottom: 8 }}
               >
                 Entrada
               </Button>
-              <Button 
-                mode="contained" 
-                buttonColor="#CC4A4A" 
+              <Button
+                mode="contained"
+                buttonColor="#CC4A4A"
                 onPress={() => selectType('expense')}
               >
                 Saída - À vista
@@ -413,7 +413,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                   onChange={handleDateChange}
                 />
               )}
-              
+
               <View>
                 <Text style={{ fontSize: 20, marginBottom: 16 }}>
                   {selectedTransaction ? 'Editando transação' : 'Adicionando nova transação'}
@@ -442,93 +442,95 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                   </Button>
                 </View>
               </View>
-              
+
               {/* Seletor de Conta */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ marginLeft: 5, marginBottom: 4 }}>Conta</Text>
-                <Menu
-                  visible={accountMenuVisible}
-                  onDismiss={() => setAccountMenuVisible(false)}
-                  anchor={
-                    <Button
-                      mode="contained-tonal"
-                      onPress={() => setAccountMenuVisible(true)}
-                      style={{ justifyContent: 'space-between' }}
-                    >
-                      {accounts.find(acc => acc.id === selectedAccountId)?.name || 'Selecionar conta'}
-                    </Button>
-                  }
-                >
-                  {accounts.map((account) => (
-                    <Menu.Item
-                      key={account.id}
-                      onPress={() => {
-                        setSelectedAccountId(account.id);
-                        setAccountMenuVisible(false);
-                      }}
-                      title={account.name}
-                      style={{ flexDirection: 'row', alignItems: 'center' }}
-                    />
-                  ))}
-                </Menu>
-              </View>
-              
-              {/* Seletor de Categoria */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ marginLeft: 5, marginBottom: 4 }}>Categoria</Text>
-                <Menu
-                  visible={categoryMenuVisible}
-                  onDismiss={() => setCategoryMenuVisible(false)}
-                  anchor={
-                    <Button
-                      mode="contained-tonal"
-                      onPress={() => setCategoryMenuVisible(true)}
-                      style={{ justifyContent: 'space-between' }}
-                    >
-                      {categories.find(cat => cat.id === selectedCategoryId)?.name || 'Selecionar categoria'}
-                    </Button>
-                  }
-                >
-                  {categories
-                    .filter(cat => !params.type || cat.type === params.type)
-                    .map((category) => (
+              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
+                <View style={{ width: '48%' }}>
+                  <Text style={{ marginLeft: 5, marginBottom: 4 }}>Conta</Text>
+                  <Menu
+                    visible={accountMenuVisible}
+                    onDismiss={() => setAccountMenuVisible(false)}
+                    anchor={
+                      <Button
+                        mode="contained-tonal"
+                        onPress={() => setAccountMenuVisible(true)}
+                        style={{ justifyContent: 'space-between' }}
+                      >
+                        {accounts.find(acc => acc.id === selectedAccountId)?.name || 'Selecionar conta'}
+                      </Button>
+                    }
+                  >
+                    {accounts.map((account) => (
                       <Menu.Item
-                        key={category.id}
+                        key={account.id}
                         onPress={() => {
-                          setSelectedCategoryId(category.id);
-                          setCategoryMenuVisible(false);
+                          setSelectedAccountId(account.id);
+                          setAccountMenuVisible(false);
                         }}
-                        title={category.name}
+                        title={account.name}
                         style={{ flexDirection: 'row', alignItems: 'center' }}
                       />
                     ))}
-                </Menu>
+                  </Menu>
+                </View>
+
+                {/* Seletor de Categoria */}
+                <View style={{ marginBottom: 16, width: '48%' }}>
+                  <Text style={{ marginLeft: 5, marginBottom: 4 }}>Categoria</Text>
+                  <Menu
+                    visible={categoryMenuVisible}
+                    onDismiss={() => setCategoryMenuVisible(false)}
+                    anchor={
+                      <Button
+                        mode="contained-tonal"
+                        onPress={() => setCategoryMenuVisible(true)}
+                        style={{ justifyContent: 'space-between' }}
+                      >
+                        {categories.find(cat => cat.id === selectedCategoryId)?.name || 'Selecionar categoria'}
+                      </Button>
+                    }
+                  >
+                    {categories
+                      .filter(cat => !params.type || cat.type === params.type)
+                      .map((category) => (
+                        <Menu.Item
+                          key={category.id}
+                          onPress={() => {
+                            setSelectedCategoryId(category.id);
+                            setCategoryMenuVisible(false);
+                          }}
+                          title={category.name}
+                          style={{ flexDirection: 'row', alignItems: 'center' }}
+                        />
+                      ))}
+                  </Menu>
+                </View>
               </View>
-              
-              <TextInput 
-                label="Descrição" 
-                value={params.description} 
-                onChangeText={(text) => setParams(prev => ({ ...prev, description: text }))} 
-                keyboardType="default" 
-                mode="outlined" 
-                style={{ marginBottom: 16 }} 
-                disabled={isDeleting} 
+
+              <TextInput
+                label="Descrição"
+                value={params.description}
+                onChangeText={(text) => setParams(prev => ({ ...prev, description: text }))}
+                keyboardType="default"
+                mode="outlined"
+                style={{ marginBottom: 16 }}
+                disabled={isDeleting}
               />
-              <TextInput 
-                label="Valor" 
-                value={params.value} 
-                onChangeText={(text) => setParams(prev => ({ ...prev, value: text }))} 
-                keyboardType="numeric" 
-                mode="outlined" 
-                style={{ marginBottom: 16 }} 
-                disabled={isDeleting} 
+              <TextInput
+                label="Valor"
+                value={params.value}
+                onChangeText={(text) => setParams(prev => ({ ...prev, value: text }))}
+                keyboardType="numeric"
+                mode="outlined"
+                style={{ marginBottom: 16 }}
+                disabled={isDeleting}
               />
 
               {selectedTransaction && !isDeleting && (
-                <Button 
-                  mode="contained" 
-                  onPress={() => { setIsDeleting(true) }} 
-                  buttonColor="#A50C36" 
+                <Button
+                  mode="contained"
+                  onPress={() => { setIsDeleting(true) }}
+                  buttonColor="#A50C36"
                   style={{ marginTop: 20 }}
                 >
                   Excluir
@@ -584,7 +586,7 @@ const styles = StyleSheet.create({
 const filterTransactionsByMonth = (transactions: Transaction[], date: Date) => {
   const year = date.getFullYear();
   const month = date.getMonth();
-  
+
   return transactions.filter(transaction => {
     const transactionDate = new Date(transaction.date);
     return transactionDate.getFullYear() === year && transactionDate.getMonth() === month;
@@ -595,7 +597,7 @@ const filterTransactionsByMonth = (transactions: Transaction[], date: Date) => {
 const calculateTotals = (transactions: Transaction[]) => {
   let totalIncome = 0;
   let totalExpense = 0;
-  
+
   transactions.forEach(transaction => {
     if (transaction.type === 'income') {
       totalIncome += transaction.amount;
@@ -603,7 +605,7 @@ const calculateTotals = (transactions: Transaction[]) => {
       totalExpense += transaction.amount;
     }
   });
-  
+
   return {
     totalIncome,
     totalExpense,
@@ -614,7 +616,7 @@ const calculateTotals = (transactions: Transaction[]) => {
 // Função para agrupar transações por conta
 const groupTransactionsByAccount = (transactions: Transaction[], accounts: any[]): GroupedTransaction[] => {
   const accountMap = new Map<string, GroupedTransaction>();
-  
+
   // Inicializar mapa com todas as contas
   accounts.forEach(account => {
     accountMap.set(account.id, {
@@ -625,7 +627,7 @@ const groupTransactionsByAccount = (transactions: Transaction[], accounts: any[]
       transactions: []
     });
   });
-  
+
   // Agrupar transações por conta
   transactions.forEach(transaction => {
     // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
@@ -636,7 +638,7 @@ const groupTransactionsByAccount = (transactions: Transaction[], accounts: any[]
       group.total += transaction.amount;
     }
   });
-  
+
   // Filtrar apenas contas que têm transações e ordenar por total (decrescente)
   return Array.from(accountMap.values())
     .filter(group => group.transactions.length > 0)
