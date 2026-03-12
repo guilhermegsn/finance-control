@@ -218,5 +218,29 @@ export const TransactionService = {
     });
 
     console.log('Transação marcada para exclusão. Execute o Sync para atualizar o servidor.');
+  },
+
+  // Calcular saldo de uma conta antes de uma data específica
+  getBalanceBeforeDate: async (accountId: string, date: Date): Promise<number> => {
+    // Buscar todas as transações da conta com data anterior à data fornecida
+    const transactions = await database.get<Transaction>('transactions')
+      .query(
+        Q.where('account_id', accountId),
+        Q.where('date', Q.lt(date.getTime())), // date é armazenado como timestamp (number)
+        Q.sortBy('date', Q.asc)
+      )
+      .fetch();
+    
+    // Calcular saldo: entradas - saídas
+    let balance = 0;
+    transactions.forEach(transaction => {
+      if (transaction.type === 'income') {
+        balance += transaction.amount;
+      } else if (transaction.type === 'expense') {
+        balance -= transaction.amount;
+      }
+    });
+    
+    return balance;
   }
 };

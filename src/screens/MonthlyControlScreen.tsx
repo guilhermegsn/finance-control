@@ -1,6 +1,6 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import dayjs from "dayjs";
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { DataTable, Icon, Portal, Modal, Button, TextInput, Divider, Menu, Switch, HelperText } from "react-native-paper";
 import { withObservables } from '@nozbe/watermelondb/react';
@@ -58,6 +58,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [accountMenuVisible, setAccountMenuVisible] = useState(false);
   const [categoryMenuVisible, setCategoryMenuVisible] = useState(false);
+  const [previousBalances, setPreviousBalances] = useState<Record<string, number>>({});
 
   const goToPreviousMonth = () => {
     const prev = new Date(currentDate);
@@ -229,6 +230,56 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
   // Calcular totais
   const totals = calculateTotals(filteredTransactions);
 
+  // Calcular saldo anterior para cada conta (primeiro dia do mês atual)
+  useEffect(() => {
+    const calculatePreviousBalances = async () => {
+      const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      const newBalances: Record<string, number> = {};
+
+      // Para cada conta, calcular saldo anterior
+      for (const account of accounts) {
+        try {
+          const balanceBeforeDate = await TransactionService.getBalanceBeforeDate(account.id, firstDayOfMonth);
+          // Adicionar saldo inicial da conta
+          const accountInitialBalance = account.initialBalance || 0;
+          newBalances[account.id] = balanceBeforeDate + accountInitialBalance;
+        } catch (error) {
+          console.error(`Erro ao calcular saldo anterior para conta ${account.id}:`, error);
+          newBalances[account.id] = account.initialBalance || 0;
+        }
+      }
+
+      setPreviousBalances(newBalances);
+    };
+
+    calculatePreviousBalances();
+  }, [currentDate, accounts, transactions.length]); // Recalcular quando mês ou contas mudarem
+
+  // Calcular saldo total por conta (saldo anterior + transações do mês)
+  const accountTotalBalances = useMemo(() => {
+    const balances: Record<string, number> = {};
+
+    // Inicializar com saldos anteriores
+    Object.keys(previousBalances).forEach(accountId => {
+      balances[accountId] = previousBalances[accountId];
+    });
+
+    // Adicionar transações do mês atual
+    filteredTransactions.forEach(transaction => {
+      // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
+      const accountId = transaction._raw?.account_id;
+      if (accountId && balances[accountId] !== undefined) {
+        if (transaction.type === 'income') {
+          balances[accountId] += transaction.amount;
+        } else if (transaction.type === 'expense') {
+          balances[accountId] -= transaction.amount;
+        }
+      }
+    });
+
+    return balances;
+  }, [previousBalances, filteredTransactions]);
+
   return (
     <View style={styles.container}>
       {/* HEADER */}
@@ -252,33 +303,42 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
             <DataTable.Title numeric>Valor</DataTable.Title>
           </DataTable.Header> */}
 
-          {groupedIncomeTransactions.map((group) => (
-            <View key={group.accountId}>
-              {/* Cabeçalho da conta */}
-              <DataTable.Row onPress={() => toggleIncomeAccountExpansion(group.accountId)}>
-                <DataTable.Cell>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: 6,
-                      backgroundColor: group.accountColor,
-                      marginRight: 8
-                    }} />
-                    <Text style={{ fontWeight: 'bold' }}>{group.accountName}</Text>
-                  </View>
-                </DataTable.Cell>
-                <DataTable.Cell>
-                  <Icon
-                    source={expandedIncomeAccounts.has(group.accountId) ? "chevron-up" : "chevron-down"}
-                    size={16}
-                    color="#666"
-                  />
-                </DataTable.Cell>
-                <DataTable.Cell numeric>
-                  <Text style={{ fontWeight: 'bold' }}>R$ {group.total.toFixed(2)}</Text>
-                </DataTable.Cell>
-              </DataTable.Row>
+          {groupedIncomeTransactions.map((group) => {
+            const previousBalance = previousBalances[group.accountId] || 0;
+            const totalBalance = previousBalance + group.total;
+            
+            return (
+              <View key={group.accountId}>
+                {/* Cabeçalho da conta */}
+                <DataTable.Row onPress={() => toggleIncomeAccountExpansion(group.accountId)}>
+                  <DataTable.Cell>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: 6,
+                        backgroundColor: group.accountColor,
+                        marginRight: 8
+                      }} />
+                      <Text style={{ fontWeight: 'bold' }}>{group.accountName}</Text>
+                    </View>
+                  </DataTable.Cell>
+                  <DataTable.Cell>
+                    <Icon
+                      source={expandedIncomeAccounts.has(group.accountId) ? "chevron-up" : "chevron-down"}
+                      size={16}
+                      color="#666"
+                    />
+                  </DataTable.Cell>
+                  <DataTable.Cell numeric>
+                    <View>
+                      <Text style={{ fontWeight: 'bold', fontSize: 14 }}>R$ {totalBalance.toFixed(2)}</Text>
+                      <Text style={{ fontSize: 10, color: '#666' }}>
+                        {previousBalance !== 0 ? `(Acumulado: R$ ${previousBalance.toFixed(2)})` : ''}
+                      </Text>
+                    </View>
+                  </DataTable.Cell>
+                </DataTable.Row>
 
               {/* Transações da conta (se expandida) */}
               {expandedIncomeAccounts.has(group.accountId) && group.transactions.map((item) => (
@@ -291,7 +351,8 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                 </DataTable.Row>
               ))}
             </View>
-          ))}
+            );
+          })}
 
           <DataTable.Row key={`totalEntries`}>
             <DataTable.Cell>TOTAL</DataTable.Cell>
@@ -308,33 +369,44 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
             <DataTable.Title numeric>Valor</DataTable.Title>
           </DataTable.Header> */}
 
-          {groupedExpenseTransactions.map((group) => (
-            <View key={group.accountId}>
-              {/* Cabeçalho da conta */}
-              <DataTable.Row onPress={() => toggleExpenseAccountExpansion(group.accountId)}>
-                <DataTable.Cell>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: 6,
-                      backgroundColor: group.accountColor,
-                      marginRight: 8
-                    }} />
-                    <Text style={{ fontWeight: 'bold' }}>{group.accountName}</Text>
-                  </View>
-                </DataTable.Cell>
-                <DataTable.Cell>
-                  <Icon
-                    source={expandedExpenseAccounts.has(group.accountId) ? "chevron-up" : "chevron-down"}
-                    size={16}
-                    color="#666"
-                  />
-                </DataTable.Cell>
-                <DataTable.Cell numeric>
-                  <Text style={{ fontWeight: 'bold' }}>R$ {group.total.toFixed(2)}</Text>
-                </DataTable.Cell>
-              </DataTable.Row>
+          {groupedExpenseTransactions.map((group) => {
+            const previousBalance = previousBalances[group.accountId] || 0;
+            // Para despesas, o total do mês é negativo (já que são saídas)
+            // O saldo total é: saldo anterior - despesas do mês
+            const totalBalance = previousBalance - group.total;
+            
+            return (
+              <View key={group.accountId}>
+                {/* Cabeçalho da conta */}
+                <DataTable.Row onPress={() => toggleExpenseAccountExpansion(group.accountId)}>
+                  <DataTable.Cell>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: 6,
+                        backgroundColor: group.accountColor,
+                        marginRight: 8
+                      }} />
+                      <Text style={{ fontWeight: 'bold' }}>{group.accountName}</Text>
+                    </View>
+                  </DataTable.Cell>
+                  <DataTable.Cell>
+                    <Icon
+                      source={expandedExpenseAccounts.has(group.accountId) ? "chevron-up" : "chevron-down"}
+                      size={16}
+                      color="#666"
+                    />
+                  </DataTable.Cell>
+                  <DataTable.Cell numeric>
+                    <View>
+                      <Text style={{ fontWeight: 'bold', fontSize: 14 }}>R$ {totalBalance.toFixed(2)}</Text>
+                      <Text style={{ fontSize: 10, color: '#666' }}>
+                        {previousBalance !== 0 ? `(Anterior: R$ ${previousBalance.toFixed(2)})` : ''}
+                      </Text>
+                    </View>
+                  </DataTable.Cell>
+                </DataTable.Row>
 
               {/* Transações da conta (se expandida) */}
               {expandedExpenseAccounts.has(group.accountId) && group.transactions.map((item) => (
@@ -347,7 +419,8 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                 </DataTable.Row>
               ))}
             </View>
-          ))}
+            );
+          })}
 
           <DataTable.Row key={`totalExpenses`}>
             <DataTable.Cell>TOTAL</DataTable.Cell>
