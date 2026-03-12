@@ -26,7 +26,7 @@ export const TransactionService = {
     return await database.get<Transaction>('transactions').find(transactionId);
   },
 
-  // Criar nova transação
+  // Criar nova transação (com suporte a recorrência usando database.batch())
   create: async (data: {
     accountId: string;
     categoryId: string;
@@ -40,31 +40,119 @@ export const TransactionService = {
     observation?: string;
     creditCardId?: string;
     relatedTransactionId?: string;
+    // Parâmetros de recorrência
+    isRecurring?: boolean;
+    recurringEndDate?: Date;
   }) => {
     await database.write(async () => {
-      await database.get<Transaction>('transactions').create((transaction) => {
-        // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
-        transaction._raw.account_id = data.accountId;
-        // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
-        transaction._raw.category_id = data.categoryId;
-        transaction.description = data.description;
-        transaction.amount = data.amount;
-        transaction.type = data.type;
-        transaction.date = data.date;
-        transaction.userId = data.userId;
-        transaction.isConsolidated = data.isConsolidated || false;
-        transaction.consolidatedAt = data.consolidatedAt;
-        transaction.observation = data.observation;
-        // Campos opcionais do schema
-        if (data.creditCardId) {
-          // @ts-ignore - campo não definido no modelo mas existe no schema
-          transaction._raw.credit_card_id = data.creditCardId;
+      // Se não for recorrente, cria apenas uma transação
+      if (!data.isRecurring) {
+        await database.get<Transaction>('transactions').create((transaction) => {
+          // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
+          transaction._raw.account_id = data.accountId;
+          // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
+          transaction._raw.category_id = data.categoryId;
+          transaction.description = data.description;
+          transaction.amount = data.amount;
+          transaction.type = data.type;
+          transaction.date = data.date;
+          transaction.userId = data.userId;
+          transaction.isConsolidated = data.isConsolidated || false;
+          transaction.consolidatedAt = data.consolidatedAt;
+          transaction.observation = data.observation;
+          transaction.isRecurring = false;
+          // Campos opcionais do schema
+          if (data.creditCardId) {
+            // @ts-ignore - campo não definido no modelo mas existe no schema
+            transaction._raw.credit_card_id = data.creditCardId;
+          }
+          if (data.relatedTransactionId) {
+            // @ts-ignore - campo não definido no modelo mas existe no schema
+            transaction._raw.related_transaction_id = data.relatedTransactionId;
+          }
+        });
+        return;
+      }
+
+      // Se for recorrente, cria uma série de transações usando database.batch()
+      // Gerar UUID único para recurring_id
+      const recurringId = `recurring_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Calcular datas: se não houver endDate, usar 24 meses (2 anos) como padrão
+      const startDate = new Date(data.date);
+      let endDate: Date;
+      
+      if (data.recurringEndDate) {
+        endDate = new Date(data.recurringEndDate);
+      } else {
+        // Recorrência infinita: criar para os próximos 24 meses
+        endDate = new Date(startDate);
+        endDate.setMonth(endDate.getMonth() + 24);
+      }
+      
+      // Normalizar horas para evitar problemas de comparação
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(0, 0, 0, 0);
+      
+      // Array para armazenar os registros preparados
+      const records = [];
+      let currentDate = new Date(startDate);
+      
+      // Função para adicionar meses tratando casos de fim de mês
+      const addMonths = (date: Date, months: number): Date => {
+        const newDate = new Date(date);
+        const day = date.getDate();
+        newDate.setMonth(newDate.getMonth() + months);
+        
+        // Tratar casos onde o dia não existe no próximo mês (ex: 31 de janeiro -> 28/29 de fevereiro)
+        if (newDate.getDate() !== day) {
+          // Se o dia não existe, usar o último dia do mês atual
+          newDate.setMonth(newDate.getMonth() + 1);
+          newDate.setDate(0); // Vai para o último dia do mês anterior (que é o mês que queremos)
         }
-        if (data.relatedTransactionId) {
+        
+        return newDate;
+      };
+      
+      // Criar registros para cada mês
+      while (currentDate <= endDate) {
+        const transactionCollection = database.get<Transaction>('transactions');
+        const transactionRecord = transactionCollection.prepareCreate((transaction) => {
+          // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
+          transaction._raw.account_id = data.accountId;
+          // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
+          transaction._raw.category_id = data.categoryId;
+          transaction.description = data.description;
+          transaction.amount = data.amount;
+          transaction.type = data.type;
+          transaction.date = new Date(currentDate);
+          transaction.userId = data.userId;
+          transaction.isConsolidated = data.isConsolidated || false;
+          transaction.consolidatedAt = data.consolidatedAt;
+          transaction.observation = data.observation;
+          transaction.isRecurring = true;
           // @ts-ignore - campo não definido no modelo mas existe no schema
-          transaction._raw.related_transaction_id = data.relatedTransactionId;
-        }
-      });
+          transaction._raw.recurring_id = recurringId;
+          
+          // Campos opcionais do schema
+          if (data.creditCardId) {
+            // @ts-ignore - campo não definido no modelo mas existe no schema
+            transaction._raw.credit_card_id = data.creditCardId;
+          }
+          if (data.relatedTransactionId) {
+            // @ts-ignore - campo não definido no modelo mas existe no schema
+            transaction._raw.related_transaction_id = data.relatedTransactionId;
+          }
+        });
+        
+        records.push(transactionRecord);
+        
+        // Avançar para o próximo mês usando a função que trata casos de fim de mês
+        currentDate = addMonths(currentDate, 1);
+      }
+      
+      // Executar todos os registros em um único batch
+      await database.batch(...records);
     });
   },
 
@@ -81,6 +169,9 @@ export const TransactionService = {
     observation?: string;
     creditCardId?: string;
     relatedTransactionId?: string;
+    // Campos de recorrência
+    recurringId?: string;
+    isRecurring?: boolean;
   }) => {
     await database.write(async () => {
       const transaction = await database.get<Transaction>('transactions').find(transactionId);
@@ -101,6 +192,7 @@ export const TransactionService = {
         if (data.isConsolidated !== undefined) tx.isConsolidated = data.isConsolidated;
         if (data.consolidatedAt !== undefined) tx.consolidatedAt = data.consolidatedAt;
         if (data.observation !== undefined) tx.observation = data.observation;
+        if (data.isRecurring !== undefined) tx.isRecurring = data.isRecurring;
         // Campos opcionais do schema
         if (data.creditCardId !== undefined) {
           // @ts-ignore - campo não definido no modelo mas existe no schema
@@ -109,6 +201,10 @@ export const TransactionService = {
         if (data.relatedTransactionId !== undefined) {
           // @ts-ignore - campo não definido no modelo mas existe no schema
           tx._raw.related_transaction_id = data.relatedTransactionId;
+        }
+        if (data.recurringId !== undefined) {
+          // @ts-ignore - campo não definido no modelo mas existe no schema
+          tx._raw.recurring_id = data.recurringId;
         }
       });
     });

@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const mySchema = appSchema({
-  version: 1,
+  version: 2,
   tables: [
     // 1. ACCOUNTS
     tableSchema({
@@ -49,6 +49,8 @@ export const mySchema = appSchema({
         { name: 'is_consolidated', type: 'boolean' },
         { name: 'consolidated_at', type: 'number', isOptional: true },
         { name: 'observation', type: 'string', isOptional: true },
+        { name: 'recurring_id', type: 'string', isOptional: true },
+        { name: 'is_recurring', type: 'boolean' },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
         { name: 'deleted_at', type: 'number' },

@@ -1,8 +1,8 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import dayjs from "dayjs";
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { DataTable, Icon, Portal, Modal, Button, TextInput, Checkbox, Divider, Menu } from "react-native-paper";
+import { DataTable, Icon, Portal, Modal, Button, TextInput, Divider, Menu, Switch, HelperText } from "react-native-paper";
 import { withObservables } from '@nozbe/watermelondb/react';
 import { TransactionService } from '../service/TransactionService';
 import { AccountService } from '../service/AccountService';
@@ -16,7 +16,10 @@ import { useAuth } from '../contexts/AuthContext';
 interface Params {
   id: string, description: string, value: string, date: Date,
   startDate?: Date | null, endDate?: Date | null,
-  type: 'income' | 'expense' | null, isRecurrence: boolean, installments?: string
+  type: 'income' | 'expense' | null, isRecurrence: boolean, installments?: string,
+  // Campos de recorrência
+  isRecurring?: boolean,
+  recurringEndDate?: Date | null
 }
 
 interface GroupedTransaction {
@@ -39,7 +42,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [activePicker, setActivePicker] = useState<'date' | 'startDate' | 'endDate' | null>(null);
+  const [activePicker, setActivePicker] = useState<'date' | 'startDate' | 'endDate' | 'recurringEndDate' | null>(null);
   const [expandedIncomeAccounts, setExpandedIncomeAccounts] = useState<Set<string>>(new Set());
   const [expandedExpenseAccounts, setExpandedExpenseAccounts] = useState<Set<string>>(new Set());
 
@@ -78,6 +81,8 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
         date: new Date(transaction.date),
         type: transaction.type,
         isRecurrence: false,
+        isRecurring: false, // Transações existentes não são editadas como recorrentes
+        recurringEndDate: null,
       });
       // TODO: Preencher conta e categoria da transação
     } else {
@@ -89,6 +94,8 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
         date: new Date(),
         type: null,
         isRecurrence: false,
+        isRecurring: false, // Por padrão não é recorrente
+        recurringEndDate: null,
       });
       // Selecionar primeira conta e categoria por padrão
       if (accounts.length > 0) {
@@ -145,11 +152,23 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
       type: params.type,
       date: params.date,
       userId: user.id,
+      // Campos de recorrência (apenas para criação, não para edição)
+      isRecurring: params.isRecurring || false,
+      recurringEndDate: params.isRecurring ? params.recurringEndDate || undefined : undefined,
     };
 
     try {
       if (selectedTransaction) {
-        await TransactionService.update(selectedTransaction.id, transactionData);
+        // Para edição, não enviamos campos de recorrência
+        const updateData = {
+          accountId: transactionData.accountId,
+          categoryId: transactionData.categoryId,
+          description: transactionData.description,
+          amount: transactionData.amount,
+          type: transactionData.type,
+          date: transactionData.date,
+        };
+        await TransactionService.update(selectedTransaction.id, updateData);
       } else {
         await TransactionService.create(transactionData);
       }
@@ -525,6 +544,36 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                 style={{ marginBottom: 16 }}
                 disabled={isDeleting}
               />
+
+              {/* Controle de Recorrência */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <Text style={{ fontSize: 16 }}>Esta transação é recorrente?</Text>
+                <Switch
+                  value={params.isRecurring || false}
+                  onValueChange={(value) => setParams(prev => ({ ...prev, isRecurring: value }))}
+                  disabled={isDeleting || !!selectedTransaction}
+                />
+              </View>
+
+              {/* Data Final da Recorrência (condicional) */}
+              {params.isRecurring && (
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ marginLeft: 5, marginBottom: 4 }}>Data Final da Recorrência (opcional)</Text>
+                  <Button
+                    mode="contained-tonal"
+                    onPress={() => setActivePicker('recurringEndDate')}
+                    style={{ marginBottom: 8 }}
+                  >
+                    {params.recurringEndDate 
+                      ? params.recurringEndDate.toLocaleDateString('pt-BR')
+                      : 'Selecionar data final'
+                    }
+                  </Button>
+                  <HelperText type="info" visible={true}>
+                    Se não definir uma data final, a recorrência será criada para os próximos 2 anos
+                  </HelperText>
+                </View>
+              )}
 
               {selectedTransaction && !isDeleting && (
                 <Button

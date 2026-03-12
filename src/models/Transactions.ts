@@ -18,6 +18,8 @@ export default class Transaction extends Model {
   @field('is_consolidated') isConsolidated!: boolean;
   @date('consolidated_at') consolidatedAt?: Date;
   @text('observation') observation?: string;
+  @text('recurring_id') recurringId?: string;
+  @field('is_recurring') isRecurring!: boolean;
 
   @readonly @date('created_at') createdAt!: Date;
   @readonly @date('updated_at') updatedAt!: Date;
