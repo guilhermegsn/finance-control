@@ -331,25 +331,40 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                     />
                   </DataTable.Cell>
                   <DataTable.Cell numeric>
-                    <View>
-                      <Text style={{ fontWeight: 'bold', fontSize: 14 }}>R$ {totalBalance.toFixed(2)}</Text>
-                      <Text style={{ fontSize: 10, color: '#666' }}>
-                        {previousBalance !== 0 ? `(Acumulado: R$ ${previousBalance.toFixed(2)})` : ''}
-                      </Text>
-                    </View>
+                    <Text style={{ fontWeight: 'bold', fontSize: 14 }}>R$ {totalBalance.toFixed(2)}</Text>
                   </DataTable.Cell>
                 </DataTable.Row>
 
               {/* Transações da conta (se expandida) */}
-              {expandedIncomeAccounts.has(group.accountId) && group.transactions.map((item) => (
-                <DataTable.Row key={item.id} onLongPress={() => openModal(item)}>
-                  <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 20 }}>
-                    {dayjs(item.date).format('DD/MM')}
-                  </DataTable.Cell>
-                  <DataTable.Cell style={{ paddingLeft: 20 }}>{item.description}</DataTable.Cell>
-                  <DataTable.Cell numeric>R$ {item.amount.toFixed(2)}</DataTable.Cell>
-                </DataTable.Row>
-              ))}
+              {expandedIncomeAccounts.has(group.accountId) && (
+                <>
+                  {/* Linha especial para saldo inicial do mês */}
+                  {previousBalance !== 0 && (
+                    <DataTable.Row key={`initial-balance-${group.accountId}`}>
+                      <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 20 }}>
+                        <Icon source="history" size={16} color="#666" />
+                      </DataTable.Cell>
+                      <DataTable.Cell style={{ paddingLeft: 20 }}>
+                        <Text style={{ color: '#666', fontStyle: 'italic' }}>Saldo Inicial do Mês</Text>
+                      </DataTable.Cell>
+                      <DataTable.Cell numeric>
+                        <Text style={{ color: '#666', fontStyle: 'italic' }}>R$ {previousBalance.toFixed(2)}</Text>
+                      </DataTable.Cell>
+                    </DataTable.Row>
+                  )}
+                  
+                  {/* Transações do mês */}
+                  {group.transactions.map((item) => (
+                    <DataTable.Row key={item.id} onLongPress={() => openModal(item)}>
+                      <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 20 }}>
+                        {dayjs(item.date).format('DD/MM')}
+                      </DataTable.Cell>
+                      <DataTable.Cell style={{ paddingLeft: 20 }}>{item.description}</DataTable.Cell>
+                      <DataTable.Cell numeric>R$ {item.amount.toFixed(2)}</DataTable.Cell>
+                    </DataTable.Row>
+                  ))}
+                </>
+              )}
             </View>
             );
           })}
@@ -399,25 +414,40 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                     />
                   </DataTable.Cell>
                   <DataTable.Cell numeric>
-                    <View>
-                      <Text style={{ fontWeight: 'bold', fontSize: 14 }}>R$ {totalBalance.toFixed(2)}</Text>
-                      <Text style={{ fontSize: 10, color: '#666' }}>
-                        {previousBalance !== 0 ? `(Anterior: R$ ${previousBalance.toFixed(2)})` : ''}
-                      </Text>
-                    </View>
+                    <Text style={{ fontWeight: 'bold', fontSize: 14 }}>R$ {totalBalance.toFixed(2)}</Text>
                   </DataTable.Cell>
                 </DataTable.Row>
 
               {/* Transações da conta (se expandida) */}
-              {expandedExpenseAccounts.has(group.accountId) && group.transactions.map((item) => (
-                <DataTable.Row key={item.id} onLongPress={() => openModal(item)}>
-                  <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 20 }}>
-                    {dayjs(item.date).format('DD/MM')}
-                  </DataTable.Cell>
-                  <DataTable.Cell style={{ paddingLeft: 20 }}>{item.description}</DataTable.Cell>
-                  <DataTable.Cell numeric>R$ {item.amount.toFixed(2)}</DataTable.Cell>
-                </DataTable.Row>
-              ))}
+              {expandedExpenseAccounts.has(group.accountId) && (
+                <>
+                  {/* Linha especial para saldo inicial do mês */}
+                  {previousBalance !== 0 && (
+                    <DataTable.Row key={`initial-balance-${group.accountId}`}>
+                      <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 20 }}>
+                        <Icon source="history" size={16} color="#666" />
+                      </DataTable.Cell>
+                      <DataTable.Cell style={{ paddingLeft: 20 }}>
+                        <Text style={{ color: '#666', fontStyle: 'italic' }}>Saldo Inicial do Mês</Text>
+                      </DataTable.Cell>
+                      <DataTable.Cell numeric>
+                        <Text style={{ color: '#666', fontStyle: 'italic' }}>R$ {previousBalance.toFixed(2)}</Text>
+                      </DataTable.Cell>
+                    </DataTable.Row>
+                  )}
+                  
+                  {/* Transações do mês */}
+                  {group.transactions.map((item) => (
+                    <DataTable.Row key={item.id} onLongPress={() => openModal(item)}>
+                      <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 20 }}>
+                        {dayjs(item.date).format('DD/MM')}
+                      </DataTable.Cell>
+                      <DataTable.Cell style={{ paddingLeft: 20 }}>{item.description}</DataTable.Cell>
+                      <DataTable.Cell numeric>R$ {item.amount.toFixed(2)}</DataTable.Cell>
+                    </DataTable.Row>
+                  ))}
+                </>
+              )}
             </View>
             );
           })}
