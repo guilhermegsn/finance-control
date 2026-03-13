@@ -1,7 +1,7 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import dayjs from "dayjs";
 import React, { useState, useMemo, useEffect } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Image } from "react-native";
 import { DataTable, Icon, Portal, Modal, Button, TextInput, Divider, Menu, Switch, HelperText } from "react-native-paper";
 import { withObservables } from '@nozbe/watermelondb/react';
 import { TransactionService } from '../service/TransactionService';
@@ -11,6 +11,7 @@ import Transaction from '../models/Transactions';
 import { Q } from '@nozbe/watermelondb';
 import { database } from '../database';
 import { useAuth } from '../contexts/AuthContext';
+import BankService from '../service/BankService';
 
 // Tipos
 interface Params {
@@ -344,13 +345,81 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                 <DataTable.Row onPress={() => toggleAccountExpansion(group.accountId)}>
                   <DataTable.Cell>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <View style={{
-                        width: 12,
-                        height: 12,
-                        borderRadius: 6,
-                        backgroundColor: group.accountColor,
-                        marginRight: 8
-                      }} />
+                      {/* Logo do banco ou círculo colorido */}
+                      {(() => {
+                        // Encontrar a conta para obter logoUrl e bankCode
+                        const account = accounts.find(acc => acc.id === group.accountId);
+                        let logoUrl = '';
+                        
+                        if (account?.logoUrl) {
+                          // Logo local (require) - usar diretamente
+                          return (
+                            <Image
+                              source={typeof account.logoUrl === 'string' ? { uri: account.logoUrl } : account.logoUrl}
+                              style={{
+                                width: 24,
+                                height: 24,
+                                borderRadius: 12,
+                                marginRight: 8,
+                              }}
+                            />
+                          );
+                        }
+                        
+                        if (account?.bankCode && account.bankCode.trim() !== '') {
+                          const bank = BankService.getBankByCode(account.bankCode);
+                          if (bank) {
+                            return (
+                              <Image
+                                source={bank.logoUrl}
+                                style={{
+                                  width: 24,
+                                  height: 24,
+                                  borderRadius: 12,
+                                  marginRight: 8,
+                                }}
+                              />
+                            );
+                          }
+                        }
+                        
+                        if (logoUrl && logoUrl.trim() !== '') {
+                          return (
+                            <Image
+                              source={{ uri: logoUrl }}
+                              style={{
+                                width: 24,
+                                height: 24,
+                                borderRadius: 12,
+                                marginRight: 8,
+                              }}
+                              onError={() => {
+                                // Fallback para círculo colorido se o logo não carregar
+                                return (
+                                  <View style={{
+                                    width: 24,
+                                    height: 24,
+                                    borderRadius: 12,
+                                    backgroundColor: group.accountColor,
+                                    marginRight: 8,
+                                  }} />
+                                );
+                              }}
+                            />
+                          );
+                        }
+                        
+                        // Fallback para círculo colorido
+                        return (
+                          <View style={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: 12,
+                            backgroundColor: group.accountColor,
+                            marginRight: 8,
+                          }} />
+                        );
+                      })()}
                       <Text style={{ fontWeight: 'bold' }}>{group.accountName}</Text>
                     </View>
                   </DataTable.Cell>
@@ -372,10 +441,10 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                     {/* Nível 2: Saldo Anterior */}
                     {group.previousBalance !== 0 && (
                       <DataTable.Row key={`initial-balance-${group.accountId}`}>
-                        <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 20 }}>
+                        <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 10 }}>
                           <Icon source="history" size={16} color="#666" />
                         </DataTable.Cell>
-                        <DataTable.Cell style={{ paddingLeft: 20 }}>
+                        <DataTable.Cell style={{ paddingLeft: 10 }}>
                           <Text style={{ color: '#666', fontStyle: 'italic' }}>Saldo Inicial do Mês</Text>
                         </DataTable.Cell>
                         <DataTable.Cell numeric>

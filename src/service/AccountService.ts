@@ -17,7 +17,15 @@ export const AccountService = {
   },
 
   // Criar nova conta
-  create: async (data: { name: string; initialBalance: number; type: string; color: string; userId: string; }) => {
+  create: async (data: { 
+    name: string; 
+    initialBalance: number; 
+    type: string; 
+    color: string; 
+    userId: string;
+    logoUrl?: string;
+    bankCode?: string;
+  }) => {
     await database.write(async () => {
       await database.get<Account>('accounts').create((account) => {
         account.name = data.name;
@@ -26,12 +34,22 @@ export const AccountService = {
         account.color = data.color;
         account.archived = false;
         account.userId = data.userId;
+        account.logoUrl = data.logoUrl || '';
+        account.bankCode = data.bankCode || '';
       });
     });
   },
 
   // Atualizar conta existente
-  update: async (accountId: string, data: { name?: string; initialBalance?: number; type?: string; color?: string; archived?: boolean; }) => {
+  update: async (accountId: string, data: { 
+    name?: string; 
+    initialBalance?: number; 
+    type?: string; 
+    color?: string; 
+    archived?: boolean;
+    logoUrl?: string;
+    bankCode?: string;
+  }) => {
     await database.write(async () => {
       const account = await database.get<Account>('accounts').find(accountId);
       
@@ -41,6 +59,8 @@ export const AccountService = {
         if (data.type !== undefined) acc.type = data.type;
         if (data.color !== undefined) acc.color = data.color;
         if (data.archived !== undefined) acc.archived = data.archived;
+        if (data.logoUrl !== undefined) acc.logoUrl = data.logoUrl;
+        if (data.bankCode !== undefined) acc.bankCode = data.bankCode;
       });
     });
   },

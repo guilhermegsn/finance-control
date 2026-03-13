@@ -10,6 +10,8 @@ export default class Account extends Model {
   @text('type') type!: string;
   @text('color') color!: string;
   @field('archived') archived!: boolean;
+  @text('logo_url') logoUrl!: string;
+  @text('bank_code') bankCode!: string;
   
   @readonly @date('created_at') createdAt!: Date;
   @readonly @date('updated_at') updatedAt!: Date;

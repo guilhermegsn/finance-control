@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, FlatList, StyleSheet } from 'react-native';
+import { View, FlatList, StyleSheet, Image } from 'react-native';
 import { List, IconButton, Text, Surface } from 'react-native-paper';
 import { withObservables } from '@nozbe/watermelondb/react';
 import Account from '../models/Accounts';
 import { AccountService } from '../service/AccountService';
+import BankService from '../service/BankService';
 
 // Componente de Item Individual
 const AccountItem = ({ account, onEdit }: { account: Account; onEdit?: (account: Account) => void }) => {
@@ -17,12 +18,41 @@ const AccountItem = ({ account, onEdit }: { account: Account; onEdit?: (account:
     }
   };
 
+  // Determinar qual ícone/logo usar
+  const renderLeftIcon = (props: any) => {
+    // Se houver logoUrl (que agora é um require local)
+    if (account.logoUrl) {
+      return (
+        <Image
+          source={typeof account.logoUrl === 'string' ? { uri: account.logoUrl } : account.logoUrl}
+          style={styles.bankLogo}
+        />
+      );
+    }
+    
+    // Se houver código do banco, tentar buscar logo
+    if (account.bankCode && account.bankCode.trim() !== '') {
+      const bank = BankService.getBankByCode(account.bankCode);
+      if (bank) {
+        return (
+          <Image
+            source={bank.logoUrl}
+            style={styles.bankLogo}
+          />
+        );
+      }
+    }
+    
+    // Caso contrário, usar ícone padrão
+    return <List.Icon {...props} icon="wallet" color={account.color} />;
+  };
+
   return (
     <Surface style={styles.card} elevation={1}>
       <List.Item
         title={account.name}
         description={`Saldo Inicial: R$ ${account.initialBalance.toFixed(2)} | Tipo: ${account.type}`}
-        left={props => <List.Icon {...props} icon="wallet" color={account.color} />}
+        left={renderLeftIcon}
         right={props => (
           <View style={{ flexDirection: 'row' }}>
             {onEdit && (
@@ -81,5 +111,12 @@ const styles = StyleSheet.create({
   empty: {
     padding: 20,
     alignItems: 'center'
-  }
+  },
+  bankLogo: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    margin: 8,
+    marginLeft: 18
+  },
 });
