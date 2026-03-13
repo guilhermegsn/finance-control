@@ -96,26 +96,34 @@ export const TransactionService = {
       
       // Array para armazenar os registros preparados
       const records = [];
-      let currentDate = new Date(startDate);
       
       // Função para adicionar meses tratando casos de fim de mês
-      const addMonths = (date: Date, months: number): Date => {
-        const newDate = new Date(date);
-        const day = date.getDate();
+      // Sempre calcula a partir da data original, não iterativamente
+      const addMonthsFromStart = (startDate: Date, months: number): Date => {
+        const newDate = new Date(startDate);
+        const originalDay = startDate.getDate();
         newDate.setMonth(newDate.getMonth() + months);
         
         // Tratar casos onde o dia não existe no próximo mês (ex: 31 de janeiro -> 28/29 de fevereiro)
-        if (newDate.getDate() !== day) {
-          // Se o dia não existe, usar o último dia do mês atual
-          newDate.setMonth(newDate.getMonth() + 1);
-          newDate.setDate(0); // Vai para o último dia do mês anterior (que é o mês que queremos)
+        if (newDate.getDate() !== originalDay) {
+          // Se o dia não existe, usar o último dia do mês atual (data segura)
+          // setDate(0) vai para o último dia do mês anterior
+          newDate.setDate(0);
         }
         
         return newDate;
       };
       
       // Criar registros para cada mês
-      while (currentDate <= endDate) {
+      let monthOffset = 0;
+      while (true) {
+        const currentDate = addMonthsFromStart(startDate, monthOffset);
+        
+        // Parar se a data calculada for após a data final
+        if (currentDate > endDate) {
+          break;
+        }
+        
         const transactionCollection = database.get<Transaction>('transactions');
         const transactionRecord = transactionCollection.prepareCreate((transaction) => {
           // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
@@ -146,9 +154,7 @@ export const TransactionService = {
         });
         
         records.push(transactionRecord);
-        
-        // Avançar para o próximo mês usando a função que trata casos de fim de mês
-        currentDate = addMonths(currentDate, 1);
+        monthOffset++;
       }
       
       // Executar todos os registros em um único batch
