@@ -2,7 +2,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import dayjs from "dayjs";
 import React, { useState, useMemo, useEffect } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Image } from "react-native";
-import { DataTable, Icon, Portal, Modal, Button, TextInput, Divider, Menu, Switch, HelperText } from "react-native-paper";
+import { DataTable, Icon, Portal, Modal, Button, TextInput, Divider, Switch, HelperText } from "react-native-paper";
+import { Select } from '../components/Select';
 import { withObservables } from '@nozbe/watermelondb/react';
 import { TransactionService } from '../service/TransactionService';
 import { AccountService } from '../service/AccountService';
@@ -59,7 +60,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [activePicker, setActivePicker] = useState<'date' | 'startDate' | 'endDate' | 'recurringEndDate' | null>(null);
+  const [activePicker, setActivePicker] = useState<'date' | 'recurringEndDate' | null>(null);
   const [expandedIncomeAccounts, setExpandedIncomeAccounts] = useState<Set<string>>(new Set());
   const [expandedExpenseAccounts, setExpandedExpenseAccounts] = useState<Set<string>>(new Set());
 
@@ -266,7 +267,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
     // Inicializar grupos para todas as contas
     accounts.forEach(account => {
       const previousBalance = previousBalances[account.id] || 0;
-      
+
       // Filtrar transações da conta no mês atual
       const accountTransactions = filteredTransactions.filter(transaction => {
         // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
@@ -338,7 +339,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
         <DataTable>
           {accountTransactionGroups.map((group) => {
             const isExpanded = expandedAccounts.has(group.accountId);
-            
+
             return (
               <View key={group.accountId}>
                 {/* Nível 1: Cabeçalho da Conta */}
@@ -350,7 +351,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                         // Encontrar a conta para obter logoUrl e bankCode
                         const account = accounts.find(acc => acc.id === group.accountId);
                         let logoUrl = '';
-                        
+
                         if (account?.logoUrl) {
                           // Logo local (require) - usar diretamente
                           return (
@@ -365,7 +366,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                             />
                           );
                         }
-                        
+
                         if (account?.bankCode && account.bankCode.trim() !== '') {
                           const bank = BankService.getBankByCode(account.bankCode);
                           if (bank) {
@@ -382,7 +383,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                             );
                           }
                         }
-                        
+
                         if (logoUrl && logoUrl.trim() !== '') {
                           return (
                             <Image
@@ -408,7 +409,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                             />
                           );
                         }
-                        
+
                         // Fallback para círculo colorido
                         return (
                           <View style={{
@@ -467,7 +468,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                             <Text style={{ color: '#2E9E57', fontWeight: '600' }}>R$ {group.income.total.toFixed(2)}</Text>
                           </DataTable.Cell>
                         </DataTable.Row>
-                        
+
                         {/* Nível 4: Transações de Entrada */}
                         {group.income.transactions.map((item) => (
                           <DataTable.Row key={item.id} onLongPress={() => openModal(item)}>
@@ -495,7 +496,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                             <Text style={{ color: '#CC4A4A', fontWeight: '600' }}>R$ {group.expense.total.toFixed(2)}</Text>
                           </DataTable.Cell>
                         </DataTable.Row>
-                        
+
                         {/* Nível 4: Transações de Saída */}
                         {group.expense.transactions.map((item) => (
                           <DataTable.Row key={item.id} onLongPress={() => openModal(item)}>
@@ -558,28 +559,109 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
         <Modal
           visible={modalVisible}
           onDismiss={closeModal}
-          contentContainerStyle={{ backgroundColor: 'white', margin: 20, borderRadius: 12, padding: 16 }}
+          contentContainerStyle={{
+            backgroundColor: 'white',
+            margin: 20,
+            borderRadius: 20,
+            padding: 24,
+            maxHeight: '90%',
+          }}
         >
-          {params.type === null ?
-            <View style={{ gap: 12 }}>
+          {params.type === null ? (
+            // Modal de seleção de tipo
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#333', marginBottom: 8 }}>
+                Nova Transação
+              </Text>
+              <Text style={{ fontSize: 16, color: '#666', marginBottom: 32 }}>
+                Selecione o tipo de transação
+              </Text>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginBottom: 32 }}>
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    alignItems: 'center',
+                    padding: 24,
+                    borderRadius: 16,
+                    marginHorizontal: 8,
+                    elevation: 4,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 8,
+                    backgroundColor: '#2E9E57',
+                  }}
+                  onPress={() => selectType('income')}
+                  activeOpacity={0.7}
+                >
+                  <View style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 32,
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginBottom: 16,
+                  }}>
+                    <Icon source="arrow-up-bold-circle" size={40} color="#fff" />
+                  </View>
+                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#fff', marginBottom: 8 }}>
+                    Entrada
+                  </Text>
+                  <Text style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.8)', textAlign: 'center' }}>
+                    Receitas, salários, investimentos
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    alignItems: 'center',
+                    padding: 24,
+                    borderRadius: 16,
+                    marginHorizontal: 8,
+                    elevation: 4,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 8,
+                    backgroundColor: '#CC4A4A',
+                  }}
+                  onPress={() => selectType('expense')}
+                  activeOpacity={0.7}
+                >
+                  <View style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 32,
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginBottom: 16,
+                  }}>
+                    <Icon source="arrow-down-bold-circle" size={40} color="#fff" />
+                  </View>
+                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#fff', marginBottom: 8 }}>
+                    Saída
+                  </Text>
+                  <Text style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.8)', textAlign: 'center' }}>
+                    Despesas, compras, pagamentos
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               <Button
-                mode="contained"
-                buttonColor="#2E9E57"
-                onPress={() => selectType('income')}
-                style={{ marginBottom: 8 }}
+                mode="outlined"
+                onPress={closeModal}
+                style={{ width: '100%' }}
               >
-                Entrada
-              </Button>
-              <Button
-                mode="contained"
-                buttonColor="#CC4A4A"
-                onPress={() => selectType('expense')}
-              >
-                Saída - À vista
+                Cancelar
               </Button>
             </View>
-            :
-            <View>
+          ) : (
+            // Modal de formulário de transação
+            <View style={{ width: '100%' }}>
               {activePicker && (
                 <DateTimePicker
                   value={params[activePicker] || new Date()}
@@ -589,183 +671,229 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                 />
               )}
 
-              <View>
-                <Text style={{ fontSize: 20, marginBottom: 16 }}>
-                  {selectedTransaction ? 'Editando transação' : 'Adicionando nova transação'}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#333' }}>
+                  {selectedTransaction ? 'Editar Transação' : 'Nova Transação'}
                 </Text>
+                <TouchableOpacity onPress={() => setParams(prev => ({ ...prev, type: null }))}>
+                  <Icon source="refresh" size={20} color="#666" />
+                </TouchableOpacity>
               </View>
 
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
-                <View style={{ width: '48%' }}>
-                  <Text style={{ marginLeft: 5, marginBottom: 4 }}>Transação</Text>
-                  <Button
-                    mode="contained-tonal"
-                    onPress={() => setParams((prevParams) => ({ ...prevParams, type: null }))}
-                    style={{ marginBottom: 16 }}
+              {/* Tipo e Data */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
+                <View style={{ flex: 1, marginHorizontal: 4 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8 }}>Tipo</Text>
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      paddingVertical: 12,
+                      paddingHorizontal: 16,
+                      borderRadius: 12,
+                      gap: 8,
+                      backgroundColor: params.type === 'income' ? '#2E9E57' : '#CC4A4A',
+                    }}
+                    onPress={() => setParams(prev => ({ ...prev, type: null }))}
                   >
-                    {params.type === 'income' ? 'Receita' : 'Despesa'}
-                  </Button>
+                    <Icon
+                      source={params.type === 'income' ? "arrow-up-bold-circle" : "arrow-down-bold-circle"}
+                      size={16}
+                      color="#fff"
+                    />
+                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
+                      {params.type === 'income' ? 'Entrada' : 'Saída'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
-                <View style={{ width: '48%' }}>
-                  <Text style={{ marginLeft: 5, marginBottom: 4 }}>Data</Text>
-                  <Button
-                    mode="contained-tonal"
+
+                <View style={{ flex: 1, marginHorizontal: 4 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8 }}>Data</Text>
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      paddingVertical: 12,
+                      paddingHorizontal: 16,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: '#ddd',
+                      backgroundColor: '#f8f9fa',
+                      gap: 8,
+                    }}
                     onPress={() => setActivePicker('date')}
-                    style={{ marginBottom: 16 }}
                   >
-                    {params?.date?.toLocaleDateString('pt-BR')}
-                  </Button>
+                    <Icon source="calendar" size={16} color="#666" />
+                    <Text style={{ color: '#333', fontSize: 14 }}>
+                      {params?.date?.toLocaleDateString('pt-BR')}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
 
-              {/* Seletor de Conta */}
-              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
-                <View style={{ width: '48%' }}>
-                  <Text style={{ marginLeft: 5, marginBottom: 4 }}>Conta</Text>
-                  <Menu
-                    visible={accountMenuVisible}
-                    onDismiss={() => setAccountMenuVisible(false)}
-                    anchor={
-                      <Button
-                        mode="contained-tonal"
-                        onPress={() => setAccountMenuVisible(true)}
-                        style={{ justifyContent: 'space-between' }}
-                      >
-                        {accounts.find(acc => acc.id === selectedAccountId)?.name || 'Selecionar conta'}
-                      </Button>
-                    }
-                  >
-                    {accounts.map((account) => (
-                      <Menu.Item
-                        key={account.id}
-                        onPress={() => {
-                          setSelectedAccountId(account.id);
-                          setAccountMenuVisible(false);
-                        }}
-                        title={account.name}
-                        style={{ flexDirection: 'row', alignItems: 'center' }}
-                      />
-                    ))}
-                  </Menu>
+              {/* Conta e Categoria */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
+                <View style={{ flex: 1, marginHorizontal: 4 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8 }}>Conta</Text>
+                  <Select
+                    items={accounts.map(account => ({
+                      id: account.id,
+                      label: account.name,
+                      value: account.id,
+                    }))}
+                    selectedValue={selectedAccountId}
+                    onSelect={(value) => setSelectedAccountId(value)}
+                    placeholder="Selecionar conta"
+                  />
                 </View>
 
-                {/* Seletor de Categoria */}
-                <View style={{ marginBottom: 16, width: '48%' }}>
-                  <Text style={{ marginLeft: 5, marginBottom: 4 }}>Categoria</Text>
-                  <Menu
-                    visible={categoryMenuVisible}
-                    onDismiss={() => setCategoryMenuVisible(false)}
-                    anchor={
-                      <Button
-                        mode="contained-tonal"
-                        onPress={() => setCategoryMenuVisible(true)}
-                        style={{ justifyContent: 'space-between' }}
-                      >
-                        {categories.find(cat => cat.id === selectedCategoryId)?.name || 'Selecionar categoria'}
-                      </Button>
-                    }
-                  >
-                    {categories
+                <View style={{ flex: 1, marginHorizontal: 4 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8 }}>Categoria</Text>
+                  <Select
+                    items={categories
                       .filter(cat => !params.type || cat.type === params.type)
-                      .map((category) => (
-                        <Menu.Item
-                          key={category.id}
-                          onPress={() => {
-                            setSelectedCategoryId(category.id);
-                            setCategoryMenuVisible(false);
-                          }}
-                          title={category.name}
-                          style={{ flexDirection: 'row', alignItems: 'center' }}
-                        />
-                      ))}
-                  </Menu>
+                      .map(category => ({
+                        id: category.id,
+                        label: category.name,
+                        value: category.id,
+                      }))}
+                    selectedValue={selectedCategoryId}
+                    onSelect={(value) => setSelectedCategoryId(value)}
+                    placeholder="Selecione"
+                  />
                 </View>
               </View>
 
-              <TextInput
-                label="Descrição"
-                value={params.description}
-                onChangeText={(text) => setParams(prev => ({ ...prev, description: text }))}
-                keyboardType="default"
-                mode="outlined"
-                style={{ marginBottom: 16 }}
-                disabled={isDeleting}
-              />
-              <TextInput
-                label="Valor"
-                value={params.value}
-                onChangeText={(text) => setParams(prev => ({ ...prev, value: text }))}
-                keyboardType="numeric"
-                mode="outlined"
-                style={{ marginBottom: 16 }}
-                disabled={isDeleting}
-              />
-
-              {/* Controle de Recorrência */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <Text style={{ fontSize: 16 }}>Esta transação é recorrente?</Text>
-                <Switch
-                  value={params.isRecurring || false}
-                  onValueChange={(value) => setParams(prev => ({ ...prev, isRecurring: value }))}
-                  disabled={isDeleting || !!selectedTransaction}
+              {/* Descrição */}
+              <View style={{ marginBottom: 20 }}>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8 }}>Descrição</Text>
+                <TextInput
+                  value={params.description}
+                  onChangeText={(text) => setParams(prev => ({ ...prev, description: text }))}
+                  placeholder="Ex: Salário, Aluguel, Supermercado"
+                  mode="outlined"
+                  style={{ backgroundColor: '#fff' }}
                 />
               </View>
 
-              {/* Data Final da Recorrência (condicional) */}
-              {params.isRecurring && (
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={{ marginLeft: 5, marginBottom: 4 }}>Data Final da Recorrência (opcional)</Text>
-                  <Button
-                    mode="contained-tonal"
-                    onPress={() => setActivePicker('recurringEndDate')}
-                    style={{ marginBottom: 8 }}
-                  >
-                    {params.recurringEndDate 
-                      ? params.recurringEndDate.toLocaleDateString('pt-BR')
-                      : 'Selecionar data final'
-                    }
-                  </Button>
-                  <HelperText type="info" visible={true}>
-                    Se não definir uma data final, a recorrência será criada para os próximos 2 anos
-                  </HelperText>
-                </View>
-              )}
-
-              {selectedTransaction && !isDeleting && (
-                <Button
-                  mode="contained"
-                  onPress={() => { setIsDeleting(true) }}
-                  buttonColor="#A50C36"
-                  style={{ marginTop: 20 }}
-                >
-                  Excluir
-                </Button>
-              )}
-
-              {isDeleting &&
-                <View style={styles.confirmDel}>
-                  <Text style={styles.textWarning}>Confirma a exclusão? </Text>
-                  <Text style={styles.textWarning}>Esta operação não poderá ser desfeita.</Text>
-                </View>
-              }
-            </View>
-          }
-
-          <Divider style={{ marginTop: 20 }} />
-
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 }}>
-            <View style={{ width: params.type ? '48%' : '100%' }}>
-              <Button mode="outlined" onPress={closeModal}>Cancelar</Button>
-            </View>
-            {params.type && (
-              <View style={{ width: '48%' }}>
-                {isDeleting ?
-                  <Button onPress={handleDelete} mode="contained" buttonColor="#A50C36">Excluir</Button> :
-                  <Button mode="contained" onPress={handleSave} disabled={isInvalidForm()}>Salvar</Button>
-                }
+              {/* Valor */}
+              <View style={{ marginBottom: 20 }}>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8 }}>Valor</Text>
+                <TextInput
+                  value={params.value}
+                  onChangeText={(text) => setParams(prev => ({ ...prev, value: text }))}
+                  placeholder="0,00"
+                  keyboardType="numeric"
+                  mode="outlined"
+                  style={{ backgroundColor: '#fff' }}
+                  left={<TextInput.Affix text="R$ " />}
+                />
               </View>
-            )}
-          </View>
+
+              {/* Recorrência */}
+              <View style={{ marginBottom: 24 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#333' }}>Recorrência</Text>
+                  <Switch
+                    value={params.isRecurring || false}
+                    onValueChange={(value) => setParams(prev => ({ ...prev, isRecurring: value }))}
+                    disabled={isDeleting || !!selectedTransaction}
+                  />
+                </View>
+
+                {params.isRecurring && (
+                  <View style={{ backgroundColor: '#f8f9fa', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#e9ecef' }}>
+                    <Text style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>Data Final (opcional)</Text>
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        paddingVertical: 12,
+                        paddingHorizontal: 16,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: '#ddd',
+                        backgroundColor: '#f8f9fa',
+                        gap: 8,
+                      }}
+                      onPress={() => setActivePicker('recurringEndDate')}
+                    >
+                      <Icon source="calendar" size={16} color="#666" />
+                      <Text style={{ color: '#333', fontSize: 14 }}>
+                        {params.recurringEndDate
+                          ? params.recurringEndDate.toLocaleDateString('pt-BR')
+                          : 'Selecionar data final'
+                        }
+                      </Text>
+                    </TouchableOpacity>
+                    <HelperText type="info" style={{ marginTop: 8 }}>
+                      Se não definir uma data final, a recorrência será criada para os próximos 2 anos
+                    </HelperText>
+                  </View>
+                )}
+              </View>
+
+              {/* Botões de ação */}
+              <Divider style={{ marginVertical: 24 }} />
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+                <Button
+                  mode="outlined"
+                  onPress={closeModal}
+                  style={{ flex: 1 }}
+                >
+                  Cancelar
+                </Button>
+
+                {selectedTransaction && !isDeleting && (
+                  <Button
+                    mode="contained"
+                    onPress={() => setIsDeleting(true)}
+                    buttonColor="#FF6B6B"
+                    style={{ flex: 1 }}
+                  >
+                    Excluir
+                  </Button>
+                )}
+
+                {isDeleting ? (
+                  <View style={{ backgroundColor: '#FFF5F5', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#FED7D7', marginTop: 16, width: '100%' }}>
+                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#C53030', marginBottom: 4 }}>Confirmar exclusão?</Text>
+                    <Text style={{ fontSize: 14, color: '#718096', marginBottom: 16 }}>Esta ação não pode ser desfeita.</Text>
+                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                      <Button
+                        mode="outlined"
+                        onPress={() => setIsDeleting(false)}
+                        style={{ flex: 1 }}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        mode="contained"
+                        onPress={handleDelete}
+                        buttonColor="#FF6B6B"
+                        style={{ flex: 1 }}
+                      >
+                        Excluir
+                      </Button>
+                    </View>
+                  </View>
+                ) : (
+                  <Button
+                    mode="contained"
+                    onPress={handleSave}
+                    disabled={isInvalidForm()}
+                    style={{ flex: 1 }}
+                  >
+                    {selectedTransaction ? 'Atualizar' : 'Salvar'}
+                  </Button>
+                )}
+              </View>
+            </View>
+          )}
         </Modal>
       </Portal>
     </View>
@@ -780,18 +908,18 @@ const styles = StyleSheet.create({
   scrollArea: { flex: 1 },
   textWarning: { fontSize: 16, color: "#A50C36" },
   sectionTitle: { fontSize: 16, fontWeight: "600", marginTop: 20, marginBottom: 8 },
-  fab: { 
-    position: 'absolute', 
-    bottom: 20, 
-    right: 20, 
-    backgroundColor: "#007bff", 
-    borderRadius: 50, 
-    width: 56, 
-    height: 56, 
-    justifyContent: "center", 
-    alignItems: "center", 
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    backgroundColor: "#007bff",
+    borderRadius: 50,
+    width: 56,
+    height: 56,
+    justifyContent: "center",
+    alignItems: "center",
     elevation: 5,
-    zIndex: 10 
+    zIndex: 10
   },
 });
 
