@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, Modal, TouchableWithoutFeedback } from 'react-native';
-import { Icon } from 'react-native-paper';
+import { Icon, useTheme } from 'react-native-paper';
 
 interface SelectItem {
   id: string;
@@ -27,6 +27,7 @@ export const Select: React.FC<SelectProps> = ({
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+  const theme = useTheme()
 
   const anchorRef = useRef<View>(null);
 
@@ -61,7 +62,7 @@ export const Select: React.FC<SelectProps> = ({
         disabled={disabled}
         activeOpacity={0.7}
       >
-        <Text style={[styles.selectText, !selectedItem && styles.placeholderText]}>
+        <Text style={[styles.selectText, !selectedItem && styles.placeholderText, {color: theme.colors.onSurface}]}>
           {selectedItem ? selectedItem.label : placeholder}
         </Text>
         <Icon source="chevron-down" size={16} color="#666" />
@@ -136,14 +137,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#ddd',
-    backgroundColor: '#f8f9fa',
     minHeight: 48,
   },
   disabled: {
     opacity: 0.5,
   },
   selectText: {
-    color: '#333',
     fontSize: 14,
     flex: 1,
   },

@@ -300,7 +300,6 @@ export default function AccountsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5'
   },
   fab: {
     position: 'absolute',
@@ -345,7 +344,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 12,
     padding: 12,
-    backgroundColor: '#f8f9fa',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#e9ecef',

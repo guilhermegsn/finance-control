@@ -1,18 +1,19 @@
 import React from 'react'
-import { DarkTheme, DefaultTheme, NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, DarkTheme as NavigationDarkTheme, DefaultTheme as NavigationDefaultTheme } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { useColorScheme } from "react-native";
 import BottomNavigator from './BottomNavigator';
 import AccountsScreen from '../screens/AccountsScreen';
 import CategoriesScreen from '../screens/CategoriesScreen';
+import { useTheme } from '../contexts/ThemeContext';
 
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
-
-  const isDarkMode = useColorScheme() === 'dark'
+  const { isDarkMode } = useTheme();
+  const navigationTheme = isDarkMode ? NavigationDarkTheme : NavigationDefaultTheme;
+  
   return (
-    <NavigationContainer theme={isDarkMode ? DarkTheme : DefaultTheme}>
+    <NavigationContainer theme={navigationTheme}>
       <Stack.Navigator>
         <Stack.Screen
           name="BottomNavigator"
@@ -35,8 +36,6 @@ export default function AppNavigator() {
             title: 'Categorias',
           }}
         />
-
-
       </Stack.Navigator>
     </NavigationContainer>
   );

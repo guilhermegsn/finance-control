@@ -1,8 +1,8 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import dayjs from "dayjs";
 import React, { useState, useMemo, useEffect } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Image } from "react-native";
-import { DataTable, Icon, Portal, Modal, Button, TextInput, Divider, Switch, HelperText } from "react-native-paper";
+import { ScrollView, StyleSheet, TouchableOpacity, View, Image } from "react-native";
+import { DataTable, Icon, Portal, Modal, Button, TextInput, Divider, Switch, HelperText, Text, useTheme } from "react-native-paper";
 import { Select } from '../components/Select';
 import { withObservables } from '@nozbe/watermelondb/react';
 import { TransactionService } from '../service/TransactionService';
@@ -61,8 +61,8 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [activePicker, setActivePicker] = useState<'date' | 'recurringEndDate' | null>(null);
-  const [expandedIncomeAccounts, setExpandedIncomeAccounts] = useState<Set<string>>(new Set());
-  const [expandedExpenseAccounts, setExpandedExpenseAccounts] = useState<Set<string>>(new Set());
+
+  const theme = useTheme()
 
   const [params, setParams] = useState<Params>({
     id: '',
@@ -74,8 +74,6 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
   });
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
-  const [accountMenuVisible, setAccountMenuVisible] = useState(false);
-  const [categoryMenuVisible, setCategoryMenuVisible] = useState(false);
   const [previousBalances, setPreviousBalances] = useState<Record<string, number>>({});
 
   const goToPreviousMonth = () => {
@@ -208,26 +206,6 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
     }
   };
 
-  // Funções para alternar expansão de conta por tipo
-  const toggleIncomeAccountExpansion = (accountId: string) => {
-    const newExpanded = new Set(expandedIncomeAccounts);
-    if (newExpanded.has(accountId)) {
-      newExpanded.delete(accountId);
-    } else {
-      newExpanded.add(accountId);
-    }
-    setExpandedIncomeAccounts(newExpanded);
-  };
-
-  const toggleExpenseAccountExpansion = (accountId: string) => {
-    const newExpanded = new Set(expandedExpenseAccounts);
-    if (newExpanded.has(accountId)) {
-      newExpanded.delete(accountId);
-    } else {
-      newExpanded.add(accountId);
-    }
-    setExpandedExpenseAccounts(newExpanded);
-  };
 
   // Filtrar transações pelo mês atual
   const filteredTransactions = filterTransactionsByMonth(transactions, currentDate);
@@ -321,21 +299,21 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container]}>
       {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={goToPreviousMonth}>
           <Icon source="chevron-left" size={24} />
         </TouchableOpacity>
-        <Text style={styles.monthText}>{`${dayjs(currentDate).format('MMMM/YYYY')}`}</Text>
+        <Text style={[styles.monthText]}>{`${dayjs(currentDate).format('MMMM/YYYY')}`}</Text>
         <TouchableOpacity onPress={goToNextMonth}>
-          <Icon source="chevron-right" size={24} color="#333" />
+          <Icon source="chevron-right" size={24} />
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false}>
+      <ScrollView style={[styles.scrollArea]} showsVerticalScrollIndicator={false}>
         {/* Lista de Contas (Nova Hierarquia) */}
-        <Text style={styles.sectionTitle}>Contas</Text>
+        <Text style={[styles.sectionTitle]}>Contas</Text>
         <DataTable>
           {accountTransactionGroups.map((group) => {
             const isExpanded = expandedAccounts.has(group.accountId);
@@ -428,7 +406,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                     <Icon
                       source={isExpanded ? "chevron-up" : "chevron-down"}
                       size={16}
-                      color="#666"
+
                     />
                   </DataTable.Cell>
                   <DataTable.Cell numeric>
@@ -443,13 +421,13 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                     {group.previousBalance !== 0 && (
                       <DataTable.Row key={`initial-balance-${group.accountId}`}>
                         <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 10 }}>
-                          <Icon source="history" size={16} color="#666" />
+                          <Icon source="history" size={16} />
                         </DataTable.Cell>
                         <DataTable.Cell style={{ paddingLeft: 10 }}>
-                          <Text style={{ color: '#666', fontStyle: 'italic' }}>Saldo Inicial do Mês</Text>
+                          <Text style={{ opacity: 0.6, fontStyle: 'italic' }}>Saldo Inicial do Mês</Text>
                         </DataTable.Cell>
                         <DataTable.Cell numeric>
-                          <Text style={{ color: '#666', fontStyle: 'italic' }}>R$ {group.previousBalance.toFixed(2)}</Text>
+                          <Text style={{ opacity: 0.6, fontStyle: 'italic' }}>R$ {group.previousBalance.toFixed(2)}</Text>
                         </DataTable.Cell>
                       </DataTable.Row>
                     )}
@@ -473,10 +451,14 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                         {group.income.transactions.map((item) => (
                           <DataTable.Row key={item.id} onLongPress={() => openModal(item)}>
                             <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 10 }}>
-                              {dayjs(item.date).format('DD/MM')}
+                              <Text>{dayjs(item.date).format('DD/MM')}</Text>
                             </DataTable.Cell>
-                            <DataTable.Cell style={{ paddingLeft: 40 }}>{item.description}</DataTable.Cell>
-                            <DataTable.Cell numeric>R$ {item.amount.toFixed(2)}</DataTable.Cell>
+                            <DataTable.Cell style={{ paddingLeft: 40 }}>
+                              <Text>{item.description}</Text>
+                            </DataTable.Cell>
+                            <DataTable.Cell numeric>
+                              <Text>R$ {item.amount.toFixed(2)}</Text>
+                            </DataTable.Cell>
                           </DataTable.Row>
                         ))}
                       </>
@@ -501,10 +483,14 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                         {group.expense.transactions.map((item) => (
                           <DataTable.Row key={item.id} onLongPress={() => openModal(item)}>
                             <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 10 }}>
-                              {dayjs(item.date).format('DD/MM')}
+                              <Text>{dayjs(item.date).format('DD/MM')}</Text>
                             </DataTable.Cell>
-                            <DataTable.Cell style={{ paddingLeft: 40 }}>{item.description}</DataTable.Cell>
-                            <DataTable.Cell numeric>R$ {item.amount.toFixed(2)}</DataTable.Cell>
+                            <DataTable.Cell style={{ paddingLeft: 40 }}>
+                              <Text>{item.description}</Text>
+                            </DataTable.Cell>
+                            <DataTable.Cell numeric>
+                              <Text>R$ {item.amount.toFixed(2)}</Text>
+                            </DataTable.Cell>
                           </DataTable.Row>
                         ))}
                       </>
@@ -518,32 +504,34 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
           {/* Totais Gerais */}
           <DataTable.Row key={`total-summary`}>
             <DataTable.Cell>
-              <Text style={{ fontWeight: 'bold' }}>TOTAL GERAL</Text>
+              <Text style={{ fontWeight: 'bold', }}>TOTAL GERAL</Text>
             </DataTable.Cell>
             <DataTable.Cell numeric>
-              <Text style={{ fontWeight: 'bold' }}>R$ {totals.balance.toFixed(2)}</Text>
+              <Text style={{ fontWeight: 'bold', }}>R$ {totals.balance.toFixed(2)}</Text>
             </DataTable.Cell>
           </DataTable.Row>
         </DataTable>
 
         {/* Cartões - TODO: Implementar quando tiver lógica de cartão de crédito */}
-        <Text style={styles.sectionTitle}>Cartão de crédito</Text>
+        <Text style={[styles.sectionTitle,]}>Cartão de crédito</Text>
         <DataTable>
           <DataTable.Header>
-            <DataTable.Title style={{ maxWidth: 70 }} >Data</DataTable.Title>
-            <DataTable.Title>Descrição</DataTable.Title>
-            <DataTable.Title numeric>Valor</DataTable.Title>
+            <DataTable.Title style={{ maxWidth: 70 }} ><Text>Data</Text></DataTable.Title>
+            <DataTable.Title><Text>Descrição</Text></DataTable.Title>
+            <DataTable.Title numeric><Text>Valor</Text></DataTable.Title>
           </DataTable.Header>
           <DataTable.Row key={`noCreditCards`}>
             <DataTable.Cell>
-              <Text style={{ color: '#666', textAlign: 'center' }}>Funcionalidade em desenvolvimento</Text>
+              <Text style={{ opacity: 0.7, textAlign: 'center' }}>Funcionalidade em desenvolvimento</Text>
             </DataTable.Cell>
-            <DataTable.Cell><Text></Text></DataTable.Cell>
-            <DataTable.Cell numeric><Text></Text></DataTable.Cell>
+            <DataTable.Cell><Text>{""}</Text></DataTable.Cell>
+            <DataTable.Cell numeric><Text>{""}</Text></DataTable.Cell>
           </DataTable.Row>
           <DataTable.Row key={`totalCredits`}>
-            <DataTable.Cell>TOTAL</DataTable.Cell>
-            <DataTable.Cell numeric><Text style={{ fontWeight: 'bold' }}> R$ 0,00 </Text></DataTable.Cell>
+            <DataTable.Cell>
+              <Text>TOTAL</Text>
+            </DataTable.Cell>
+            <DataTable.Cell numeric><Text style={{ fontWeight: 'bold', }}> R$ 0,00 </Text></DataTable.Cell>
           </DataTable.Row>
         </DataTable>
 
@@ -560,20 +548,20 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
           visible={modalVisible}
           onDismiss={closeModal}
           contentContainerStyle={{
-            backgroundColor: 'white',
             margin: 20,
             borderRadius: 20,
             padding: 24,
             maxHeight: '90%',
+            backgroundColor: theme.colors.background
           }}
         >
           {params.type === null ? (
             // Modal de seleção de tipo
             <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#333', marginBottom: 8 }}>
+              <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 8 }}>
                 Nova Transação
               </Text>
-              <Text style={{ fontSize: 16, color: '#666', marginBottom: 32 }}>
+              <Text style={{ fontSize: 16, opacity: 0.7, marginBottom: 32 }}>
                 Selecione o tipo de transação
               </Text>
 
@@ -672,18 +660,18 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
               )}
 
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#333' }}>
+                <Text style={{ fontSize: 20, fontWeight: 'bold', }}>
                   {selectedTransaction ? 'Editar Transação' : 'Nova Transação'}
                 </Text>
                 <TouchableOpacity onPress={() => setParams(prev => ({ ...prev, type: null }))}>
-                  <Icon source="refresh" size={20} color="#666" />
+                  <Icon source="refresh" size={20} />
                 </TouchableOpacity>
               </View>
 
               {/* Tipo e Data */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
                 <View style={{ flex: 1, marginHorizontal: 4 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8 }}>Tipo</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>Tipo</Text>
                   <TouchableOpacity
                     style={{
                       flexDirection: 'row',
@@ -709,7 +697,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                 </View>
 
                 <View style={{ flex: 1, marginHorizontal: 4 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8 }}>Data</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>Data</Text>
                   <TouchableOpacity
                     style={{
                       flexDirection: 'row',
@@ -720,13 +708,12 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                       borderRadius: 12,
                       borderWidth: 1,
                       borderColor: '#ddd',
-                      backgroundColor: '#f8f9fa',
                       gap: 8,
                     }}
                     onPress={() => setActivePicker('date')}
                   >
-                    <Icon source="calendar" size={16} color="#666" />
-                    <Text style={{ color: '#333', fontSize: 14 }}>
+                    <Icon source="calendar" size={16} />
+                    <Text style={{ fontSize: 14 }}>
                       {params?.date?.toLocaleDateString('pt-BR')}
                     </Text>
                   </TouchableOpacity>
@@ -736,7 +723,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
               {/* Conta e Categoria */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
                 <View style={{ flex: 1, marginHorizontal: 4 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8 }}>Conta</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>Conta</Text>
                   <Select
                     items={accounts.map(account => ({
                       id: account.id,
@@ -750,7 +737,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                 </View>
 
                 <View style={{ flex: 1, marginHorizontal: 4 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8 }}>Categoria</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>Categoria</Text>
                   <Select
                     items={categories
                       .filter(cat => !params.type || cat.type === params.type)
@@ -768,26 +755,24 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
 
               {/* Descrição */}
               <View style={{ marginBottom: 20 }}>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8 }}>Descrição</Text>
+                <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>Descrição</Text>
                 <TextInput
                   value={params.description}
                   onChangeText={(text) => setParams(prev => ({ ...prev, description: text }))}
                   placeholder="Ex: Salário, Aluguel, Supermercado"
                   mode="outlined"
-                  style={{ backgroundColor: '#fff' }}
                 />
               </View>
 
               {/* Valor */}
               <View style={{ marginBottom: 20 }}>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8 }}>Valor</Text>
+                <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>Valor</Text>
                 <TextInput
                   value={params.value}
                   onChangeText={(text) => setParams(prev => ({ ...prev, value: text }))}
                   placeholder="0,00"
                   keyboardType="numeric"
                   mode="outlined"
-                  style={{ backgroundColor: '#fff' }}
                   left={<TextInput.Affix text="R$ " />}
                 />
               </View>
@@ -795,7 +780,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
               {/* Recorrência */}
               <View style={{ marginBottom: 24 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#333' }}>Recorrência</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600' }}>Recorrência</Text>
                   <Switch
                     value={params.isRecurring || false}
                     onValueChange={(value) => setParams(prev => ({ ...prev, isRecurring: value }))}
@@ -805,7 +790,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
 
                 {params.isRecurring && (
                   <View style={{ backgroundColor: '#f8f9fa', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#e9ecef' }}>
-                    <Text style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>Data Final (opcional)</Text>
+                    <Text style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>Data Final (opcional)</Text>
                     <TouchableOpacity
                       style={{
                         flexDirection: 'row',
@@ -821,8 +806,8 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                       }}
                       onPress={() => setActivePicker('recurringEndDate')}
                     >
-                      <Icon source="calendar" size={16} color="#666" />
-                      <Text style={{ color: '#333', fontSize: 14 }}>
+                      <Icon source="calendar" size={16} />
+                      <Text style={{ fontSize: 14 }}>
                         {params.recurringEndDate
                           ? params.recurringEndDate.toLocaleDateString('pt-BR')
                           : 'Selecionar data final'
@@ -862,7 +847,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                 {isDeleting ? (
                   <View style={{ backgroundColor: '#FFF5F5', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#FED7D7', marginTop: 16, width: '100%' }}>
                     <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#C53030', marginBottom: 4 }}>Confirmar exclusão?</Text>
-                    <Text style={{ fontSize: 14, color: '#718096', marginBottom: 16 }}>Esta ação não pode ser desfeita.</Text>
+                    <Text style={{ fontSize: 14, opacity: 0.7, marginBottom: 16 }}>Esta ação não pode ser desfeita.</Text>
                     <View style={{ flexDirection: 'row', gap: 12 }}>
                       <Button
                         mode="outlined"
@@ -901,7 +886,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff", paddingHorizontal: 16 },
+  container: { flex: 1, paddingHorizontal: 16 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 16 },
   confirmDel: { backgroundColor: '#FFB86A', padding: 14 },
   monthText: { fontSize: 18, fontWeight: "bold", textTransform: "capitalize" },

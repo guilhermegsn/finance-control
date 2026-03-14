@@ -1,8 +1,9 @@
 import React, { useEffect } from 'react';
 import { StyleSheet, View, ActivityIndicator } from 'react-native';
-import { PaperProvider, Text, Button, Surface } from 'react-native-paper';
+import { PaperProvider, Text, Button, Surface, MD3DarkTheme, MD3LightTheme } from 'react-native-paper';
 import AppNavigator from './src/navigation/AppNavigator';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
+import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import { CategoryService } from './src/service/CategoryService';
 
 // 1. Componente de Login (Simples e Direto)
@@ -53,15 +54,27 @@ const RootNavigation = () => {
   return user ? <AppNavigator /> : <LoginScreen />;
 };
 
+// Componente que fornece o tema combinado
+const ThemedApp = () => {
+  const { isDarkMode } = useTheme();
+  const theme = isDarkMode ? MD3DarkTheme : MD3LightTheme;
+  
+  return (
+    <PaperProvider theme={theme}>
+      <View style={styles.container}>
+        <RootNavigation />
+      </View>
+    </PaperProvider>
+  );
+};
+
 // 3. App Principal
 export default function App() {
   return (
     <AuthProvider>
-      <PaperProvider>
-        <View style={styles.container}>
-          <RootNavigation />
-        </View>
-      </PaperProvider>
+      <ThemeProvider>
+        <ThemedApp />
+      </ThemeProvider>
     </AuthProvider>
   );
 }
