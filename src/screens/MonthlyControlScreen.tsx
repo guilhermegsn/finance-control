@@ -2,7 +2,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import dayjs from "dayjs";
 import React, { useState, useMemo, useEffect } from "react";
 import { ScrollView, StyleSheet, TouchableOpacity, View, Image } from "react-native";
-import { DataTable, Icon, Portal, Modal, Button, TextInput, Divider, Switch, HelperText, Text, useTheme } from "react-native-paper";
+import { DataTable, Icon, Portal, Modal, Button, TextInput, Divider, Switch, HelperText, Text, useTheme, Dialog } from "react-native-paper";
 import { Select } from '../components/Select';
 import { withObservables } from '@nozbe/watermelondb/react';
 import { TransactionService } from '../service/TransactionService';
@@ -61,6 +61,11 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [activePicker, setActivePicker] = useState<'date' | 'recurringEndDate' | null>(null);
+  
+  // Estado para Dialog de transações recorrentes
+  const [recurringDialogVisible, setRecurringDialogVisible] = useState(false);
+  const [recurringAction, setRecurringAction] = useState<'edit' | 'delete' | null>(null);
+  const [pendingTransaction, setPendingTransaction] = useState<Transaction | null>(null);
 
   const theme = useTheme()
 
@@ -176,20 +181,27 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
 
     try {
       if (selectedTransaction) {
-        // Para edição, não enviamos campos de recorrência
-        const updateData = {
-          accountId: transactionData.accountId,
-          categoryId: transactionData.categoryId,
-          description: transactionData.description,
-          amount: transactionData.amount,
-          type: transactionData.type,
-          date: transactionData.date,
-        };
-        await TransactionService.update(selectedTransaction.id, updateData);
+        // Verificar se é uma transação recorrente
+        if (selectedTransaction.isRecurring) {
+          // Mostrar dialog para escolher o modo de edição
+          showRecurringDialog(selectedTransaction, 'edit');
+        } else {
+          // Para edição de transação não recorrente
+          const updateData = {
+            accountId: transactionData.accountId,
+            categoryId: transactionData.categoryId,
+            description: transactionData.description,
+            amount: transactionData.amount,
+            type: transactionData.type,
+            date: transactionData.date,
+          };
+          await TransactionService.update(selectedTransaction.id, updateData);
+          closeModal();
+        }
       } else {
         await TransactionService.create(transactionData);
+        closeModal();
       }
-      closeModal();
     } catch (error) {
       console.error('Erro ao salvar transação:', error);
     }
@@ -197,13 +209,84 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
 
   const handleDelete = async () => {
     if (selectedTransaction) {
-      try {
-        await TransactionService.delete(selectedTransaction.id);
-        closeModal();
-      } catch (error) {
-        console.error('Erro ao excluir transação:', error);
+      // Verificar se é uma transação recorrente
+      if (selectedTransaction.isRecurring) {
+        // Mostrar dialog para escolher o modo de exclusão
+        showRecurringDialog(selectedTransaction, 'delete');
+      } else {
+        // Para exclusão de transação não recorrente
+        try {
+          await TransactionService.delete(selectedTransaction.id);
+          closeModal();
+        } catch (error) {
+          console.error('Erro ao excluir transação:', error);
+        }
       }
     }
+  };
+
+  // Funções para transações recorrentes
+  const showRecurringDialog = (transaction: Transaction, action: 'edit' | 'delete') => {
+    setPendingTransaction(transaction);
+    setRecurringAction(action);
+    setRecurringDialogVisible(true);
+  };
+
+  const handleRecurringAction = async (mode: 'only_this' | 'all_future') => {
+    if (!pendingTransaction || !recurringAction) return;
+
+    try {
+      if (recurringAction === 'edit') {
+        // Para edição, precisamos dos dados do formulário
+        if (!user || !params.type) return;
+
+        const amount = parseFloat(params.value);
+        if (isNaN(amount)) return;
+
+        const filteredCategories = categories.filter(cat => cat.type === params.type);
+        const categoryId = selectedCategoryId ||
+          (filteredCategories.length > 0 ? filteredCategories[0].id :
+            (categories.length > 0 ? categories[0].id : ''));
+
+        const updateData = {
+          accountId: selectedAccountId || (accounts.length > 0 ? accounts[0].id : ''),
+          categoryId: categoryId,
+          description: params.description,
+          amount: amount,
+          type: params.type,
+          observation: params.description, // Usando description como observation
+        };
+
+        await TransactionService.updateRecurring(pendingTransaction.id, mode, updateData);
+      } else {
+        // Para exclusão
+        await TransactionService.deleteRecurring(pendingTransaction.id, mode);
+      }
+
+      setRecurringDialogVisible(false);
+      setPendingTransaction(null);
+      setRecurringAction(null);
+      closeModal();
+    } catch (error) {
+      console.error(`Erro ao ${recurringAction === 'edit' ? 'atualizar' : 'excluir'} transação recorrente:`, error);
+    }
+  };
+
+  const cancelRecurringDialog = () => {
+    setRecurringDialogVisible(false);
+    setPendingTransaction(null);
+    setRecurringAction(null);
+  };
+
+  // Verificar se a transação é de um mês anterior ao atual
+  const isPreviousMonthTransaction = (transactionDate: Date): boolean => {
+    const now = new Date();
+    const transactionMonth = new Date(transactionDate);
+    
+    // Comparar ano e mês
+    return transactionMonth.getFullYear() < now.getFullYear() || 
+           (transactionMonth.getFullYear() === now.getFullYear() && 
+            transactionMonth.getMonth() < now.getMonth());
   };
 
 
@@ -880,6 +963,49 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
             </View>
           )}
         </Modal>
+      </Portal>
+
+      {/* Dialog para transações recorrentes */}
+      <Portal>
+        <Dialog
+          visible={recurringDialogVisible}
+          onDismiss={cancelRecurringDialog}
+          style={{ backgroundColor: theme.colors.background }}
+        >
+          <Dialog.Title>
+            {recurringAction === 'edit' ? 'Editar Transação Recorrente' : 'Excluir Transação Recorrente'}
+          </Dialog.Title>
+          <Dialog.Content>
+            <Text style={{ marginBottom: 16 }}>
+              {recurringAction === 'edit' 
+                ? 'Deseja alterar apenas esta transação ou também as próximas?'
+                : 'Deseja excluir apenas esta transação ou também as próximas?'}
+            </Text>
+            
+            {pendingTransaction && isPreviousMonthTransaction(pendingTransaction.date) && (
+              <Text style={{ color: '#FF6B6B', marginBottom: 16, fontSize: 12 }}>
+                ⚠️ Esta transação é de um mês anterior. A opção "Esta e as próximas" não está disponível para histórico.
+              </Text>
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={cancelRecurringDialog}>Cancelar</Button>
+            <Button 
+              onPress={() => handleRecurringAction('only_this')}
+              mode="contained"
+            >
+              Apenas esta
+            </Button>
+            {pendingTransaction && !isPreviousMonthTransaction(pendingTransaction.date) && (
+              <Button 
+                onPress={() => handleRecurringAction('all_future')}
+                mode="contained"
+              >
+                Esta e as próximas
+              </Button>
+            )}
+          </Dialog.Actions>
+        </Dialog>
       </Portal>
     </View>
   );

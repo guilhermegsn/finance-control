@@ -226,6 +226,136 @@ export const TransactionService = {
     console.log('Transação marcada para exclusão. Execute o Sync para atualizar o servidor.');
   },
 
+  // Atualizar transações recorrentes (apenas esta ou esta e as próximas)
+  updateRecurring: async (
+    transactionId: string,
+    mode: 'only_this' | 'all_future',
+    data: {
+      accountId?: string;
+      categoryId?: string;
+      description?: string;
+      amount?: number;
+      type?: 'income' | 'expense';
+      observation?: string;
+    }
+  ) => {
+    await database.write(async () => {
+      const transaction = await database.get<Transaction>('transactions').find(transactionId);
+      
+      if (mode === 'only_this') {
+        // Atualiza apenas esta transação e remove do grupo recorrente
+        await transaction.update((tx) => {
+          if (data.accountId !== undefined) {
+            // @ts-ignore
+            tx._raw.account_id = data.accountId;
+          }
+          if (data.categoryId !== undefined) {
+            // @ts-ignore
+            tx._raw.category_id = data.categoryId;
+          }
+          if (data.description !== undefined) tx.description = data.description;
+          if (data.amount !== undefined) tx.amount = data.amount;
+          if (data.type !== undefined) tx.type = data.type;
+          if (data.observation !== undefined) tx.observation = data.observation;
+          // Remove do grupo recorrente
+          tx.isRecurring = false;
+          // @ts-ignore
+          tx._raw.recurring_id = null;
+        });
+      } else {
+        // Atualiza esta e todas as próximas (all_future)
+        // @ts-ignore
+        const recurringId = transaction._raw.recurring_id;
+        const transactionDate = new Date(transaction.date);
+        
+        if (!recurringId) {
+          // Se não tem recurring_id, atualiza apenas esta
+          await transaction.update((tx) => {
+            if (data.accountId !== undefined) {
+              // @ts-ignore
+              tx._raw.account_id = data.accountId;
+            }
+            if (data.categoryId !== undefined) {
+              // @ts-ignore
+              tx._raw.category_id = data.categoryId;
+            }
+            if (data.description !== undefined) tx.description = data.description;
+            if (data.amount !== undefined) tx.amount = data.amount;
+            if (data.type !== undefined) tx.type = data.type;
+            if (data.observation !== undefined) tx.observation = data.observation;
+          });
+          return;
+        }
+        
+        // Buscar todas as transações com o mesmo recurring_id e data >= data atual
+        const futureTransactions = await database.get<Transaction>('transactions')
+          .query(
+            Q.where('recurring_id', recurringId),
+            Q.where('date', Q.gte(transactionDate.getTime()))
+          )
+          .fetch();
+        
+        // Preparar atualizações em batch
+        const updates = futureTransactions.map(tx => 
+          tx.prepareUpdate((record) => {
+            if (data.accountId !== undefined) {
+              // @ts-ignore
+              record._raw.account_id = data.accountId;
+            }
+            if (data.categoryId !== undefined) {
+              // @ts-ignore
+              record._raw.category_id = data.categoryId;
+            }
+            if (data.description !== undefined) record.description = data.description;
+            if (data.amount !== undefined) record.amount = data.amount;
+            if (data.type !== undefined) record.type = data.type;
+            if (data.observation !== undefined) record.observation = data.observation;
+          })
+        );
+        
+        await database.batch(...updates);
+      }
+    });
+  },
+
+  // Excluir transações recorrentes (apenas esta ou esta e as próximas)
+  deleteRecurring: async (transactionId: string, mode: 'only_this' | 'all_future') => {
+    await database.write(async () => {
+      const transaction = await database.get<Transaction>('transactions').find(transactionId);
+      
+      if (mode === 'only_this') {
+        // Exclui apenas esta transação
+        await transaction.markAsDeleted();
+      } else {
+        // Exclui esta e todas as próximas (all_future)
+        // @ts-ignore
+        const recurringId = transaction._raw.recurring_id;
+        const transactionDate = new Date(transaction.date);
+        
+        if (!recurringId) {
+          // Se não tem recurring_id, exclui apenas esta
+          await transaction.markAsDeleted();
+          return;
+        }
+        
+        // Buscar todas as transações com o mesmo recurring_id e data >= data atual
+        const futureTransactions = await database.get<Transaction>('transactions')
+          .query(
+            Q.where('recurring_id', recurringId),
+            Q.where('date', Q.gte(transactionDate.getTime()))
+          )
+          .fetch();
+        
+        // Preparar exclusões em batch
+        const deletions = futureTransactions.map(tx => tx.prepareMarkAsDeleted());
+        
+        await database.batch(...deletions);
+      }
+    });
+    
+    console.log('Transação(ões) recorrente(s) marcada(s) para exclusão.');
+  },
+
   // Calcular saldo de uma conta antes de uma data específica
   getBalanceBeforeDate: async (accountId: string, date: Date): Promise<number> => {
     // Buscar todas as transações da conta com data anterior à data fornecida
