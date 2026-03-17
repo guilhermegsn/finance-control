@@ -17,7 +17,6 @@ export default function AccountsScreen() {
 
   const [emptyParams] = useState<Partial<Account>>({
     name: "",
-    initialBalance: 0,
     type: "checking",
     color: "#6200ee",
     logoUrl: "",
@@ -57,7 +56,6 @@ export default function AccountsScreen() {
     try {
       await AccountService.create({
         name: params.name,
-        initialBalance: params.initialBalance || 0,
         type: params.type || 'checking',
         color: params.color || '#6200ee',
         logoUrl: params.logoUrl || '',
@@ -77,7 +75,6 @@ export default function AccountsScreen() {
     setEditingAccount(account);
     setParams({
       name: account.name,
-      initialBalance: account.initialBalance,
       type: account.type,
       color: account.color,
       logoUrl: account.logoUrl || '',
@@ -111,7 +108,6 @@ export default function AccountsScreen() {
     try {
       await AccountService.update(editingAccount.id, {
         name: params.name,
-        initialBalance: params.initialBalance || 0,
         type: params.type || 'checking',
         color: params.color || '#6200ee',
         logoUrl: params.logoUrl || '',
@@ -257,14 +253,6 @@ export default function AccountsScreen() {
                 )}
               </View>
 
-              <TextInput
-                label="Saldo Inicial"
-                value={params.initialBalance?.toString() || ''}
-                onChangeText={(text) => setParams({ ...params, initialBalance: parseFloat(text) || 0 })}
-                keyboardType="numeric"
-                style={styles.input}
-                mode="outlined"
-              />
               <TextInput
                 label="Tipo (checking, savings, investment)"
                 value={params.type || ''}

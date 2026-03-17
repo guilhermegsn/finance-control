@@ -19,7 +19,6 @@ export const AccountService = {
   // Criar nova conta
   create: async (data: { 
     name: string; 
-    initialBalance: number; 
     type: string; 
     color: string; 
     userId: string;
@@ -29,7 +28,6 @@ export const AccountService = {
     await database.write(async () => {
       await database.get<Account>('accounts').create((account) => {
         account.name = data.name;
-        account.initialBalance = data.initialBalance;
         account.type = data.type;
         account.color = data.color;
         account.archived = false;
@@ -43,7 +41,6 @@ export const AccountService = {
   // Atualizar conta existente
   update: async (accountId: string, data: { 
     name?: string; 
-    initialBalance?: number; 
     type?: string; 
     color?: string; 
     archived?: boolean;
@@ -55,7 +52,6 @@ export const AccountService = {
       
       await account.update((acc) => {
         if (data.name !== undefined) acc.name = data.name;
-        if (data.initialBalance !== undefined) acc.initialBalance = data.initialBalance;
         if (data.type !== undefined) acc.type = data.type;
         if (data.color !== undefined) acc.color = data.color;
         if (data.archived !== undefined) acc.archived = data.archived;

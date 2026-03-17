@@ -51,7 +51,6 @@ const AccountItem = ({ account, onEdit }: { account: Account; onEdit?: (account:
     <Surface style={styles.card} elevation={1}>
       <List.Item
         title={account.name}
-        description={`Saldo Inicial: R$ ${account.initialBalance.toFixed(2)} | Tipo: ${account.type}`}
         left={renderLeftIcon}
         right={props => (
           <View style={{ flexDirection: 'row' }}>
