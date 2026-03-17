@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Alert } from 'react-native';
-import { Appbar, Portal, Modal, TextInput, Button, Card, IconButton, FAB } from 'react-native-paper';
+import { Appbar, Portal, Modal, TextInput, Button, Card, IconButton, FAB, useTheme, Text } from 'react-native-paper';
 import { useAuth } from '../contexts/AuthContext';
 import { CategoryService } from '../service/CategoryService';
 import CategoryList from '../components/CategoryList';
@@ -8,6 +8,7 @@ import Category from '../models/Caterogy';
 
 export default function CategoriesScreen() {
   const { user } = useAuth();
+  const theme = useTheme()
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any>(null);
 
@@ -107,53 +108,42 @@ export default function CategoriesScreen() {
         <Modal
           visible={modalVisible}
           onDismiss={resetForm}
-          contentContainerStyle={styles.modalContainer}
+          style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
+          contentContainerStyle={[styles.modalContainer, { backgroundColor: theme.colors.background }]}
+
         >
-          <Card>
-            <Card.Title
-              title={editingCategory ? 'Editando categoria' : "Nova Categoria"}
-              right={(props) => (
-                <IconButton
-                  {...props}
-                  icon="close"
-                  onPress={() => {
-                    setModalVisible(false)
-                    resetForm();
-                  }}
-                />
-              )}
+          <View>
+            <Text variant="titleLarge" style={{ marginBottom: 10 }}>Cadastrar categoria</Text>
+            <TextInput
+              label="Nome da Categoria (ex: Alimentação)"
+              value={params.name || ''}
+              onChangeText={(text) => setParams({ ...params, name: text })}
+              style={styles.input}
+              mode="outlined"
+              autoFocus
             />
-            <Card.Content>
-              <TextInput
-                label="Nome da Categoria (ex: Alimentação)"
-                value={params.name || ''}
-                onChangeText={(text) => setParams({ ...params, name: text })}
-                style={styles.input}
-                mode="outlined"
-                autoFocus
-              />
-              <TextInput
-                label="Tipo (income/expense)"
-                value={params.type || ''}
-                onChangeText={(text) => setParams({ ...params, type: text as 'income' | 'expense' })}
-                style={styles.input}
-                mode="outlined"
-              />
-              <TextInput
-                label="Ícone (nome do ícone, ex: 'food', 'shopping', 'home')"
-                value={params.icon || ''}
-                onChangeText={(text) => setParams({ ...params, icon: text })}
-                style={styles.input}
-                mode="outlined"
-              />
-              <TextInput
-                label="Cor (hexadecimal)"
-                value={params.color || ''}
-                onChangeText={(text) => setParams({ ...params, color: text })}
-                style={styles.input}
-                mode="outlined"
-              />
-            </Card.Content>
+            <TextInput
+              label="Tipo (income/expense)"
+              value={params.type || ''}
+              onChangeText={(text) => setParams({ ...params, type: text as 'income' | 'expense' })}
+              style={styles.input}
+              mode="outlined"
+            />
+            <TextInput
+              label="Ícone (nome do ícone, ex: 'food', 'shopping', 'home')"
+              value={params.icon || ''}
+              onChangeText={(text) => setParams({ ...params, icon: text })}
+              style={styles.input}
+              mode="outlined"
+            />
+            <TextInput
+              label="Cor (hexadecimal)"
+              value={params.color || ''}
+              onChangeText={(text) => setParams({ ...params, color: text })}
+              style={styles.input}
+              mode="outlined"
+            />
+
             <Card.Actions>
               <Button onPress={() => {
                 setModalVisible(false)
@@ -165,7 +155,7 @@ export default function CategoriesScreen() {
                 Salvar
               </Button>
             </Card.Actions>
-          </Card>
+          </View>
         </Modal>
       </Portal>
 
@@ -195,5 +185,8 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     padding: 20,
+    margin: 20,
+    borderRadius: 20,
+    maxHeight: '90%',
   },
 });

@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 interface ThemeContextData {
   isDarkMode: boolean;
   toggleDarkMode: () => void;
+  isThemeLoading: boolean;
 }
 
 const ThemeContext = createContext<ThemeContextData>({} as ThemeContextData);
@@ -12,6 +13,7 @@ const THEME_STORAGE_KEY = '@finance-control:dark-mode';
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isThemeLoading, setIsThemeLoading] = useState(true);
 
   useEffect(() => {
     loadTheme();
@@ -25,6 +27,8 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error) {
       console.error('Erro ao carregar tema:', error);
+    } finally {
+      setIsThemeLoading(false);
     }
   };
 
@@ -39,7 +43,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <ThemeContext.Provider value={{ isDarkMode, toggleDarkMode }}>
+    <ThemeContext.Provider value={{ isDarkMode, toggleDarkMode, isThemeLoading }}>
       {children}
     </ThemeContext.Provider>
   );

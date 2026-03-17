@@ -56,12 +56,17 @@ const RootNavigation = () => {
 
 // Componente que fornece o tema combinado
 const ThemedApp = () => {
-  const { isDarkMode } = useTheme();
+  const { isDarkMode, isThemeLoading } = useTheme();
   const theme = isDarkMode ? MD3DarkTheme : MD3LightTheme;
+  
+  // Aguarda o tema carregar antes de renderizar para evitar flash branco
+  if (isThemeLoading) {
+    return null;
+  }
   
   return (
     <PaperProvider theme={theme}>
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <RootNavigation />
       </View>
     </PaperProvider>
