@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import BottomNavigator from './BottomNavigator';
 import AccountsScreen from '../screens/AccountsScreen';
 import CategoriesScreen from '../screens/CategoriesScreen';
+import TransactionFormScreen from '../screens/TransactionFormScreen';
 import { useTheme } from '../contexts/ThemeContext';
 
 const Stack = createNativeStackNavigator();
@@ -34,6 +35,14 @@ export default function AppNavigator() {
           component={CategoriesScreen}
           options={{
             title: 'Categorias',
+          }}
+        />
+
+        <Stack.Screen
+          name="TransactionForm"
+          component={TransactionFormScreen}
+          options={{
+            title: 'Transação',
           }}
         />
       </Stack.Navigator>

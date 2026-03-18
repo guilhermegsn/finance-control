@@ -1,9 +1,7 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
 import dayjs from "dayjs";
 import React, { useState, useMemo, useEffect } from "react";
 import { ScrollView, StyleSheet, TouchableOpacity, View, Image } from "react-native";
-import { DataTable, Icon, Portal, Modal, Button, TextInput, Divider, Switch, HelperText, Text, useTheme, Dialog } from "react-native-paper";
-import { Select } from '../components/Select';
+import { DataTable, Icon, Text } from "react-native-paper";
 import TransactionItem from '../components/TransactionItem';
 import { withObservables } from '@nozbe/watermelondb/react';
 import { TransactionService } from '../service/TransactionService';
@@ -15,18 +13,7 @@ import { database } from '../database';
 import { useAuth } from '../contexts/AuthContext';
 import BankService from '../service/BankService';
 import SummaryFooter from '../components/SummaryFooter';
-
-// Tipos
-interface Params {
-  id: string, description: string, value: string, date: Date,
-  startDate?: Date | null, endDate?: Date | null,
-  type: 'income' | 'expense' | null, isRecurrence: boolean, installments?: string,
-  // Campos de recorrência
-  isRecurring?: boolean,
-  recurringEndDate?: Date | null,
-  // Campo de consolidação
-  isConsolidated?: boolean
-}
+import { useNavigation } from '@react-navigation/native';
 
 interface AccountTransactionGroup {
   accountId: string;
@@ -44,14 +31,6 @@ interface AccountTransactionGroup {
   };
 }
 
-interface GroupedTransaction {
-  accountId: string;
-  accountName: string;
-  accountColor: string;
-  total: number;
-  transactions: Transaction[];
-}
-
 interface MonthlyControlScreenProps {
   transactions: Transaction[];
   accounts: any[];
@@ -60,30 +39,9 @@ interface MonthlyControlScreenProps {
 
 function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyControlScreenProps) {
   const { user } = useAuth();
+  const navigation = useNavigation();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [activePicker, setActivePicker] = useState<'date' | 'recurringEndDate' | null>(null);
-
-  // Estado para Dialog de transações recorrentes
-  const [recurringDialogVisible, setRecurringDialogVisible] = useState(false);
-  const [recurringAction, setRecurringAction] = useState<'edit' | 'delete' | null>(null);
-  const [pendingTransaction, setPendingTransaction] = useState<Transaction | null>(null);
-
-  const theme = useTheme()
-
-  const [params, setParams] = useState<Params>({
-    id: '',
-    description: '',
-    value: '',
-    date: new Date(),
-    type: null,
-    isRecurrence: false,
-  });
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
-  const [previousBalances, setPreviousBalances] = useState<Record<string, number>>({})
+  const [previousBalances, setPreviousBalances] = useState<Record<string, number>>({});
 
   const isFutureMonth = useMemo(() => {
     const now = new Date();
@@ -111,196 +69,30 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
     setCurrentDate(next);
   };
 
-  const openModal = (transaction?: Transaction) => {
-    if (transaction) {
-      setSelectedTransaction(transaction);
-      setParams({
-        id: transaction.id,
-        description: transaction.description,
-        value: transaction.amount.toString(),
-        date: new Date(transaction.date),
-        type: transaction.type,
-        isRecurrence: false,
-        isRecurring: false, // Transações existentes não são editadas como recorrentes
-        recurringEndDate: null,
-        isConsolidated: transaction.isConsolidated,
-      });
-      // TODO: Preencher conta e categoria da transação
-    } else {
-      setSelectedTransaction(null);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const newDate = new Date();
-      setParams({
-        id: '',
-        description: '',
-        value: '',
-        date: newDate,
-        type: null,
-        isRecurrence: false,
-        isRecurring: false, // Por padrão não é recorrente
-        recurringEndDate: null,
-        isConsolidated: newDate <= today, // true se data <= hoje
-      });
-      // Selecionar primeira conta e categoria por padrão
-      if (accounts.length > 0) {
-        setSelectedAccountId(accounts[0].id);
+  const openTransactionForm = (transaction?: Transaction) => {
+    // Extrair apenas dados simples para evitar referências circulares
+    const safeTransaction = transaction ? {
+      id: transaction.id,
+      description: transaction.description,
+      amount: transaction.amount,
+      type: transaction.type,
+      date: transaction.date,
+      isConsolidated: transaction.isConsolidated,
+      isRecurring: transaction.isRecurring,
+    } : undefined;
+    
+    navigation.navigate('TransactionForm', {
+      transaction: safeTransaction,
+      accounts,
+      categories,
+      onSave: () => {
+        // Recarregar dados após salvar
+        // A reatividade do WatermelonDB já cuida disso
+      },
+      onCancel: () => {
+        navigation.goBack();
       }
-      if (categories.length > 0) {
-        // Filtrar categorias pelo tipo quando o tipo for selecionado
-        setSelectedCategoryId(categories[0].id);
-      }
-    }
-    setIsDeleting(false);
-    setModalVisible(true);
-  };
-
-  const closeModal = () => {
-    setModalVisible(false);
-    setSelectedTransaction(null);
-    setIsDeleting(false);
-    setActivePicker(null);
-  };
-
-  const handleDateChange = (event: any, selectedDate?: Date) => {
-    if (selectedDate && activePicker) {
-      setParams(prev => ({ ...prev, [activePicker]: selectedDate }));
-    }
-    setActivePicker(null);
-  };
-
-  const selectType = (type: 'income' | 'expense') => {
-    setParams(prev => ({ ...prev, type }));
-  };
-
-  const isInvalidForm = () => {
-    return !params.description.trim() || !params.value.trim() || !params.type || !params.date;
-  };
-
-  const handleSave = async () => {
-    if (!user || !params.type) return;
-
-    const amount = parseFloat(params.value);
-    if (isNaN(amount)) return;
-
-    // Usar categoria selecionada ou primeira categoria do tipo correto
-    const filteredCategories = categories.filter(cat => cat.type === params.type);
-    const categoryId = selectedCategoryId ||
-      (filteredCategories.length > 0 ? filteredCategories[0].id :
-        (categories.length > 0 ? categories[0].id : ''));
-
-    const transactionData = {
-      accountId: selectedAccountId || (accounts.length > 0 ? accounts[0].id : ''),
-      categoryId: categoryId,
-      description: params.description,
-      amount: amount,
-      type: params.type,
-      date: params.date,
-      userId: user.id,
-      isConsolidated: params.isConsolidated || false,
-      // Campos de recorrência (apenas para criação, não para edição)
-      isRecurring: params.isRecurring || false,
-      recurringEndDate: params.isRecurring ? params.recurringEndDate || undefined : undefined,
-    };
-
-    try {
-      if (selectedTransaction) {
-        // Verificar se é uma transação recorrente
-        if (selectedTransaction.isRecurring) {
-          // Mostrar dialog para escolher o modo de edição
-          showRecurringDialog(selectedTransaction, 'edit');
-        } else {
-          // Para edição de transação não recorrente
-          const updateData = {
-            accountId: transactionData.accountId,
-            categoryId: transactionData.categoryId,
-            description: transactionData.description,
-            amount: transactionData.amount,
-            type: transactionData.type,
-            date: transactionData.date,
-            isConsolidated: transactionData.isConsolidated,
-          };
-          await TransactionService.update(selectedTransaction.id, updateData);
-          closeModal();
-        }
-      } else {
-        await TransactionService.create(transactionData);
-        closeModal();
-      }
-    } catch (error) {
-      console.error('Erro ao salvar transação:', error);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (selectedTransaction) {
-      // Verificar se é uma transação recorrente
-      if (selectedTransaction.isRecurring) {
-        // Mostrar dialog para escolher o modo de exclusão
-        showRecurringDialog(selectedTransaction, 'delete');
-      } else {
-        // Para exclusão de transação não recorrente
-        try {
-          await TransactionService.delete(selectedTransaction.id);
-          closeModal();
-        } catch (error) {
-          console.error('Erro ao excluir transação:', error);
-        }
-      }
-    }
-  };
-
-  // Funções para transações recorrentes
-  const showRecurringDialog = (transaction: Transaction, action: 'edit' | 'delete') => {
-    setPendingTransaction(transaction);
-    setRecurringAction(action);
-    setRecurringDialogVisible(true);
-  };
-
-  const handleRecurringAction = async (mode: 'only_this' | 'all_future') => {
-    if (!pendingTransaction || !recurringAction) return;
-
-    try {
-      if (recurringAction === 'edit') {
-        // Para edição, precisamos dos dados do formulário
-        if (!user || !params.type) return;
-
-        const amount = parseFloat(params.value);
-        if (isNaN(amount)) return;
-
-        const filteredCategories = categories.filter(cat => cat.type === params.type);
-        const categoryId = selectedCategoryId ||
-          (filteredCategories.length > 0 ? filteredCategories[0].id :
-            (categories.length > 0 ? categories[0].id : ''));
-
-        const updateData = {
-          accountId: selectedAccountId || (accounts.length > 0 ? accounts[0].id : ''),
-          categoryId: categoryId,
-          description: params.description,
-          amount: amount,
-          type: params.type,
-          observation: params.description, // Usando description como observation
-        };
-
-        await TransactionService.updateRecurring(pendingTransaction.id, mode, updateData);
-      } else {
-        // Para exclusão
-        await TransactionService.deleteRecurring(pendingTransaction.id, mode);
-      }
-
-      setRecurringDialogVisible(false);
-      setPendingTransaction(null);
-      setRecurringAction(null);
-      closeModal();
-    } catch (error) {
-      console.error(`Erro ao ${recurringAction === 'edit' ? 'atualizar' : 'excluir'} transação recorrente:`, error);
-    }
-  };
-
-  const cancelRecurringDialog = () => {
-    setRecurringDialogVisible(false);
-    setPendingTransaction(null);
-    setRecurringAction(null);
+    });
   };
 
   // Verificar se a transação é de um mês anterior ao atual
@@ -313,7 +105,6 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
       (transactionMonth.getFullYear() === now.getFullYear() &&
         transactionMonth.getMonth() < now.getMonth());
   };
-
 
   // Filtrar transações pelo mês atual
   const filteredTransactions = filterTransactionsByMonth(transactions, currentDate);
@@ -514,7 +305,6 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                     <Icon
                       source={isExpanded ? "chevron-up" : "chevron-down"}
                       size={16}
-
                     />
                   </DataTable.Cell>
                   <DataTable.Cell numeric>
@@ -557,9 +347,9 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
 
                         {/* Nível 4: Transações de Entrada */}
                         {group.income.transactions.map((item) => (
-                          <DataTable.Row key={item.id} onLongPress={() => openModal(item)}>
+                          <DataTable.Row key={item.id} onLongPress={() => openTransactionForm(item)}>
                             <DataTable.Cell style={{ paddingLeft: 10 }}>
-                              <TransactionItem transaction={item} onLongPress={() => openModal(item)} />
+                              <TransactionItem transaction={item} onLongPress={() => openTransactionForm(item)} />
                             </DataTable.Cell>
                           </DataTable.Row>
                         ))}
@@ -583,9 +373,9 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
 
                         {/* Nível 4: Transações de Saída */}
                         {group.expense.transactions.map((item) => (
-                          <DataTable.Row key={item.id} onLongPress={() => openModal(item)}>
+                          <DataTable.Row key={item.id} onLongPress={() => openTransactionForm(item)}>
                             <DataTable.Cell style={{ paddingLeft: 10 }}>
-                              <TransactionItem transaction={item} onLongPress={() => openModal(item)} />
+                              <TransactionItem transaction={item} onLongPress={() => openTransactionForm(item)} />
                             </DataTable.Cell>
                           </DataTable.Row>
                         ))}
@@ -600,19 +390,19 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
           {/* Totais Gerais */}
           <DataTable.Row key={`total-summary`}>
             <DataTable.Cell>
-              <Text style={{ fontWeight: 'bold', }}>TOTAL GERAL</Text>
+              <Text style={{ fontWeight: 'bold' }}>TOTAL GERAL</Text>
             </DataTable.Cell>
             <DataTable.Cell numeric>
-              <Text style={{ fontWeight: 'bold', }}>R$ {totals.balance.toFixed(2)}</Text>
+              <Text style={{ fontWeight: 'bold' }}>R$ {totals.balance.toFixed(2)}</Text>
             </DataTable.Cell>
           </DataTable.Row>
         </DataTable>
 
         {/* Cartões - TODO: Implementar quando tiver lógica de cartão de crédito */}
-        <Text style={[styles.sectionTitle,]}>Cartão de crédito</Text>
+        <Text style={[styles.sectionTitle]}>Cartão de crédito</Text>
         <DataTable>
           <DataTable.Header>
-            <DataTable.Title style={{ maxWidth: 70 }} ><Text>Data</Text></DataTable.Title>
+            <DataTable.Title style={{ maxWidth: 70 }}><Text>Data</Text></DataTable.Title>
             <DataTable.Title><Text>Descrição</Text></DataTable.Title>
             <DataTable.Title numeric><Text>Valor</Text></DataTable.Title>
           </DataTable.Header>
@@ -627,424 +417,22 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
             <DataTable.Cell>
               <Text>TOTAL</Text>
             </DataTable.Cell>
-            <DataTable.Cell numeric><Text style={{ fontWeight: 'bold', }}> R$ 0,00 </Text></DataTable.Cell>
+            <DataTable.Cell numeric><Text style={{ fontWeight: 'bold' }}> R$ 0,00 </Text></DataTable.Cell>
           </DataTable.Row>
         </DataTable>
-
 
         <SummaryFooter
           currentDate={currentDate}
           isFutureMonth={isFutureMonth}
         />
 
-
         <View style={{ height: 100 }} />
-
-
-
-
       </ScrollView>
 
       {/* FAB para adicionar nova transação */}
-      <TouchableOpacity onPress={() => openModal()} style={styles.fab}>
+      <TouchableOpacity onPress={() => openTransactionForm()} style={styles.fab}>
         <Icon source="plus" size={24} color="#fff" />
       </TouchableOpacity>
-
-      <Portal>
-        <Modal
-          visible={modalVisible}
-          onDismiss={closeModal}
-          contentContainerStyle={{
-            margin: 20,
-            borderRadius: 20,
-            padding: 24,
-            maxHeight: '90%',
-            backgroundColor: theme.colors.background
-          }}
-        >
-          {params.type === null ? (
-            // Modal de seleção de tipo
-            <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 8 }}>
-                Nova Transação
-              </Text>
-              <Text style={{ fontSize: 16, opacity: 0.7, marginBottom: 32 }}>
-                Selecione o tipo de transação
-              </Text>
-
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginBottom: 32 }}>
-                <TouchableOpacity
-                  style={{
-                    flex: 1,
-                    alignItems: 'center',
-                    padding: 24,
-                    borderRadius: 16,
-                    marginHorizontal: 8,
-                    elevation: 4,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 8,
-                    backgroundColor: '#2E9E57',
-                  }}
-                  onPress={() => selectType('income')}
-                  activeOpacity={0.7}
-                >
-                  <View style={{
-                    width: 64,
-                    height: 64,
-                    borderRadius: 32,
-                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    marginBottom: 16,
-                  }}>
-                    <Icon source="arrow-up-bold-circle" size={40} color="#fff" />
-                  </View>
-                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#fff', marginBottom: 8 }}>
-                    Entrada
-                  </Text>
-                  <Text style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.8)', textAlign: 'center' }}>
-                    Receitas, salários, investimentos
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={{
-                    flex: 1,
-                    alignItems: 'center',
-                    padding: 24,
-                    borderRadius: 16,
-                    marginHorizontal: 8,
-                    elevation: 4,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 8,
-                    backgroundColor: '#CC4A4A',
-                  }}
-                  onPress={() => selectType('expense')}
-                  activeOpacity={0.7}
-                >
-                  <View style={{
-                    width: 64,
-                    height: 64,
-                    borderRadius: 32,
-                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    marginBottom: 16,
-                  }}>
-                    <Icon source="arrow-down-bold-circle" size={40} color="#fff" />
-                  </View>
-                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#fff', marginBottom: 8 }}>
-                    Saída
-                  </Text>
-                  <Text style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.8)', textAlign: 'center' }}>
-                    Despesas, compras, pagamentos
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <Button
-                mode="outlined"
-                onPress={closeModal}
-                style={{ width: '100%' }}
-              >
-                Cancelar
-              </Button>
-            </View>
-          ) : (
-            // Modal de formulário de transação
-            <View style={{ width: '100%' }}>
-              {activePicker && (
-                <DateTimePicker
-                  value={params[activePicker] || new Date()}
-                  mode="date"
-                  display="default"
-                  onChange={handleDateChange}
-                />
-              )}
-
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <Text style={{ fontSize: 20, fontWeight: 'bold', }}>
-                  {selectedTransaction ? 'Editar Transação' : 'Nova Transação'}
-                </Text>
-                <TouchableOpacity onPress={() => setParams(prev => ({ ...prev, type: null }))}>
-                  <Icon source="refresh" size={20} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Tipo e Data */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
-                <View style={{ flex: 1, marginHorizontal: 4 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>Tipo</Text>
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      paddingVertical: 12,
-                      paddingHorizontal: 16,
-                      borderRadius: 12,
-                      gap: 8,
-                      backgroundColor: params.type === 'income' ? '#2E9E57' : '#CC4A4A',
-                    }}
-                    onPress={() => setParams(prev => ({ ...prev, type: null }))}
-                  >
-                    <Icon
-                      source={params.type === 'income' ? "arrow-up-bold-circle" : "arrow-down-bold-circle"}
-                      size={16}
-                      color="#fff"
-                    />
-                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
-                      {params.type === 'income' ? 'Entrada' : 'Saída'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={{ flex: 1, marginHorizontal: 4 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>Data</Text>
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      paddingVertical: 12,
-                      paddingHorizontal: 16,
-                      borderRadius: 12,
-                      borderWidth: 1,
-                      borderColor: '#ddd',
-                      gap: 8,
-                    }}
-                    onPress={() => setActivePicker('date')}
-                  >
-                    <Icon source="calendar" size={16} />
-                    <Text style={{ fontSize: 14 }}>
-                      {params?.date?.toLocaleDateString('pt-BR')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Conta e Categoria */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
-                <View style={{ flex: 1, marginHorizontal: 4 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>Conta</Text>
-                  <Select
-                    items={accounts.map(account => ({
-                      id: account.id,
-                      label: account.name,
-                      value: account.id,
-                    }))}
-                    selectedValue={selectedAccountId}
-                    onSelect={(value) => setSelectedAccountId(value)}
-                    placeholder="Selecionar conta"
-                  />
-                </View>
-
-                <View style={{ flex: 1, marginHorizontal: 4 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>Categoria</Text>
-                  <Select
-                    items={categories
-                      .filter(cat => !params.type || cat.type === params.type)
-                      .map(category => ({
-                        id: category.id,
-                        label: category.name,
-                        value: category.id,
-                      }))}
-                    selectedValue={selectedCategoryId}
-                    onSelect={(value) => setSelectedCategoryId(value)}
-                    placeholder="Selecione"
-                  />
-                </View>
-              </View>
-
-              {/* Descrição */}
-              <View style={{ marginBottom: 20 }}>
-                <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>Descrição</Text>
-                <TextInput
-                  value={params.description}
-                  onChangeText={(text) => setParams(prev => ({ ...prev, description: text }))}
-                  placeholder="Ex: Salário, Aluguel, Supermercado"
-                  mode="outlined"
-                />
-              </View>
-
-              {/* Valor */}
-              <View style={{ marginBottom: 20 }}>
-                <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>Valor</Text>
-                <TextInput
-                  value={params.value}
-                  onChangeText={(text) => setParams(prev => ({ ...prev, value: text }))}
-                  placeholder="0,00"
-                  keyboardType="numeric"
-                  mode="outlined"
-                  left={<TextInput.Affix text="R$ " />}
-                />
-              </View>
-
-              {/* Efetivado/Pago? */}
-              <View style={{ marginBottom: 20 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600' }}>Efetivado/Pago?</Text>
-                  <Switch
-                    value={params.isConsolidated || false}
-                    onValueChange={(value) => setParams(prev => ({ ...prev, isConsolidated: value }))}
-                  />
-                </View>
-                <HelperText type="info">
-                  {params.isConsolidated ? 'Transação já efetivada/paga' : 'Transação pendente'}
-                </HelperText>
-              </View>
-
-              {/* Recorrência */}
-              <View style={{ marginBottom: 24 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600' }}>Recorrência</Text>
-                  <Switch
-                    value={params.isRecurring || false}
-                    onValueChange={(value) => setParams(prev => ({ ...prev, isRecurring: value }))}
-                    disabled={isDeleting || !!selectedTransaction}
-                  />
-                </View>
-
-                {params.isRecurring && (
-                  <View style={{ backgroundColor: '#f8f9fa', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#e9ecef' }}>
-                    <Text style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>Data Final (opcional)</Text>
-                    <TouchableOpacity
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        paddingVertical: 12,
-                        paddingHorizontal: 16,
-                        borderRadius: 12,
-                        borderWidth: 1,
-                        borderColor: '#ddd',
-                        backgroundColor: '#f8f9fa',
-                        gap: 8,
-                      }}
-                      onPress={() => setActivePicker('recurringEndDate')}
-                    >
-                      <Icon source="calendar" size={16} />
-                      <Text style={{ fontSize: 14 }}>
-                        {params.recurringEndDate
-                          ? params.recurringEndDate.toLocaleDateString('pt-BR')
-                          : 'Selecionar data final'
-                        }
-                      </Text>
-                    </TouchableOpacity>
-                    <HelperText type="info" style={{ marginTop: 8 }}>
-                      Se não definir uma data final, a recorrência será criada para os próximos 2 anos
-                    </HelperText>
-                  </View>
-                )}
-              </View>
-
-              {/* Botões de ação */}
-              <Divider style={{ marginVertical: 24 }} />
-
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
-                <Button
-                  mode="outlined"
-                  onPress={closeModal}
-                  style={{ flex: 1 }}
-                >
-                  Cancelar
-                </Button>
-
-                {selectedTransaction && !isDeleting && (
-                  <Button
-                    mode="contained"
-                    onPress={() => setIsDeleting(true)}
-                    buttonColor="#FF6B6B"
-                    style={{ flex: 1 }}
-                  >
-                    Excluir
-                  </Button>
-                )}
-
-                {isDeleting ? (
-                  <View style={{ backgroundColor: '#FFF5F5', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#FED7D7', marginTop: 16, width: '100%' }}>
-                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#C53030', marginBottom: 4 }}>Confirmar exclusão?</Text>
-                    <Text style={{ fontSize: 14, opacity: 0.7, marginBottom: 16 }}>Esta ação não pode ser desfeita.</Text>
-                    <View style={{ flexDirection: 'row', gap: 12 }}>
-                      <Button
-                        mode="outlined"
-                        onPress={() => setIsDeleting(false)}
-                        style={{ flex: 1 }}
-                      >
-                        Cancelar
-                      </Button>
-                      <Button
-                        mode="contained"
-                        onPress={handleDelete}
-                        buttonColor="#FF6B6B"
-                        style={{ flex: 1 }}
-                      >
-                        Excluir
-                      </Button>
-                    </View>
-                  </View>
-                ) : (
-                  <Button
-                    mode="contained"
-                    onPress={handleSave}
-                    disabled={isInvalidForm()}
-                    style={{ flex: 1 }}
-                  >
-                    {selectedTransaction ? 'Atualizar' : 'Salvar'}
-                  </Button>
-                )}
-              </View>
-            </View>
-          )}
-        </Modal>
-      </Portal>
-
-      {/* Dialog para transações recorrentes */}
-      <Portal>
-        <Dialog
-          visible={recurringDialogVisible}
-          onDismiss={cancelRecurringDialog}
-          style={{ backgroundColor: theme.colors.background }}
-        >
-          <Dialog.Title>
-            {recurringAction === 'edit' ? 'Editar Transação Recorrente' : 'Excluir Transação Recorrente'}
-          </Dialog.Title>
-          <Dialog.Content>
-            <Text style={{ marginBottom: 16 }}>
-              {recurringAction === 'edit'
-                ? 'Deseja alterar apenas esta transação ou também as próximas?'
-                : 'Deseja excluir apenas esta transação ou também as próximas?'}
-            </Text>
-
-            {pendingTransaction && isPreviousMonthTransaction(pendingTransaction.date) && (
-              <Text style={{ color: '#FF6B6B', marginBottom: 16, fontSize: 12 }}>
-                ⚠️ Esta transação é de um mês anterior. A opção "Esta e as próximas" não está disponível para histórico.
-              </Text>
-            )}
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={cancelRecurringDialog}>Cancelar</Button>
-            <Button
-              onPress={() => handleRecurringAction('only_this')}
-              mode="contained"
-            >
-              Apenas esta
-            </Button>
-            {pendingTransaction && !isPreviousMonthTransaction(pendingTransaction.date) && (
-              <Button
-                onPress={() => handleRecurringAction('all_future')}
-                mode="contained"
-              >
-                Esta e as próximas
-              </Button>
-            )}
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
     </View>
   );
 }
@@ -1052,10 +440,8 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 16 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 16 },
-  confirmDel: { backgroundColor: '#FFB86A', padding: 14 },
   monthText: { fontSize: 18, fontWeight: "bold", textTransform: "capitalize" },
   scrollArea: { flex: 1 },
-  textWarning: { fontSize: 16, color: "#A50C36" },
   sectionTitle: { fontSize: 16, fontWeight: "600", marginTop: 20, marginBottom: 8 },
   fab: {
     position: 'absolute',
@@ -1101,38 +487,6 @@ const calculateTotals = (transactions: Transaction[]) => {
     totalExpense,
     balance: totalIncome - totalExpense
   };
-};
-
-// Função para agrupar transações por conta
-const groupTransactionsByAccount = (transactions: Transaction[], accounts: any[]): GroupedTransaction[] => {
-  const accountMap = new Map<string, GroupedTransaction>();
-
-  // Inicializar mapa com todas as contas
-  accounts.forEach(account => {
-    accountMap.set(account.id, {
-      accountId: account.id,
-      accountName: account.name,
-      accountColor: account.color,
-      total: 0,
-      transactions: []
-    });
-  });
-
-  // Agrupar transações por conta
-  transactions.forEach(transaction => {
-    // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
-    const accountId = transaction._raw?.account_id;
-    if (accountId && accountMap.has(accountId)) {
-      const group = accountMap.get(accountId)!;
-      group.transactions.push(transaction);
-      group.total += transaction.amount;
-    }
-  });
-
-  // Filtrar apenas contas que têm transações e ordenar por total (decrescente)
-  return Array.from(accountMap.values())
-    .filter(group => group.transactions.length > 0)
-    .sort((a, b) => b.total - a.total);
 };
 
 // Configuração do withObservables
