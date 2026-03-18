@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { ScrollView, StyleSheet, TouchableOpacity, View, Image } from "react-native";
 import { DataTable, Icon, Portal, Modal, Button, TextInput, Divider, Switch, HelperText, Text, useTheme, Dialog } from "react-native-paper";
 import { Select } from '../components/Select';
+import TransactionItem from '../components/TransactionItem';
 import { withObservables } from '@nozbe/watermelondb/react';
 import { TransactionService } from '../service/TransactionService';
 import { AccountService } from '../service/AccountService';
@@ -13,6 +14,7 @@ import { Q } from '@nozbe/watermelondb';
 import { database } from '../database';
 import { useAuth } from '../contexts/AuthContext';
 import BankService from '../service/BankService';
+import SummaryFooter from '../components/SummaryFooter';
 
 // Tipos
 interface Params {
@@ -21,7 +23,9 @@ interface Params {
   type: 'income' | 'expense' | null, isRecurrence: boolean, installments?: string,
   // Campos de recorrência
   isRecurring?: boolean,
-  recurringEndDate?: Date | null
+  recurringEndDate?: Date | null,
+  // Campo de consolidação
+  isConsolidated?: boolean
 }
 
 interface AccountTransactionGroup {
@@ -61,7 +65,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [activePicker, setActivePicker] = useState<'date' | 'recurringEndDate' | null>(null);
-  
+
   // Estado para Dialog de transações recorrentes
   const [recurringDialogVisible, setRecurringDialogVisible] = useState(false);
   const [recurringAction, setRecurringAction] = useState<'edit' | 'delete' | null>(null);
@@ -79,7 +83,21 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
   });
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
-  const [previousBalances, setPreviousBalances] = useState<Record<string, number>>({});
+  const [previousBalances, setPreviousBalances] = useState<Record<string, number>>({})
+
+  const isFutureMonth = useMemo(() => {
+    const now = new Date();
+    const currentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const nowMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    return currentMonth > nowMonth;
+  }, [currentDate]);
+
+  const isPastMonth = useMemo(() => {
+    const now = new Date();
+    const currentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const nowMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    return currentMonth < nowMonth;
+  }, [currentDate]);
 
   const goToPreviousMonth = () => {
     const prev = new Date(currentDate);
@@ -105,19 +123,24 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
         isRecurrence: false,
         isRecurring: false, // Transações existentes não são editadas como recorrentes
         recurringEndDate: null,
+        isConsolidated: transaction.isConsolidated,
       });
       // TODO: Preencher conta e categoria da transação
     } else {
       setSelectedTransaction(null);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const newDate = new Date();
       setParams({
         id: '',
         description: '',
         value: '',
-        date: new Date(),
+        date: newDate,
         type: null,
         isRecurrence: false,
         isRecurring: false, // Por padrão não é recorrente
         recurringEndDate: null,
+        isConsolidated: newDate <= today, // true se data <= hoje
       });
       // Selecionar primeira conta e categoria por padrão
       if (accounts.length > 0) {
@@ -174,6 +197,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
       type: params.type,
       date: params.date,
       userId: user.id,
+      isConsolidated: params.isConsolidated || false,
       // Campos de recorrência (apenas para criação, não para edição)
       isRecurring: params.isRecurring || false,
       recurringEndDate: params.isRecurring ? params.recurringEndDate || undefined : undefined,
@@ -194,6 +218,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
             amount: transactionData.amount,
             type: transactionData.type,
             date: transactionData.date,
+            isConsolidated: transactionData.isConsolidated,
           };
           await TransactionService.update(selectedTransaction.id, updateData);
           closeModal();
@@ -282,11 +307,11 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
   const isPreviousMonthTransaction = (transactionDate: Date): boolean => {
     const now = new Date();
     const transactionMonth = new Date(transactionDate);
-    
+
     // Comparar ano e mês
-    return transactionMonth.getFullYear() < now.getFullYear() || 
-           (transactionMonth.getFullYear() === now.getFullYear() && 
-            transactionMonth.getMonth() < now.getMonth());
+    return transactionMonth.getFullYear() < now.getFullYear() ||
+      (transactionMonth.getFullYear() === now.getFullYear() &&
+        transactionMonth.getMonth() < now.getMonth());
   };
 
 
@@ -533,14 +558,8 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                         {/* Nível 4: Transações de Entrada */}
                         {group.income.transactions.map((item) => (
                           <DataTable.Row key={item.id} onLongPress={() => openModal(item)}>
-                            <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 10 }}>
-                              <Text>{dayjs(item.date).format('DD/MM')}</Text>
-                            </DataTable.Cell>
-                            <DataTable.Cell style={{ paddingLeft: 40 }}>
-                              <Text>{item.description}</Text>
-                            </DataTable.Cell>
-                            <DataTable.Cell numeric>
-                              <Text>R$ {item.amount.toFixed(2)}</Text>
+                            <DataTable.Cell style={{ paddingLeft: 10 }}>
+                              <TransactionItem transaction={item} onLongPress={() => openModal(item)} />
                             </DataTable.Cell>
                           </DataTable.Row>
                         ))}
@@ -565,14 +584,8 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                         {/* Nível 4: Transações de Saída */}
                         {group.expense.transactions.map((item) => (
                           <DataTable.Row key={item.id} onLongPress={() => openModal(item)}>
-                            <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 10 }}>
-                              <Text>{dayjs(item.date).format('DD/MM')}</Text>
-                            </DataTable.Cell>
-                            <DataTable.Cell style={{ paddingLeft: 40 }}>
-                              <Text>{item.description}</Text>
-                            </DataTable.Cell>
-                            <DataTable.Cell numeric>
-                              <Text>R$ {item.amount.toFixed(2)}</Text>
+                            <DataTable.Cell style={{ paddingLeft: 10 }}>
+                              <TransactionItem transaction={item} onLongPress={() => openModal(item)} />
                             </DataTable.Cell>
                           </DataTable.Row>
                         ))}
@@ -618,7 +631,18 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
           </DataTable.Row>
         </DataTable>
 
+
+        <SummaryFooter
+          currentDate={currentDate}
+          isFutureMonth={isFutureMonth}
+        />
+
+
         <View style={{ height: 100 }} />
+
+
+
+
       </ScrollView>
 
       {/* FAB para adicionar nova transação */}
@@ -860,6 +884,20 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
                 />
               </View>
 
+              {/* Efetivado/Pago? */}
+              <View style={{ marginBottom: 20 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600' }}>Efetivado/Pago?</Text>
+                  <Switch
+                    value={params.isConsolidated || false}
+                    onValueChange={(value) => setParams(prev => ({ ...prev, isConsolidated: value }))}
+                  />
+                </View>
+                <HelperText type="info">
+                  {params.isConsolidated ? 'Transação já efetivada/paga' : 'Transação pendente'}
+                </HelperText>
+              </View>
+
               {/* Recorrência */}
               <View style={{ marginBottom: 24 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -977,11 +1015,11 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
           </Dialog.Title>
           <Dialog.Content>
             <Text style={{ marginBottom: 16 }}>
-              {recurringAction === 'edit' 
+              {recurringAction === 'edit'
                 ? 'Deseja alterar apenas esta transação ou também as próximas?'
                 : 'Deseja excluir apenas esta transação ou também as próximas?'}
             </Text>
-            
+
             {pendingTransaction && isPreviousMonthTransaction(pendingTransaction.date) && (
               <Text style={{ color: '#FF6B6B', marginBottom: 16, fontSize: 12 }}>
                 ⚠️ Esta transação é de um mês anterior. A opção "Esta e as próximas" não está disponível para histórico.
@@ -990,14 +1028,14 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={cancelRecurringDialog}>Cancelar</Button>
-            <Button 
+            <Button
               onPress={() => handleRecurringAction('only_this')}
               mode="contained"
             >
               Apenas esta
             </Button>
             {pendingTransaction && !isPreviousMonthTransaction(pendingTransaction.date) && (
-              <Button 
+              <Button
                 onPress={() => handleRecurringAction('all_future')}
                 mode="contained"
               >
@@ -1107,5 +1145,4 @@ const enhance = withObservables([], () => ({
   accounts: AccountService.observeAccounts(),
   categories: CategoryService.observeCategories(),
 }));
-
 export default enhance(MonthlyControlScreen);

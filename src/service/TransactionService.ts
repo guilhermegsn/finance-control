@@ -356,6 +356,15 @@ export const TransactionService = {
     console.log('Transação(ões) recorrente(s) marcada(s) para exclusão.');
   },
 
+  // Alternar status de consolidação
+  toggleConsolidated: async (transaction: Transaction) => {
+    await database.write(async () => {
+      await transaction.update((tx) => {
+        tx.isConsolidated = !tx.isConsolidated;
+      });
+    });
+  },
+
   // Calcular saldo de uma conta antes de uma data específica
   getBalanceBeforeDate: async (accountId: string, date: Date): Promise<number> => {
     // Buscar todas as transações da conta com data anterior à data fornecida
