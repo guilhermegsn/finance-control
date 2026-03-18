@@ -62,21 +62,21 @@ const SummaryFooterComponent = ({ currentDate, isFutureMonth, transactions, past
       <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 12, textAlign: 'center' }}>
         Resumo do Mês
       </Text>
-      
+
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
         <Text style={{ fontSize: 14, color: '#666' }}>Total de Entradas:</Text>
         <Text style={{ fontSize: 14, fontWeight: '600', color: '#2E9E57' }}>
           R$ {totals.income.toFixed(2)}
         </Text>
       </View>
-      
+
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
         <Text style={{ fontSize: 14, color: '#666' }}>Total de Saídas:</Text>
         <Text style={{ fontSize: 14, fontWeight: '600', color: '#CC4A4A' }}>
           R$ {totals.expense.toFixed(2)}
         </Text>
       </View>
-      
+
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#eee' }}>
         <Text style={{ fontSize: 16, fontWeight: 'bold' }}>Balanço Mensal:</Text>
         <Text style={{ fontSize: 16, fontWeight: 'bold', color: totals.balance >= 0 ? '#2E9E57' : '#CC4A4A' }}>
@@ -106,18 +106,19 @@ const SummaryFooterComponent = ({ currentDate, isFutureMonth, transactions, past
   );
 };
 
-// O Segredo da Reatividade: Observar as duas janelas de tempo
+// O Segredo da Reatividade: Observar as duas janelas de tempo E as colunas específicas
 const enhanceSummaryFooter = withObservables(['currentDate'], ({ currentDate }: { currentDate: Date }) => {
   const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
   const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-  
+
   return {
     transactions: database.get<Transaction>('transactions')
       .query(Q.where('date', Q.between(firstDay.getTime(), lastDay.getTime())))
-      .observe(),
+      .observeWithColumns(['is_consolidated', 'amount', 'type']),
+
     pastTransactions: database.get<Transaction>('transactions')
       .query(Q.where('date', Q.lt(firstDay.getTime())))
-      .observe(),
+      .observeWithColumns(['is_consolidated', 'amount', 'type']),
   };
 });
 
