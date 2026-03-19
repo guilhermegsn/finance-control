@@ -1,6 +1,6 @@
 import React from 'react';
-import { TouchableOpacity, View, Text } from 'react-native';
-import { Icon } from 'react-native-paper';
+import { TouchableOpacity, View } from 'react-native';
+import { Icon, Text } from 'react-native-paper';
 import { withObservables } from '@nozbe/watermelondb/react';
 import Transaction from '../models/Transactions';
 import { TransactionService } from '../service/TransactionService';

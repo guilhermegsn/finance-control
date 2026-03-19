@@ -409,7 +409,6 @@ export default function TransactionFormScreen() {
           value={formData.description}
           onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
           placeholder="Ex: Salário, Aluguel, Supermercado"
-          mode="outlined"
         />
       </View>
 
@@ -421,7 +420,6 @@ export default function TransactionFormScreen() {
           onChangeText={(text) => setFormData(prev => ({ ...prev, value: text }))}
           placeholder="0,00"
           keyboardType="numeric"
-          mode="outlined"
           left={<TextInput.Affix text="R$ " />}
         />
       </View>
