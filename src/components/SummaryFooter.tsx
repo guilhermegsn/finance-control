@@ -1,10 +1,11 @@
 import React, { useMemo } from 'react';
-import { View } from 'react-native';
+import { View, StyleSheet, Dimensions } from 'react-native';
 import { Surface, Text, Icon } from 'react-native-paper';
 import { withObservables } from '@nozbe/watermelondb/react';
 import { Q } from '@nozbe/watermelondb';
 import { database } from '../database';
 import Transaction from '../models/Transactions';
+import { useTheme } from '../contexts/ThemeContext';
 
 // Props que o componente puro recebe (incluindo as injetadas pelo WatermelonDB)
 interface SummaryFooterProps {
@@ -14,7 +15,10 @@ interface SummaryFooterProps {
   pastTransactions: Transaction[];
 }
 
-const SummaryFooterComponent = ({ currentDate, isFutureMonth, transactions, pastTransactions }: SummaryFooterProps) => {
+const SummaryFooterComponent = ({ isFutureMonth, transactions, pastTransactions }: SummaryFooterProps) => {
+  const theme = useTheme();
+  const { isDarkMode } = useTheme(); // Assumindo que o tema tem essa propriedade
+
   const totals = useMemo(() => {
     // 1. Calcular o Passado (Reativo a qualquer mudança histórica)
     let totalPreviousBalance = 0;
@@ -57,56 +61,283 @@ const SummaryFooterComponent = ({ currentDate, isFutureMonth, transactions, past
     };
   }, [transactions, pastTransactions]);
 
+  // Cores baseadas no tema
+  const getCardBackgroundColor = () => {
+    return isDarkMode ? '#2A2D3E' : '#FFFFFF';
+  };
+
+  const getHeaderGradientColors = () => {
+    return isDarkMode
+      ? ['#4F46E5', '#7C3AED']
+      : ['#818CF8', '#C084FC'];
+  };
+
+  const getTextColor = () => {
+    return isDarkMode ? '#FFFFFF' : '#1F2937';
+  };
+
+  const getSubtitleColor = () => {
+    return isDarkMode ? '#E5E7EB' : '#4B5563';
+  };
+
+  const getBorderColor = () => {
+    return isDarkMode ? 'transparent' : '#E5E7EB';
+  };
+
+  const getShadowColor = () => {
+    return isDarkMode ? '#000' : '#9CA3AF';
+  };
+
   return (
-    <Surface style={{ marginTop: 20, marginBottom: 20, padding: 16, borderRadius: 12, elevation: 2 }}>
-      <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 12, textAlign: 'center' }}>
-        Resumo do Mês
-      </Text>
-
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-        <Text style={{ fontSize: 14, color: '#666' }}>Total de Entradas:</Text>
-        <Text style={{ fontSize: 14, fontWeight: '600', color: '#2E9E57' }}>
-          R$ {totals.income.toFixed(2)}
+    <View>
+      <View style={{padding: 12, marginTop: 30}}>
+        <Text variant='headlineSmall'>
+          Resumo mensal
+        </Text>
+        <Text style={[
+          styles.headerSubtitle,
+          { color: getSubtitleColor() }
+        ]}>
+          {totals.balance >= 0
+            ? 'Você está no caminho certo! 🚀'
+            : 'Vamos melhorar isso juntos! 💪'}
         </Text>
       </View>
 
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-        <Text style={{ fontSize: 14, color: '#666' }}>Total de Saídas:</Text>
-        <Text style={{ fontSize: 14, fontWeight: '600', color: '#CC4A4A' }}>
-          R$ {totals.expense.toFixed(2)}
-        </Text>
-      </View>
-
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#eee' }}>
-        <Text style={{ fontSize: 16, fontWeight: 'bold' }}>Balanço Mensal:</Text>
-        <Text style={{ fontSize: 16, fontWeight: 'bold', color: totals.balance >= 0 ? '#2E9E57' : '#CC4A4A' }}>
-          R$ {totals.balance.toFixed(2)}
-        </Text>
-      </View>
-
-      {!isFutureMonth && (
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#eee', alignItems: 'center' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Icon source="wallet" size={20} color="#007bff" />
-            <Text style={{ fontSize: 16, fontWeight: 'bold', marginLeft: 8 }}>Saldo Atual no Banco</Text>
+      <View style={styles.gridContainer}>
+        {/* Card de Entradas */}
+        <Surface
+          style={[
+            styles.card,
+            styles.cardElevated,
+            {
+              backgroundColor: getCardBackgroundColor(),
+              borderColor: getBorderColor(),
+              borderWidth: isDarkMode ? 0 : 1,
+              shadowColor: getShadowColor(),
+            }
+          ]}
+        >
+          <View style={styles.cardHeader}>
+            <Icon source="arrow-up-circle" size={24} color="#56D6A3" />
+            <Text style={[
+              styles.cardLabel,
+              { color: getTextColor() }
+            ]}>
+              Entradas
+            </Text>
           </View>
-          <Text style={{ fontSize: 18, fontWeight: 'bold', color: totals.currentBalance >= 0 ? '#2E9E57' : '#CC4A4A' }}>
-            R$ {totals.currentBalance.toFixed(2)}
+          <Text style={[styles.cardValue, styles.incomeValue]}>
+            R$ {totals.income.toFixed(2)}
+          </Text>
+        </Surface>
+
+        {/* Card de Saídas */}
+        <Surface
+          style={[
+            styles.card,
+            styles.cardElevated,
+            {
+              backgroundColor: getCardBackgroundColor(),
+              borderColor: getBorderColor(),
+              borderWidth: isDarkMode ? 0 : 1,
+              shadowColor: getShadowColor(),
+            }
+          ]}
+        >
+          <View style={styles.cardHeader}>
+            <Icon source="arrow-down-circle" size={24} color="#FF7285" />
+            <Text style={[
+              styles.cardLabel,
+              { color: getTextColor() }
+            ]}>
+              Saídas
+            </Text>
+          </View>
+          <Text style={[styles.cardValue, styles.expenseValue]}>
+            R$ {totals.expense.toFixed(2)}
+          </Text>
+        </Surface>
+
+        {/* Card de Balanço */}
+        <Surface
+          style={[
+            styles.card,
+            styles.cardElevated,
+            styles.balanceCard,
+            {
+              backgroundColor: getCardBackgroundColor(),
+              borderColor: getBorderColor(),
+              borderWidth: isDarkMode ? 0 : 1,
+              shadowColor: getShadowColor(),
+            }
+          ]}
+        >
+          <View style={styles.cardHeader}>
+            <Icon source="chart-line-variant" size={24} color="#7C73E6" />
+            <Text style={[
+              styles.cardLabel,
+              { color: getTextColor() }
+            ]}>
+              Balanço
+            </Text>
+          </View>
+          <Text style={[
+            styles.cardValue,
+            { color: totals.balance >= 0 ? '#56D6A3' : '#FF7285' }
+          ]}>
+            R$ {totals.balance.toFixed(2)}
+          </Text>
+        </Surface>
+
+        {/* Saldo Atual (se não for mês futuro) */}
+        {!isFutureMonth && (
+          <Surface
+            style={[
+              styles.card,
+              styles.cardElevated,
+              styles.currentBalanceCard,
+              {
+                backgroundColor: getCardBackgroundColor(),
+                borderColor: getBorderColor(),
+                borderWidth: isDarkMode ? 0 : 1,
+                shadowColor: getShadowColor(),
+              }
+            ]}
+          >
+            <View style={styles.cardHeader}>
+              <Icon source="wallet" size={24} color="#FFB156" />
+              <Text style={[
+                styles.cardLabel,
+                { color: getTextColor() }
+              ]}>
+                Saldo Atual
+              </Text>
+            </View>
+            <Text style={[
+              styles.cardValue,
+              { color: totals.currentBalance >= 0 ? '#56D6A3' : '#FF7285' }
+            ]}>
+              R$ {totals.currentBalance.toFixed(2)}
+            </Text>
+          </Surface>
+        )}
+      </View>
+
+      {/* Previsão */}
+      <Surface
+        style={[
+          styles.forecastContainer,
+          styles.cardElevated,
+          {
+            backgroundColor: getCardBackgroundColor(),
+            borderColor: getBorderColor(),
+            borderWidth: isDarkMode ? 0 : 1,
+            shadowColor: getShadowColor(),
+          }
+        ]}
+      >
+        <View style={styles.forecastHeader}>
+          <Icon source="crystal-ball" size={20} color="#7C73E6" />
+          <Text style={[
+            styles.forecastTitle,
+            { color: getTextColor() }
+          ]}>
+            Previsão para o Fim do Mês
           </Text>
         </View>
-      )}
-
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
-        <Text style={{ fontSize: 14, color: '#666', fontStyle: 'italic' }}>Saldo Previsto (Fim do mês):</Text>
-        <Text style={{ fontSize: 14, color: '#666', fontStyle: 'italic' }}>
+        <Text style={[
+          styles.forecastValue,
+          { color: totals.projectedBalance >= 0 ? '#56D6A3' : '#FF7285' }
+        ]}>
           R$ {totals.projectedBalance.toFixed(2)}
         </Text>
-      </View>
-    </Surface>
+      </Surface>
+    </View>
   );
 };
 
-// O Segredo da Reatividade: Observar as duas janelas de tempo E as colunas específicas
+const styles = StyleSheet.create({
+  headerGradient: {
+    padding: 10,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    opacity: 0.9,
+  },
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 12,
+    gap: 12,
+  },
+  card: {
+    width: (Dimensions.get('window').width - 76) / 2,
+    padding: 16,
+    borderRadius: 12,
+  },
+  cardElevated: {
+    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  balanceCard: {
+    // Estilo específico se necessário
+  },
+  currentBalanceCard: {
+    // Estilo específico se necessário
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  cardLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  cardValue: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  incomeValue: {
+    color: '#56D6A3',
+  },
+  expenseValue: {
+    color: '#FF7285',
+  },
+  forecastContainer: {
+    margin: 12,
+    padding: 16,
+    borderRadius: 12,
+  },
+  forecastHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  forecastTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  forecastValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+});
+
 const enhanceSummaryFooter = withObservables(['currentDate'], ({ currentDate }: { currentDate: Date }) => {
   const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
   const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
