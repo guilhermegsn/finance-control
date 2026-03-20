@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet, Modal, Pressable } from 'react-native';
 import { Text, Icon } from 'react-native-paper';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface TransactionTypeModalProps {
@@ -19,6 +20,7 @@ export default function TransactionTypeModal({
   onSelectTransfer,
 }: TransactionTypeModalProps) {
   const { isDarkMode } = useTheme();
+  const { t } = useTranslation();
 
   const getBackgroundColor = () => {
     return isDarkMode ? '#2A2D3E' : '#FFFFFF';
@@ -36,68 +38,68 @@ export default function TransactionTypeModal({
       onRequestClose={onClose}
     >
       <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable 
-          style={[styles.bottomSheet, { backgroundColor: getBackgroundColor() }]} 
+        <Pressable
+          style={[styles.bottomSheet, { backgroundColor: getBackgroundColor() }]}
           onPress={(e) => e.stopPropagation()}
         >
           <View style={[styles.handle]} />
-          
-          <Text style={[styles.title]}>Nova Transação</Text>
-          <Text style={[styles.subtitle]}>Selecione o tipo</Text>
 
-          <TouchableOpacity 
-            style={[styles.option, { borderBottomColor: getBorderColor() }]} 
-            onPress={onSelectIncome} 
+          <Text style={[styles.title]}>{t("Nova Transação")}</Text>
+          <Text style={[styles.subtitle]}>{t("Selecione o tipo")}</Text>
+
+          <TouchableOpacity
+            style={[styles.option, { borderBottomColor: getBorderColor() }]}
+            onPress={onSelectIncome}
             activeOpacity={0.7}
           >
             <View style={[styles.iconContainer, { backgroundColor: '#2E9E57' }]}>
               <Icon source="arrow-up-bold-circle" size={28} color="#fff" />
             </View>
             <View style={styles.optionTextContainer}>
-              <Text style={[styles.optionTitle]}>Entrada</Text>
+              <Text style={[styles.optionTitle]}>{t("Entrada")}</Text>
               <Text style={[styles.optionDescription]}>
-                Receitas, salários, investimentos
+                {t("Receitas, salários, investimentos")}
               </Text>
             </View>
-            <Icon source="chevron-right" size={24}  />
+            <Icon source="chevron-right" size={24} />
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.option, { borderBottomColor: getBorderColor() }]} 
-            onPress={onSelectExpense} 
+          <TouchableOpacity
+            style={[styles.option, { borderBottomColor: getBorderColor() }]}
+            onPress={onSelectExpense}
             activeOpacity={0.7}
           >
             <View style={[styles.iconContainer, { backgroundColor: '#CC4A4A' }]}>
               <Icon source="arrow-down-bold-circle" size={28} color="#fff" />
             </View>
             <View style={styles.optionTextContainer}>
-              <Text style={[styles.optionTitle]}>Saída</Text>
+              <Text style={[styles.optionTitle]}>{t("account:Saída")}</Text>
               <Text style={[styles.optionDescription]}>
-                Despesas, compras, pagamentos
+                {t("Despesas, compras, pagamentos")}
               </Text>
             </View>
             <Icon source="chevron-right" size={24} />
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.option, { borderBottomColor: getBorderColor() }]} 
-            onPress={onSelectTransfer} 
+          <TouchableOpacity
+            style={[styles.option, { borderBottomColor: getBorderColor() }]}
+            onPress={onSelectTransfer}
             activeOpacity={0.7}
           >
             <View style={[styles.iconContainer, { backgroundColor: '#007bff' }]}>
               <Icon source="swap-horizontal" size={28} color="#fff" />
             </View>
             <View style={styles.optionTextContainer}>
-              <Text style={[styles.optionTitle]}>Transferência entre contas</Text>
+              <Text style={[styles.optionTitle]}>{t("Transferência entre contas")}</Text>
               <Text style={[styles.optionDescription]}>
-                Mover saldo entre suas contas
+                {t("Mover saldo entre suas contas")}
               </Text>
             </View>
             <Icon source="chevron-right" size={24} />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-            <Text style={[styles.cancelText]}>Cancelar</Text>
+            <Text style={[styles.cancelText]}>{t("Cancelar")}</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>

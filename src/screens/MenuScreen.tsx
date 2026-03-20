@@ -1,5 +1,6 @@
 import { View, ScrollView, StyleSheet, Switch } from 'react-native';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import MenuCard, { MenuCardProps } from '../components/MenuCard';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
@@ -10,28 +11,29 @@ export default function MenuScreen() {
 
   const navigation = useNavigation()
   const { isDarkMode, toggleDarkMode } = useTheme();
-  
+  const { t } = useTranslation();
+
   const menuItems: MenuCardProps[] = [
     {
-      nome: 'Contas',
-      descricao: 'Gerencie suas contas bancárias',
+      nome: t('Contas'),
+      descricao: t('Gerencie suas contas bancárias'),
       icone: 'wallet',
       onPress: () => navigation.navigate('Accounts')
     },
     {
-      nome: 'Categorias',
-      descricao: 'Organize suas categorias de gastos',
+      nome: t('Categorias'),
+      descricao: t('Organize suas categorias de gastos'),
       icone: 'tag',
       onPress: () => navigation.navigate('Categories')
     },
     {
-      nome: 'Relatórios',
-      descricao: 'Visualize gráficos e estatísticas',
+      nome: t('Relatórios'),
+      descricao: t('Visualize gráficos e estatísticas'),
       icone: 'chart-bar'
     },
     {
-      nome: 'Metas',
-      descricao: 'Defina e acompanhe suas metas financeiras',
+      nome: t('Metas'),
+      descricao: t('Defina e acompanhe suas metas financeiras'),
       icone: 'flag'
     },
   ];
@@ -50,13 +52,13 @@ export default function MenuScreen() {
 
       {/* Seção de Configurações */}
       <View style={styles.configSection}>
-        <Text style={styles.configTitle}>Configurações</Text>
-        
+        <Text style={styles.configTitle}>{t('Configurações')}</Text>
+
         <View style={styles.configItem}>
           <View>
-            <Text style={styles.configLabel}>Modo Escuro</Text>
+            <Text style={styles.configLabel}>{t('Modo Escuro')}</Text>
             <Text style={styles.configDescription}>
-              Ativar tema escuro no app
+              {t('Ativar tema escuro no app')}
             </Text>
           </View>
           <Switch

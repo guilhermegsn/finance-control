@@ -1,5 +1,6 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, TouchableOpacity, ScrollView } from 'react-native';
 import { Button, TextInput, Divider, Switch, HelperText, Text, Icon, Portal, Dialog } from 'react-native-paper';
 import { Select } from '../components/Select';
@@ -24,6 +25,7 @@ interface FormData {
 
 export default function TransactionFormScreen() {
   const { user } = useAuth();
+    const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const [recurringDialogVisible, setRecurringDialogVisible] = useState(false);
@@ -213,7 +215,7 @@ export default function TransactionFormScreen() {
 
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <Text style={{ fontSize: 20, fontWeight: 'bold' }}>
-          {transaction ? 'Editar Transação' : 'Nova Transação'}
+          {transaction ? t('Editar Transação') : t('Nova Transação')}
         </Text>
       </View>
 
@@ -221,7 +223,7 @@ export default function TransactionFormScreen() {
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
         <View style={{ flex: 1, marginHorizontal: 4 }}>
 
-          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>Tipo</Text>
+          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Tipo')}</Text>
           <Select
             backgroundColor={formData.type === 'income' ? '#2E9E57' : '#CC4A4A'}
             fontColor='#ffff'
@@ -230,12 +232,12 @@ export default function TransactionFormScreen() {
             items={[
               {
                 id: 'income',
-                label: 'Entrada',
+                label: t('Entrada'),
                 value: 'income'
               },
               {
                 id: 'expense',
-                label: 'Saída',
+                label: t('account:Saída'),
                 value: 'expense'
               }]}
           />
@@ -243,7 +245,7 @@ export default function TransactionFormScreen() {
         </View>
 
         <View style={{ flex: 1, marginHorizontal: 4 }}>
-          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>Data</Text>
+          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Data')}</Text>
           <TouchableOpacity
             style={{
               flexDirection: 'row',
@@ -269,7 +271,7 @@ export default function TransactionFormScreen() {
       {/* Conta e Categoria */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
         <View style={{ flex: 1, marginHorizontal: 4 }}>
-          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>Conta</Text>
+          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Conta')}</Text>
           <Select
             items={accounts.map((account: Account) => ({
               id: account.id,
@@ -278,12 +280,12 @@ export default function TransactionFormScreen() {
             }))}
             selectedValue={formData.accountId}
             onSelect={(value) => setFormData(prev => ({ ...prev, accountId: value }))}
-            placeholder="Selecionar conta"
+            placeholder={t("Selecionar conta")}
           />
         </View>
 
         <View style={{ flex: 1, marginHorizontal: 4 }}>
-          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>Categoria</Text>
+          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Categoria')}</Text>
           <Select
             items={categories
               .filter((cat: Category) => !formData.type || cat.type === formData.type)
@@ -294,28 +296,28 @@ export default function TransactionFormScreen() {
               }))}
             selectedValue={formData.categoryId}
             onSelect={(value) => setFormData(prev => ({ ...prev, categoryId: value }))}
-            placeholder="Selecione"
+            placeholder={t("Selecione")}
           />
         </View>
       </View>
 
       {/* Descrição */}
       <View style={{ marginBottom: 20 }}>
-        <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>Descrição</Text>
+        <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Descrição')}</Text>
         <TextInput
           value={formData.description}
           onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
-          placeholder="Ex: Salário, Aluguel, Supermercado"
+          placeholder={t("Salário, Aluguel, Supermercado")}
         />
       </View>
 
       {/* Valor */}
       <View style={{ marginBottom: 20 }}>
-        <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>Valor</Text>
+        <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Valor')}</Text>
         <TextInput
           value={formData.value}
           onChangeText={(text) => setFormData(prev => ({ ...prev, value: text }))}
-          placeholder="0,00"
+          placeholder={t("0,00")}
           keyboardType="numeric"
           left={<TextInput.Affix text="R$ " />}
         />
@@ -324,21 +326,21 @@ export default function TransactionFormScreen() {
       {/* Efetivado/Pago? */}
       <View style={{ marginBottom: 20 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <Text style={{ fontSize: 14, fontWeight: '600' }}>Efetivado/Pago?</Text>
+          <Text style={{ fontSize: 14, fontWeight: '600' }}>{t('Efetivado/Pago?')}</Text>
           <Switch
             value={formData.isConsolidated}
             onValueChange={(value) => setFormData(prev => ({ ...prev, isConsolidated: value }))}
           />
         </View>
         <HelperText type="info">
-          {formData.isConsolidated ? 'Transação já efetivada/paga' : 'Transação pendente'}
+          {formData.isConsolidated ? t('Transação já efetivada/paga') : t('Transação pendente')}
         </HelperText>
       </View>
 
       {/* Recorrência */}
       <View style={{ marginBottom: 24 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <Text style={{ fontSize: 14, fontWeight: '600' }}>Recorrência</Text>
+          <Text style={{ fontSize: 14, fontWeight: '600' }}>{t('Recorrência')}</Text>
           <Switch
             value={formData.isRecurring}
             onValueChange={(value) => setFormData(prev => ({ ...prev, isRecurring: value }))}
@@ -348,7 +350,7 @@ export default function TransactionFormScreen() {
 
         {formData.isRecurring && (
           <View style={{ backgroundColor: '#f8f9fa', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#e9ecef' }}>
-            <Text style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>Data Final (opcional)</Text>
+            <Text style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>{t('Data Final (opcional)')}</Text>
             <TouchableOpacity
               style={{
                 flexDirection: 'row',
@@ -368,12 +370,12 @@ export default function TransactionFormScreen() {
               <Text style={{ fontSize: 14 }}>
                 {formData.recurringEndDate
                   ? formData.recurringEndDate.toLocaleDateString('pt-BR')
-                  : 'Selecionar data final'
+                  : t('Selecionar data final')
                 }
               </Text>
             </TouchableOpacity>
             <HelperText type="info" style={{ marginTop: 8 }}>
-              Se não definir uma data final, a recorrência será criada para os próximos 2 anos
+              {t('Se não definir uma data final, a recorrência será criada para os próximos 2 anos')}
             </HelperText>
           </View>
         )}
@@ -391,7 +393,7 @@ export default function TransactionFormScreen() {
           }}
           style={{ flex: 1 }}
         >
-          Cancelar
+          {t('Cancelar')}
         </Button>
 
         {transaction && !isDeleting && (
@@ -401,21 +403,21 @@ export default function TransactionFormScreen() {
             buttonColor="#FF6B6B"
             style={{ flex: 1 }}
           >
-            Excluir
+            {t('Excluir')}
           </Button>
         )}
 
         {isDeleting ? (
           <View style={{ backgroundColor: '#FFF5F5', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#FED7D7', marginTop: 16, width: '100%' }}>
-            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#C53030', marginBottom: 4 }}>Confirmar exclusão?</Text>
-            <Text style={{ fontSize: 14, opacity: 0.7, marginBottom: 16 }}>Esta ação não pode ser desfeita.</Text>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#C53030', marginBottom: 4 }}>{t('Confirmar exclusão?')}</Text>
+            <Text style={{ fontSize: 14, opacity: 0.7, marginBottom: 16 }}>{t('Esta ação não pode ser desfeita.')}</Text>
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <Button
                 mode="outlined"
                 onPress={() => setIsDeleting(false)}
                 style={{ flex: 1 }}
               >
-                Cancelar
+                {t('Cancelar')}
               </Button>
               <Button
                 mode="contained"
@@ -423,7 +425,7 @@ export default function TransactionFormScreen() {
                 buttonColor="#FF6B6B"
                 style={{ flex: 1 }}
               >
-                Excluir
+                {t('Excluir')}
               </Button>
             </View>
           </View>
@@ -434,7 +436,7 @@ export default function TransactionFormScreen() {
             disabled={isInvalidForm()}
             style={{ flex: 1 }}
           >
-            {transaction ? 'Atualizar' : 'Salvar'}
+            {transaction ? t('Atualizar') : t('Salvar')}
           </Button>
         )}
       </View>
@@ -446,17 +448,17 @@ export default function TransactionFormScreen() {
           visible={recurringDialogVisible}
           onDismiss={() => setRecurringDialogVisible(false)}
         >
-          <Dialog.Title>Editar Transação Recorrente</Dialog.Title>
+          <Dialog.Title>{t('Editar Transação Recorrente')}</Dialog.Title>
           <Dialog.Content>
-            <Text>Deseja alterar apenas esta transação ou também as próximas?</Text>
+            <Text>{t('Deseja alterar apenas esta transação ou também as próximas?')}</Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setRecurringDialogVisible(false)}>Cancelar</Button>
+            <Button onPress={() => setRecurringDialogVisible(false)}>{t('Cancelar')}</Button>
             <Button onPress={() => handleRecurringAction('only_this')} mode="contained" style={{ marginRight: 8 }}>
-              Apenas esta
+              {t('Apenas esta')}
             </Button>
             <Button onPress={() => handleRecurringAction('all_future')} mode="contained">
-              Esta e as próximas
+              {t('Esta e as próximas')}
             </Button>
           </Dialog.Actions>
         </Dialog>

@@ -15,7 +15,46 @@
         "Saídas": "Expenses",
         "Balanço": "Balance",
         "Saldo Atual": "Current Balance",
-        "Previsão para o Fim do Mês": "End of Month Forecast"
+        "Previsão para o Fim do Mês": "End of Month Forecast",
+        "Nova Transação": "New Transaction",
+        "Selecione o tipo": "Select type",
+        "Receitas, salários, investimentos": "Revenue, salaries, investments",
+        "Despesas, compras, pagamentos": "Expenses, purchases, payments",
+        "Transferência entre contas": "Account transfer",
+        "Mover saldo entre suas contas": "Move balance between your accounts",
+        "Editar Transação": "Edit Transaction",
+        "Tipo": "Type",
+        "Conta": "Account",
+        "Selecionar conta": "Select account",
+        "Categoria": "Category",
+        "Selecione": "Select",
+        "Salário, Aluguel, Supermercado": "Salary, Rent, Supermarket",
+        "0,00": "0.00",
+        "Efetivado/Pago?": "Settled/Paid?",
+        "Transação já efetivada/paga": "Transaction already settled/paid",
+        "Transação pendente": "Pending transaction",
+        "Recorrência": "Recurrence",
+        "Data Final (opcional)": "End Date (optional)",
+        "Selecionar data final": "Select end date",
+        "Se não definir uma data final, a recorrência será criada para os próximos 2 anos": "If no end date is defined, recurrence will be created for the next 2 years",
+        "Excluir": "Delete",
+        "Confirmar exclusão?": "Confirm deletion?",
+        "Esta ação não pode ser desfeita.": "This action cannot be undone.",
+        "Atualizar": "Update",
+        "Editar Transação Recorrente": "Edit Recurring Transaction",
+        "Deseja alterar apenas esta transação ou também as próximas?": "Do you want to change only this transaction or also the next ones?",
+        "Apenas esta": "Only this one",
+        "Esta e as próximas": "This and the next ones",
+        "Gerencie suas contas bancárias": "Manage your bank accounts",
+        "Organize suas categorias de gastos": "Organize your spending categories",
+        "Relatórios": "Reports",
+        "Visualize gráficos e estatísticas": "View charts and statistics",
+        "Metas": "Goals",
+        "Defina e acompanhe suas metas financeiras": "Define and track your financial goals",
+        "Configurações": "Settings",
+        "Modo Escuro": "Dark Mode",
+        "Ativar tema escuro no app": "Enable dark theme in the app",
+        "Categorias": "Categories"
     },
     "auth": {
         "Entrar": "Login",
@@ -23,5 +62,8 @@
     },
     "errors": {
         "Valor inválido": "Invalid amount"
+    },
+    "account": {
+        "Saída": "Expense"
     }
 }
