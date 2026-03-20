@@ -75,13 +75,25 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
       isRecurring: transaction.isRecurring,
     } : undefined;
     
+    const safeAccounts = accounts.map(acc => ({
+      id: acc.id,
+      name: acc.name,
+      logoUrl: acc.logoUrl,
+      bankCode: acc.bankCode
+    }));
+
+    const safeCategories = categories.map(cat => ({
+      id: cat.id,
+      name: cat.name,
+      icon: cat.icon,
+      type: cat.type
+    }));
+
     navigation.navigate('TransactionForm', {
       transaction: safeTransaction,
       initialType: type,
-      accounts,
-      categories,
-      onSave: () => {},
-      onCancel: () => navigation.goBack()
+      accounts: safeAccounts,
+      categories: safeCategories,
     });
   };
 

@@ -81,10 +81,6 @@ export default function TransactionFormScreen() {
     setActivePicker(null);
   };
 
-  const selectType = (type: 'income' | 'expense') => {
-    setFormData(prev => ({ ...prev, type }));
-  };
-
   const isInvalidForm = () => {
     return !formData.description.trim() || !formData.value.trim() || !formData.type || !formData.date;
   };
@@ -233,12 +229,14 @@ export default function TransactionFormScreen() {
               {
                 id: 'income',
                 label: t('Entrada'),
-                value: 'income'
+                value: 'income',
+                icon: 'arrow-down-circle'
               },
               {
                 id: 'expense',
                 label: t('account:Saída'),
-                value: 'expense'
+                value: 'expense',
+                icon: 'arrow-up-circle'
               }]}
           />
 
@@ -273,11 +271,22 @@ export default function TransactionFormScreen() {
         <View style={{ flex: 1, marginHorizontal: 4 }}>
           <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Conta')}</Text>
           <Select
-            items={accounts.map((account: Account) => ({
-              id: account.id,
-              label: account.name,
-              value: account.id,
-            }))}
+            items={accounts.map((account: Account) => {
+              // Resolvendo a imagem da conta da mesma forma que no AccountsTable
+              let imageSource = account.logoUrl;
+              if (!imageSource && account.bankCode && account.bankCode.trim() !== '') {
+                const bank = require('../service/BankService').default.getBankByCode(account.bankCode);
+                if (bank) {
+                  imageSource = bank.logoUrl;
+                }
+              }
+              return {
+                id: account.id,
+                label: account.name,
+                value: account.id,
+                image: imageSource
+              };
+            })}
             selectedValue={formData.accountId}
             onSelect={(value) => setFormData(prev => ({ ...prev, accountId: value }))}
             placeholder={t("Selecionar conta")}
@@ -293,6 +302,7 @@ export default function TransactionFormScreen() {
                 id: category.id,
                 label: category.name,
                 value: category.id,
+                icon: category.icon
               }))}
             selectedValue={formData.categoryId}
             onSelect={(value) => setFormData(prev => ({ ...prev, categoryId: value }))}

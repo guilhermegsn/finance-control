@@ -1,11 +1,13 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, Modal, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, Modal, TouchableWithoutFeedback, Image } from 'react-native';
 import { Icon, useTheme } from 'react-native-paper';
 
 interface SelectItem {
   id: string;
   label: string;
   value: string;
+  icon?: string;
+  image?: any;
 }
 
 interface SelectProps {
@@ -68,6 +70,18 @@ export const Select: React.FC<SelectProps> = ({
         disabled={disabled}
         activeOpacity={0.7}
       >
+
+        {selectedItem?.image && (
+          <Image
+            source={typeof selectedItem.image === 'string' ? { uri: selectedItem.image } : selectedItem.image}
+            style={{ width: 24, height: 24, borderRadius: 12, marginRight: 8 }}
+          />
+        )}
+
+        {selectedItem?.icon && !selectedItem?.image && (
+          <Icon source={selectedItem.icon} size={20} color={fontColor || theme.colors.onSurface} />
+        )}
+
         <Text style={[styles.selectText, !selectedItem && styles.placeholderText,
         { color: fontColor || theme.colors.onSurface }]}>
           {selectedItem ? selectedItem.label : placeholder}
@@ -102,6 +116,15 @@ export const Select: React.FC<SelectProps> = ({
                     ]}
                     onPress={() => handleSelect(item.value)}
                   >
+                    {item.image && (
+                      <Image 
+                        source={typeof item.image === 'string' ? { uri: item.image } : item.image} 
+                        style={styles.itemImage} 
+                      />
+                    )}
+                    {item.icon && !item.image && (
+                      <Icon source={item.icon} size={20} color="#333" />
+                    )}
                     <Text style={[
                       styles.dropdownItemText,
                       selectedValue === item.value && styles.selectedItemText
@@ -145,6 +168,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
     minHeight: 48,
+    gap: 8,
   },
   disabled: {
     opacity: 0.5,
@@ -182,6 +206,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
+    gap: 8,
   },
   selectedItem: {
     backgroundColor: '#f0f9f0',
@@ -194,5 +219,10 @@ const styles = StyleSheet.create({
   selectedItemText: {
     color: '#2E9E57',
     fontWeight: '600',
+  },
+  itemImage: {
+    width: 20,
+    height: 20,
+    // borderRadius: 12,
   },
 });

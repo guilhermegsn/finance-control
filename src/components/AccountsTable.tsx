@@ -38,6 +38,7 @@ export default function AccountsTable({
   onEditTransaction,
   totalBalance,
 }: AccountsTableProps) {
+  
   const renderAccountLogo = (group: AccountTransactionGroup) => {
     const account = accounts.find(acc => acc.id === group.accountId);
 
