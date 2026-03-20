@@ -31,7 +31,7 @@ export default function TransactionFormScreen() {
   const [activePicker, setActivePicker] = useState<'date' | 'recurringEndDate' | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const { transaction, accounts = [], categories = [], onSave, onCancel } = route.params || {};
+  const { transaction, initialType, accounts = [], categories = [], onSave } = route.params || {};
 
   const [formData, setFormData] = useState<FormData>(() => {
     if (transaction) {
@@ -56,7 +56,7 @@ export default function TransactionFormScreen() {
         description: '',
         value: '',
         date: newDate,
-        type: null,
+        type: initialType || null,
         isRecurring: false,
         recurringEndDate: null,
         isConsolidated: newDate <= today,
@@ -199,103 +199,6 @@ export default function TransactionFormScreen() {
     }
   };
 
-  if (formData.type === null) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-        <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 8 }}>
-          Nova Transação
-        </Text>
-        <Text style={{ fontSize: 16, opacity: 0.7, marginBottom: 32 }}>
-          Selecione o tipo de transação
-        </Text>
-
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginBottom: 32 }}>
-          <TouchableOpacity
-            style={{
-              flex: 1,
-              alignItems: 'center',
-              padding: 24,
-              borderRadius: 16,
-              marginHorizontal: 8,
-              elevation: 4,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 8,
-              backgroundColor: '#2E9E57',
-            }}
-            onPress={() => selectType('income')}
-            activeOpacity={0.7}
-          >
-            <View style={{
-              width: 64,
-              height: 64,
-              borderRadius: 32,
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-              justifyContent: 'center',
-              alignItems: 'center',
-              marginBottom: 16,
-            }}>
-              <Icon source="arrow-up-bold-circle" size={40} color="#fff" />
-            </View>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#fff', marginBottom: 8 }}>
-              Entrada
-            </Text>
-            <Text style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.8)', textAlign: 'center' }}>
-              Receitas, salários, investimentos
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={{
-              flex: 1,
-              alignItems: 'center',
-              padding: 24,
-              borderRadius: 16,
-              marginHorizontal: 8,
-              elevation: 4,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 8,
-              backgroundColor: '#CC4A4A',
-            }}
-            onPress={() => selectType('expense')}
-            activeOpacity={0.7}
-          >
-            <View style={{
-              width: 64,
-              height: 64,
-              borderRadius: 32,
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-              justifyContent: 'center',
-              alignItems: 'center',
-              marginBottom: 16,
-            }}>
-              <Icon source="arrow-down-bold-circle" size={40} color="#fff" />
-            </View>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#fff', marginBottom: 8 }}>
-              Saída
-            </Text>
-            <Text style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.8)', textAlign: 'center' }}>
-              Despesas, compras, pagamentos
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <Button
-          mode="outlined"
-          onPress={() => {
-            onCancel?.();
-            navigation.goBack();
-          }}
-          style={{ width: '100%' }}
-        >
-          Cancelar
-        </Button>
-      </View>
-    );
-  }
 
   return (
     <ScrollView style={{ flex: 1, padding: 20 }}>
@@ -320,29 +223,26 @@ export default function TransactionFormScreen() {
       {/* Tipo e Data */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
         <View style={{ flex: 1, marginHorizontal: 4 }}>
+
           <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>Tipo</Text>
-          <TouchableOpacity
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              paddingVertical: 12,
-              paddingHorizontal: 16,
-              borderRadius: 12,
-              gap: 8,
-              backgroundColor: formData.type === 'income' ? '#2E9E57' : '#CC4A4A',
-            }}
-            onPress={() => setFormData(prev => ({ ...prev, type: null }))}
-          >
-            <Icon
-              source={formData.type === 'income' ? "arrow-up-bold-circle" : "arrow-down-bold-circle"}
-              size={16}
-              color="#fff"
-            />
-            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
-              {formData.type === 'income' ? 'Entrada' : 'Saída'}
-            </Text>
-          </TouchableOpacity>
+          <Select
+            backgroundColor={formData.type === 'income' ? '#2E9E57' : '#CC4A4A'}
+            fontColor='#ffff'
+            selectedValue={formData.type || ''}
+            onSelect={(value) => setFormData((prev: any) => ({ ...prev, type: value }))}
+            items={[
+              {
+                id: 'income',
+                label: 'Entrada',
+                value: 'income'
+              },
+              {
+                id: 'expense',
+                label: 'Saída',
+                value: 'expense'
+              }]}
+          />
+
         </View>
 
         <View style={{ flex: 1, marginHorizontal: 4 }}>
@@ -489,7 +389,7 @@ export default function TransactionFormScreen() {
         <Button
           mode="outlined"
           onPress={() => {
-            onCancel?.();
+           // onCancel?.();
             navigation.goBack();
           }}
           style={{ flex: 1 }}
@@ -564,8 +464,6 @@ export default function TransactionFormScreen() {
           </Dialog.Actions>
         </Dialog>
       </Portal>
-
     </ScrollView>
-
   );
 }

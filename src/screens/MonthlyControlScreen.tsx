@@ -1,6 +1,6 @@
 import dayjs from "dayjs";
 import React, { useState, useMemo, useEffect } from "react";
-import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { DataTable, Icon, Text } from "react-native-paper";
 import { withObservables } from '@nozbe/watermelondb/react';
 import { TransactionService } from '../service/TransactionService';
@@ -11,6 +11,7 @@ import { Q } from '@nozbe/watermelondb';
 import { database } from '../database';
 import SummaryFooter from '../components/SummaryFooter';
 import AccountsTable from '../components/AccountsTable';
+import TransactionTypeModal from '../components/TransactionTypeModal';
 import { useNavigation } from '@react-navigation/native';
 
 interface AccountTransactionGroup {
@@ -40,6 +41,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
   const [currentDate, setCurrentDate] = useState(new Date());
   const [previousBalances, setPreviousBalances] = useState<Record<string, number>>({});
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
+  const [typeModalVisible, setTypeModalVisible] = useState(false);
 
   const isFutureMonth = useMemo(() => {
     const now = new Date();
@@ -60,7 +62,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
     setCurrentDate(next);
   };
 
-  const openTransactionForm = (transaction?: Transaction) => {
+  const openTransactionForm = (transaction?: Transaction, type?: 'income' | 'expense') => {
     const safeTransaction = transaction ? {
       id: transaction.id,
       description: transaction.description,
@@ -73,11 +75,22 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
     
     navigation.navigate('TransactionForm', {
       transaction: safeTransaction,
+      initialType: type,
       accounts,
       categories,
       onSave: () => {},
       onCancel: () => navigation.goBack()
     });
+  };
+
+  const handleSelectTransactionType = (type: 'income' | 'expense') => {
+    setTypeModalVisible(false);
+    openTransactionForm(undefined, type);
+  };
+
+  const handleSelectTransfer = () => {
+    setTypeModalVisible(false);
+    Alert.alert('Em breve', 'Funcionalidade de transferência entre contas será implementada em breve.');
   };
 
   const filteredTransactions = filterTransactionsByMonth(transactions, currentDate);
@@ -207,9 +220,18 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
       </ScrollView>
 
       {/* FAB */}
-      <TouchableOpacity onPress={() => openTransactionForm()} style={styles.fab}>
+      <TouchableOpacity onPress={() => setTypeModalVisible(true)} style={styles.fab}>
         <Icon source="plus" size={24} color="#fff" />
       </TouchableOpacity>
+
+      {/* Modal de seleção de tipo */}
+      <TransactionTypeModal
+        visible={typeModalVisible}
+        onClose={() => setTypeModalVisible(false)}
+        onSelectIncome={() => handleSelectTransactionType('income')}
+        onSelectExpense={() => handleSelectTransactionType('expense')}
+        onSelectTransfer={handleSelectTransfer}
+      />
     </View>
   );
 }

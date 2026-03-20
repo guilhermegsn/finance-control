@@ -15,6 +15,8 @@ interface SelectProps {
   placeholder?: string;
   disabled?: boolean;
   label?: string;
+  backgroundColor?: string
+  fontColor?: string
 }
 
 export const Select: React.FC<SelectProps> = ({
@@ -24,6 +26,8 @@ export const Select: React.FC<SelectProps> = ({
   placeholder = 'Selecionar',
   disabled = false,
   label,
+  backgroundColor,
+  fontColor
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
@@ -33,7 +37,7 @@ export const Select: React.FC<SelectProps> = ({
 
   const handleOpen = () => {
     if (disabled) return;
-    
+
     anchorRef.current?.measureInWindow((x, y, width, height) => {
       setDropdownPosition({
         top: y + height,
@@ -54,18 +58,21 @@ export const Select: React.FC<SelectProps> = ({
   return (
     <View style={styles.container}>
       {label && <Text style={styles.label}>{label}</Text>}
-      
+
       <TouchableOpacity
         ref={anchorRef}
-        style={[styles.selectButton, disabled && styles.disabled]}
+        style={[styles.selectButton,
+        { backgroundColor: backgroundColor },
+        disabled && styles.disabled]}
         onPress={handleOpen}
         disabled={disabled}
         activeOpacity={0.7}
       >
-        <Text style={[styles.selectText, !selectedItem && styles.placeholderText, {color: theme.colors.onSurface}]}>
+        <Text style={[styles.selectText, !selectedItem && styles.placeholderText,
+        { color: fontColor || theme.colors.onSurface }]}>
           {selectedItem ? selectedItem.label : placeholder}
         </Text>
-        <Icon source="chevron-down" size={16} color="#666" />
+        <Icon source="chevron-down" size={16} color={fontColor || theme.colors.onSurface} />
       </TouchableOpacity>
 
       <Modal
