@@ -13,6 +13,7 @@ import SummaryFooter from '../components/SummaryFooter';
 import AccountsTable from '../components/AccountsTable';
 import TransactionTypeModal from '../components/TransactionTypeModal';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from "react-i18next";
 
 interface AccountTransactionGroup {
   accountId: string;
@@ -37,6 +38,7 @@ interface MonthlyControlScreenProps {
 }
 
 function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyControlScreenProps) {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [previousBalances, setPreviousBalances] = useState<Record<string, number>>({});
@@ -183,7 +185,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
       <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false}>
         
         {/* Lista de Contas */}
-        <Text style={styles.sectionTitle}>Contas</Text>
+        <Text style={styles.sectionTitle}>{t('Contas')}</Text>
         <AccountsTable
           accountTransactionGroups={accountTransactionGroups}
           accounts={accounts}
@@ -195,16 +197,16 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
 
 
         {/* Cartões - TODO */}
-        <Text style={styles.sectionTitle}>Cartão de crédito</Text>
+        <Text style={styles.sectionTitle}>{t("Cartão de crédito")}</Text>
         <DataTable>
           <DataTable.Header>
-            <DataTable.Title style={{ maxWidth: 70 }}><Text>Data</Text></DataTable.Title>
-            <DataTable.Title><Text>Descrição</Text></DataTable.Title>
-            <DataTable.Title numeric><Text>Valor</Text></DataTable.Title>
+            <DataTable.Title style={{ maxWidth: 70 }}><Text>{t("Data")}</Text></DataTable.Title>
+            <DataTable.Title><Text>{t("Descrição")}</Text></DataTable.Title>
+            <DataTable.Title numeric><Text>{t("Valor")}</Text></DataTable.Title>
           </DataTable.Header>
           <DataTable.Row>
             <DataTable.Cell>
-              <Text style={{ opacity: 0.7 }}>Funcionalidade em desenvolvimento</Text>
+              <Text style={{ opacity: 0.7 }}>---</Text>
             </DataTable.Cell>
             <DataTable.Cell><Text>{""}</Text></DataTable.Cell>
             <DataTable.Cell numeric><Text>{""}</Text></DataTable.Cell>

@@ -1,0 +1,27 @@
+{
+    "common": {
+        "Salvar": "Save",
+        "Cancelar": "Cancel",
+        "Entrada": "Income",
+        "Contas": "Accounts",
+        "Cartão de crédito": "Credit Card",
+        "Data": "Date",
+        "Descrição": "Description",
+        "Valor": "Value",
+        "Resumo mensal": "Monthly summary",
+        "Você está no caminho certo! 🚀": "You're on the right track! 🚀",
+        "Vamos melhorar isso juntos! 💪": "Let's improve this together! 💪",
+        "Entradas": "Incomes",
+        "Saídas": "Expenses",
+        "Balanço": "Balance",
+        "Saldo Atual": "Current Balance",
+        "Previsão para o Fim do Mês": "End of Month Forecast"
+    },
+    "auth": {
+        "Entrar": "Login",
+        "Sair": "Logout"
+    },
+    "errors": {
+        "Valor inválido": "Invalid amount"
+    }
+}

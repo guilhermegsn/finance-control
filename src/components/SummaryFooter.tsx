@@ -6,6 +6,7 @@ import { Q } from '@nozbe/watermelondb';
 import { database } from '../database';
 import Transaction from '../models/Transactions';
 import { useTheme } from '../contexts/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
 // Props que o componente puro recebe (incluindo as injetadas pelo WatermelonDB)
 interface SummaryFooterProps {
@@ -16,7 +17,8 @@ interface SummaryFooterProps {
 }
 
 const SummaryFooterComponent = ({ isFutureMonth, transactions, pastTransactions }: SummaryFooterProps) => {
-  const theme = useTheme();
+  
+    const { t } = useTranslation();
   const { isDarkMode } = useTheme(); // Assumindo que o tema tem essa propriedade
 
   const totals = useMemo(() => {
@@ -90,17 +92,17 @@ const SummaryFooterComponent = ({ isFutureMonth, transactions, pastTransactions 
 
   return (
     <View>
-      <View style={{padding: 12, marginTop: 30}}>
+      <View style={{ padding: 12, marginTop: 30 }}>
         <Text variant='headlineSmall'>
-          Resumo mensal
+          {t("Resumo mensal")}
         </Text>
         <Text style={[
           styles.headerSubtitle,
           { color: getSubtitleColor() }
         ]}>
           {totals.balance >= 0
-            ? 'Você está no caminho certo! 🚀'
-            : 'Vamos melhorar isso juntos! 💪'}
+            ? t("Você está no caminho certo! 🚀")
+            : t("Vamos melhorar isso juntos! 💪")}
         </Text>
       </View>
 
@@ -124,7 +126,7 @@ const SummaryFooterComponent = ({ isFutureMonth, transactions, pastTransactions 
               styles.cardLabel,
               { color: getTextColor() }
             ]}>
-              Entradas
+              {t("Entradas")}
             </Text>
           </View>
           <Text style={[styles.cardValue, styles.incomeValue]}>
@@ -151,7 +153,7 @@ const SummaryFooterComponent = ({ isFutureMonth, transactions, pastTransactions 
               styles.cardLabel,
               { color: getTextColor() }
             ]}>
-              Saídas
+              {t("Saídas")}
             </Text>
           </View>
           <Text style={[styles.cardValue, styles.expenseValue]}>
@@ -179,7 +181,7 @@ const SummaryFooterComponent = ({ isFutureMonth, transactions, pastTransactions 
               styles.cardLabel,
               { color: getTextColor() }
             ]}>
-              Balanço
+              {t("Balanço")}
             </Text>
           </View>
           <Text style={[
@@ -211,7 +213,7 @@ const SummaryFooterComponent = ({ isFutureMonth, transactions, pastTransactions 
                 styles.cardLabel,
                 { color: getTextColor() }
               ]}>
-                Saldo Atual
+                {t("Saldo Atual")}
               </Text>
             </View>
             <Text style={[
@@ -243,7 +245,7 @@ const SummaryFooterComponent = ({ isFutureMonth, transactions, pastTransactions 
             styles.forecastTitle,
             { color: getTextColor() }
           ]}>
-            Previsão para o Fim do Mês
+            {t("Previsão para o Fim do Mês")}
           </Text>
         </View>
         <Text style={[

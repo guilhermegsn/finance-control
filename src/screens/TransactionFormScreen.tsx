@@ -215,9 +215,6 @@ export default function TransactionFormScreen() {
         <Text style={{ fontSize: 20, fontWeight: 'bold' }}>
           {transaction ? 'Editar Transação' : 'Nova Transação'}
         </Text>
-        <TouchableOpacity onPress={() => setFormData(prev => ({ ...prev, type: null }))}>
-          <Icon source="refresh" size={20} />
-        </TouchableOpacity>
       </View>
 
       {/* Tipo e Data */}

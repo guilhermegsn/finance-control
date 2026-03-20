@@ -5,6 +5,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import { CategoryService } from './src/service/CategoryService';
+import './src/i18n';
 
 // 1. Componente de Login (Simples e Direto)
 const LoginScreen = () => {
