@@ -434,6 +434,55 @@ export const TransactionService = {
     return balance;
   },
 
+  // Consolidar (pagar) a fatura virtual de um cartão
+  payCreditCardInvoice: async (
+    accountId: string,
+    description: string,
+    amount: number,
+    date: Date,
+    userId: string,
+    transactionIds: string[]
+  ) => {
+    await database.write(async () => {
+      const transactionCollection = database.get<Transaction>('transactions');
+      
+      // 1. Criar a nova transação real na conta
+      const invoicePaymentRecord = transactionCollection.prepareCreate((transaction) => {
+        // @ts-ignore
+        transaction._raw.account_id = accountId;
+        // @ts-ignore
+        transaction._raw.category_id = null; // Fatura não tem categoria ou poderia ter uma específica
+        transaction.description = description;
+        transaction.amount = amount;
+        transaction.type = 'expense';
+        transaction.date = date;
+        transaction.userId = userId;
+        transaction.isConsolidated = true;
+        transaction.isRecurring = false;
+        // Importante: credit_card_id = null para que ela entre no fluxo normal
+        // @ts-ignore
+        transaction._raw.credit_card_id = null; 
+      });
+
+      // 2. Buscar todas as transações que compuseram essa fatura e marcá-length como consolidadas
+      const recordsToUpdate: any[] = [];
+      for (const id of transactionIds) {
+        try {
+          const tx = await transactionCollection.find(id);
+          const updatedRecord = tx.prepareUpdate((record) => {
+            record.isConsolidated = true;
+          });
+          recordsToUpdate.push(updatedRecord);
+        } catch (error) {
+          console.error(`Erro ao buscar transação ${id} para consolidação:`, error);
+        }
+      }
+
+      // Executar todas as operações em um único batch
+      await database.batch(invoicePaymentRecord, ...recordsToUpdate);
+    });
+  },
+
   // Criar compra no cartão de crédito com parcelamento
   createCreditCardPurchase: async (data: {
     amount: number;
@@ -446,144 +495,111 @@ export const TransactionService = {
     userId: string;
   }) => {
     await database.write(async () => {
-      // Validações básicas
-      if (data.installments < 1) {
-        throw new Error('O número de parcelas deve ser maior que zero');
-      }
-      if (data.interestRate < 0) {
-        throw new Error('A taxa de juros não pode ser negativa');
-      }
+      if (data.installments < 1) throw new Error('O número de parcelas deve ser maior que zero');
+      if (data.interestRate < 0) throw new Error('A taxa de juros não pode ser negativa');
 
-      // Buscar o cartão de crédito
       const creditCard = await database.get<CreditCard>('credit_cards').find(data.creditCardId);
       
-      // Calcular valor da parcela e valor total
       let installmentAmount = data.amount;
       let totalAmount = data.amount;
       
       if (data.installments > 1) {
         if (data.interestRate > 0) {
-          // Tabela Price: PMT = PV * i / (1 - (1 + i)^-n)
-          const i = data.interestRate / 100; // taxa decimal
+          const i = data.interestRate / 100;
           const n = data.installments;
           const pv = data.amount;
           const pmt = pv * i / (1 - Math.pow(1 + i, -n));
           installmentAmount = parseFloat(pmt.toFixed(2));
           totalAmount = parseFloat((installmentAmount * n).toFixed(2));
         } else {
-          // Sem juros: divisão simples
           installmentAmount = parseFloat((data.amount / data.installments).toFixed(2));
           totalAmount = data.amount;
         }
       }
 
-      // Determinar mês da primeira parcela baseado no closing_day
       const purchaseDate = new Date(data.date);
-      const purchaseDay = purchaseDate.getDate();
-      const closingDay = creditCard.closingDay;
-      
-      // Se dia_da_compra >= closing_day: fatura atual já fechou, primeira parcela cai no mês seguinte
-      // Se dia_da_compra < closing_day: primeira parcela cai no mês atual
-      let firstInstallmentMonthOffset = 0;
-      if (purchaseDay >= closingDay) {
-        firstInstallmentMonthOffset = 1; // Próximo mês
-      }
-      
-      // Função para adicionar meses a uma data, tratando virada de ano
-      const addMonths = (date: Date, months: number): Date => {
-        const newDate = new Date(date);
-        newDate.setMonth(newDate.getMonth() + months);
-        return newDate;
-      };
 
-      // Função para calcular a data de vencimento (due_day) de uma fatura
-      const calculateDueDate = (baseDate: Date): Date => {
-        const dueDay = creditCard.dueDay;
-        const dueDate = new Date(baseDate);
-        dueDate.setDate(dueDay);
-        
-        // Ajustar se o dia não existe no mês (ex: 31 em fevereiro)
-        if (dueDate.getDate() !== dueDay) {
-          dueDate.setDate(0); // Último dia do mês anterior
+      // 🔥 A MÁGICA MATEMÁTICA BRASILEIRA ESTÁ AQUI 🔥
+      const getInstallmentDueDate = (installmentIndex: number) => {
+        let month = purchaseDate.getMonth();
+        let year = purchaseDate.getFullYear();
+
+        // 1. Passou da data de fechamento? Pula um mês.
+        if (purchaseDate.getDate() >= creditCard.closingDay) {
+          month++;
         }
-        
+        // 2. O vencimento vem numericamente antes do fechamento? (Ex: fecha 20, vence 05)
+        // Então o pagamento é no mês seguinte. Pula mais um mês.
+        if (creditCard.dueDay < creditCard.closingDay) {
+          month++;
+        }
+
+        // 3. Adiciona os meses do parcelamento atual
+        month += installmentIndex;
+
+        // 4. Trata a virada de ano (ex: Dezembro -> Janeiro)
+        while (month > 11) {
+          month -= 12;
+          year++;
+        }
+
+        const dueDate = new Date(year, month, creditCard.dueDay);
+        // Trata meses que acabam dia 28/30
+        if (dueDate.getDate() !== creditCard.dueDay) {
+          dueDate.setDate(0); 
+        }
         return dueDate;
       };
 
-      // Calcular data da primeira fatura (mês base)
-      const firstInvoiceMonth = addMonths(purchaseDate, firstInstallmentMonthOffset);
-      firstInvoiceMonth.setDate(1); // Primeiro dia do mês para consistência
-      
-      // Criar a primeira parcela para obter seu ID
       const firstTransaction = await database.get<Transaction>('transactions').create((transaction) => {
-        // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
+        // @ts-ignore
         transaction._raw.account_id = creditCard.accountId || '';
         // @ts-ignore
         transaction._raw.category_id = data.categoryId;
-        transaction.description = `${data.description} (1/${data.installments})`;
+        transaction.description = data.installments > 1 ? `${data.description} (1/${data.installments})` : data.description;
         transaction.amount = installmentAmount;
         transaction.type = 'expense';
         
-        // Data de vencimento da primeira parcela (competência)
-        const firstDueDate = calculateDueDate(firstInvoiceMonth);
-        transaction.date = firstDueDate;
-        
-        // Data real da compra (purchase_date)
-        transaction.purchaseDate = new Date(data.date);
+        // As DUAS datas salvas corretamente
+        transaction.date = getInstallmentDueDate(0); // A Competência / Fluxo de caixa
+        transaction.purchaseDate = purchaseDate;     // A data que passou o cartão
         
         transaction.userId = data.userId;
         transaction.isConsolidated = false;
         transaction.isRecurring = false;
-        // @ts-ignore - campo não definido no modelo mas existe no schema
+        // @ts-ignore
         transaction._raw.credit_card_id = data.creditCardId;
-        // related_transaction_id não preenchido para a primeira parcela
       });
 
-      // Obter o ID da primeira transação
       const firstTransactionId = firstTransaction.id;
       
-      // Se houver mais parcelas, criar as demais
       if (data.installments > 1) {
         const records = [];
-        
         for (let i = 1; i < data.installments; i++) {
-          // Mês da fatura: primeira fatura + i meses
-          const invoiceMonth = addMonths(firstInvoiceMonth, i);
-          
-          // Data de vencimento: due_day do mês da fatura
-          const dueDate = calculateDueDate(invoiceMonth);
-          
-          // Descrição com número da parcela
-          const installmentDescription = `${data.description} (${i + 1}/${data.installments})`;
-          
           const transactionCollection = database.get<Transaction>('transactions');
           const transactionRecord = transactionCollection.prepareCreate((transaction) => {
-            // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
+            // @ts-ignore
             transaction._raw.account_id = creditCard.accountId || '';
             // @ts-ignore
             transaction._raw.category_id = data.categoryId;
-            transaction.description = installmentDescription;
+            transaction.description = `${data.description} (${i + 1}/${data.installments})`;
             transaction.amount = installmentAmount;
             transaction.type = 'expense';
-            transaction.date = dueDate;
-            transaction.purchaseDate = new Date(data.date);
+            transaction.date = getInstallmentDueDate(i);
+            transaction.purchaseDate = purchaseDate;
             transaction.userId = data.userId;
             transaction.isConsolidated = false;
             transaction.isRecurring = false;
-            // @ts-ignore - campo não definido no modelo mas existe no schema
+            // @ts-ignore
             transaction._raw.credit_card_id = data.creditCardId;
             // @ts-ignore
             transaction._raw.related_transaction_id = firstTransactionId;
           });
-          
           records.push(transactionRecord);
         }
-        
-        // Executar batch para criar as parcelas restantes
         await database.batch(...records);
       }
       
-      // Retornar informações sobre a compra criada (para possível uso futuro)
       return {
         firstTransactionId,
         installmentAmount,
@@ -592,4 +608,4 @@ export const TransactionService = {
       };
     });
   }
-};
+}

@@ -18,9 +18,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from "react-i18next";
 import CreditCardSectionComponent from "../components/CreditCardSection";
+import { isTransactionDueInMonth } from '../utils/creditCardInvoiceHelper';
 
 import { MixedTransaction, SyntheticTransaction, AccountTransactionGroup } from '../components/AccountsTable';
-import { isTransactionInInvoiceMonth } from '../utils/creditCardInvoiceHelper';
 
 interface MonthlyControlScreenProps {
   transactions: Transaction[]; // Transações sem cartão (filtradas)
@@ -33,6 +33,7 @@ interface MonthlyControlScreenProps {
 function MonthlyControlScreen({ transactions, allTransactions, creditCards, accounts, categories }: MonthlyControlScreenProps) {
   const { t } = useTranslation();
   const navigation = useNavigation();
+  const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [previousBalances, setPreviousBalances] = useState<Record<string, number>>({});
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
@@ -170,7 +171,7 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
       const incomeTransactions = accountTransactions.filter(t => t.type === 'income');
       const expenseTransactions: MixedTransaction[] = accountTransactions.filter(t => t.type === 'expense');
 
-      // Calcular Faturas de Cartão de Crédito vinculadas a essa conta
+        // Calcular Faturas de Cartão de Crédito vinculadas a essa conta
       const accountCreditCards = creditCards.filter(card => card.accountId === account.id);
       
       accountCreditCards.forEach(card => {
@@ -179,8 +180,13 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
           return t._raw?.credit_card_id === card.id;
         });
         
-        const invoiceTransactions = cardTransactions.filter(t => isTransactionInInvoiceMonth(t, card, currentDate));
-        const cardTotal = invoiceTransactions.reduce((sum, t) => sum + t.amount, 0);
+        // REGRA DE OURO: Para o Fluxo de Caixa, usar isTransactionDueInMonth que considera
+        // APENAS a data de vencimento (date) para determinar se a transação aparece na fatura virtual
+        const pendingInvoiceTransactions = cardTransactions.filter(t => {
+          return isTransactionDueInMonth(t, currentDate) && !t.isConsolidated;
+        });
+        
+        const cardTotal = pendingInvoiceTransactions.reduce((sum, t) => sum + t.amount, 0);
         
         if (cardTotal > 0) {
           let dueDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), card.dueDay);
@@ -196,7 +202,9 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
             type: 'expense',
             date: dueDate,
             isVirtualInvoice: true,
-            creditCardId: card.id
+            creditCardId: card.id,
+            accountId: account.id,
+            transactionIds: pendingInvoiceTransactions.map(t => t.id)
           };
           expenseTransactions.push(syntheticInvoice);
         }
@@ -240,6 +248,38 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
     setExpandedAccounts(newExpanded);
   };
 
+  const handleConsolidateInvoice = async (invoice: SyntheticTransaction) => {
+    if (!user?.id) return;
+    
+    Alert.alert(
+      t('Pagar Fatura'),
+      t(`Deseja confirmar o pagamento de ${invoice.description} no valor de R$ ${invoice.amount.toFixed(2)}?`),
+      [
+        { text: t('Cancelar'), style: 'cancel' },
+        {
+          text: t('Confirmar'),
+          onPress: async () => {
+            try {
+              await TransactionService.payCreditCardInvoice(
+                invoice.accountId,
+                `Pagamento ${invoice.description}`,
+                invoice.amount,
+                invoice.date,
+                user.id,
+                invoice.transactionIds
+              );
+              // Como estamos usando observables, a tela será atualizada automaticamente
+              // e a fatura virtual desaparecerá (pois isConsolidated será true para as compras)
+            } catch (error) {
+              console.error('Erro ao pagar fatura:', error);
+              Alert.alert(t('Erro'), t('Ocorreu um erro ao pagar a fatura.'));
+            }
+          }
+        }
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       {/* HEADER */}
@@ -263,6 +303,7 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
           expandedAccounts={expandedAccounts}
           onToggleAccount={toggleAccountExpansion}
           onEditTransaction={openTransactionForm}
+          onConsolidateInvoice={handleConsolidateInvoice}
           totalBalance={totals.balance}
           currentDate={currentDate}
         />

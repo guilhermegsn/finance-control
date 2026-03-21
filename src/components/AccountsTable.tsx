@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Image } from 'react-native';
+import { View, Image, TouchableOpacity } from 'react-native';
 import { DataTable, Icon, Text } from 'react-native-paper';
 import TransactionItem from './TransactionItem';
 import BankService from '../service/BankService';
@@ -13,6 +13,8 @@ export type SyntheticTransaction = {
   date: Date;
   isVirtualInvoice: true;
   creditCardId: string;
+  accountId: string;
+  transactionIds: string[];
 };
 
 export type MixedTransaction = Transaction | SyntheticTransaction;
@@ -39,6 +41,7 @@ interface AccountsTableProps {
   expandedAccounts: Set<string>;
   onToggleAccount: (accountId: string) => void;
   onEditTransaction: (transaction: Transaction) => void;
+  onConsolidateInvoice?: (invoice: SyntheticTransaction) => void;
   totalBalance: number;
   currentDate: Date;
 }
@@ -49,6 +52,7 @@ export default function AccountsTable({
   expandedAccounts,
   onToggleAccount,
   onEditTransaction,
+  onConsolidateInvoice,
   totalBalance,
   currentDate,
 }: AccountsTableProps) {
@@ -183,7 +187,9 @@ export default function AccountsTable({
                                   </View>
                                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                     <Text style={{ marginRight: 8 }}>R$ {item.amount.toFixed(2)}</Text>
-                                    <Icon source="check-circle" size={20} color="#2E9E57" />
+                                    <TouchableOpacity onPress={() => onConsolidateInvoice && onConsolidateInvoice(item as SyntheticTransaction)}>
+                                      <Icon source="check-circle-outline" size={20} color="#999" />
+                                    </TouchableOpacity>
                                   </View>
                                 </View>
                               </View>

@@ -6,7 +6,7 @@ import CreditCard from '../models/CreditCard';
 import Transaction from '../models/Transactions';
 import { brandLogos } from '../utils/brandLogos';
 import {
-  calculateInvoiceTotal,
+  calculateInvoiceTotalByPurchaseDate,
   filterTransactionsByInvoiceMonth,
   getInvoiceMonthDescription
 } from '../utils/creditCardInvoiceHelper';
@@ -46,28 +46,33 @@ function CreditCardSectionComponent({
     t._raw?.credit_card_id && t._raw.credit_card_id !== null
   );
 
-  // Agrupar transações por cartão e calcular totais da fatura
-  const creditCardGroups: CreditCardInvoiceGroup[] = creditCards.map(card => {
-    const cardTransactions = creditCardTransactions.filter(t =>
-      // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
-      t._raw?.credit_card_id === card.id
-    );
+    // Agrupar transações por cartão e calcular totais da fatura usando REGRA 1 (purchaseDate + closingDay)
+    const creditCardGroups: CreditCardInvoiceGroup[] = creditCards.map(card => {
+      const cardTransactions = creditCardTransactions.filter(t =>
+        // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
+        t._raw?.credit_card_id === card.id
+      );
 
-    const invoiceTransactions = filterTransactionsByInvoiceMonth(card, cardTransactions, currentDate);
-    const invoiceTotal = calculateInvoiceTotal(card, cardTransactions, currentDate);
+      // Filtrar apenas transações não consolidadas para a fatura atual
+      const pendingCardTransactions = cardTransactions.filter(t => !t.isConsolidated);
+      
+      // REGRA 1: Filtrar transações pela data de compra (purchaseDate) e dia de fechamento
+      const invoiceTransactions = filterTransactionsByInvoiceMonth(pendingCardTransactions, card, currentDate);
+      // REGRA 1: Calcular total pela data de compra (purchaseDate)
+      const invoiceTotal = calculateInvoiceTotalByPurchaseDate(pendingCardTransactions, card, currentDate);
 
-    return {
-      cardId: card.id,
-      cardName: card.name,
-      cardBrand: card.brand,
-      cardColor: card.color,
-      closingDay: card.closingDay,
-      dueDay: card.dueDay,
-      limit: card.limit,
-      invoiceTotal,
-      invoiceTransactions,
-    };
-  });
+      return {
+        cardId: card.id,
+        cardName: card.name,
+        cardBrand: card.brand,
+        cardColor: card.color,
+        closingDay: card.closingDay,
+        dueDay: card.dueDay,
+        limit: card.limit,
+        invoiceTotal,
+        invoiceTransactions,
+      };
+    });
 
   const toggleCardExpansion = (cardId: string) => {
     const newExpanded = new Set(expandedCards);
@@ -161,7 +166,7 @@ function CreditCardSectionComponent({
                   </DataTable.Cell>
                   <DataTable.Cell style={{ paddingLeft: 10 }}>
                     <Text style={{ opacity: 0.6, fontStyle: 'italic' }}>
-                      {getInvoiceMonthDescription(creditCards.find(c => c.id === group.cardId)!, currentDate)}
+                      {getInvoiceMonthDescription(currentDate)}
                     </Text>
                   </DataTable.Cell>
                   <DataTable.Cell numeric>
