@@ -126,5 +126,13 @@
     },
     "account": {
         "Saída": "Expense"
+    },
+    "creditCard": {
+        "Faturas de Cartão": "Credit Card Invoices",
+        "Nenhuma fatura de cartão de crédito para este mês.": "No credit card invoices for this month.",
+        "Nenhuma compra nesta fatura.": "No purchases in this invoice.",
+        "Total da Fatura": "Invoice Total",
+        "Total Geral das Faturas": "Total Invoices",
+        "Melhor dia de compra": "Best purchase day"
     }
 }

@@ -13,6 +13,7 @@ import { database } from '../database';
 import SummaryFooter from '../components/SummaryFooter';
 import AccountsTable from '../components/AccountsTable';
 import TransactionTypeModal from '../components/TransactionTypeModal';
+import CreditCardSection from '../components/CreditCardSection';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from "react-i18next";
 import { useAuth } from '../contexts/AuthContext';
@@ -179,8 +180,12 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
     navigation.navigate('TransferForm', { accounts: accounts })
   };
 
+  // Filtra transações por mês (todas as transações)
   const filteredTransactions = filterTransactionsByMonth(transactions, currentDate);
-  const totals = calculateTotals(filteredTransactions);
+  
+  // Filtra apenas transações de débito (sem cartão de crédito) para cálculo de contas
+  const debitTransactions = filterDebitTransactionsByMonth(transactions, currentDate);
+  const totals = calculateTotals(debitTransactions);
 
   useEffect(() => {
     const calculatePreviousBalances = async () => {
@@ -210,7 +215,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
     accounts.forEach(account => {
       const previousBalance = previousBalances[account.id] || 0;
 
-      const accountTransactions = filteredTransactions.filter(transaction => {
+      const accountTransactions = debitTransactions.filter(transaction => {
         // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
         const transactionAccountId = transaction._raw?.account_id;
         return transactionAccountId === account.id;
@@ -241,7 +246,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
     });
 
     return groups.sort((a, b) => b.totalBalance - a.totalBalance);
-  }, [filteredTransactions, accounts, previousBalances]);
+  }, [debitTransactions, accounts, previousBalances]);
 
   const toggleAccountExpansion = (accountId: string) => {
     const newExpanded = new Set(expandedAccounts);
@@ -280,26 +285,13 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
         />
 
 
-        {/* Cartões - TODO */}
-        <Text style={styles.sectionTitle}>{t("Cartão de crédito")}</Text>
-        <DataTable>
-          <DataTable.Header>
-            <DataTable.Title style={{ maxWidth: 70 }}><Text>{t("Data")}</Text></DataTable.Title>
-            <DataTable.Title><Text>{t("Descrição")}</Text></DataTable.Title>
-            <DataTable.Title numeric><Text>{t("Valor")}</Text></DataTable.Title>
-          </DataTable.Header>
-          <DataTable.Row>
-            <DataTable.Cell>
-              <Text style={{ opacity: 0.7 }}>---</Text>
-            </DataTable.Cell>
-            <DataTable.Cell><Text>{""}</Text></DataTable.Cell>
-            <DataTable.Cell numeric><Text>{""}</Text></DataTable.Cell>
-          </DataTable.Row>
-          <DataTable.Row>
-            <DataTable.Cell><Text>TOTAL</Text></DataTable.Cell>
-            <DataTable.Cell numeric><Text style={{ fontWeight: 'bold' }}> R$ 0,00 </Text></DataTable.Cell>
-          </DataTable.Row>
-        </DataTable>
+        {/* Cartões de Crédito */}
+        <CreditCardSection
+          creditCards={creditCards}
+          transactions={transactions}
+          currentMonth={currentDate.getMonth()}
+          currentYear={currentDate.getFullYear()}
+        />
 
         <SummaryFooter currentDate={currentDate} isFutureMonth={isFutureMonth} />
         <View style={{ height: 100 }} />
@@ -345,12 +337,28 @@ const styles = StyleSheet.create({
   },
 });
 
-const filterTransactionsByMonth = (transactions: Transaction[], date: Date) => {
+const filterTransactionsByMonth = (transactions: Transaction[], date: Date): Transaction[] => {
   const year = date.getFullYear();
   const month = date.getMonth();
   return transactions.filter(transaction => {
     const transactionDate = new Date(transaction.date);
     return transactionDate.getFullYear() === year && transactionDate.getMonth() === month;
+  });
+};
+
+const filterDebitTransactionsByMonth = (transactions: Transaction[], date: Date): Transaction[] => {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  return transactions.filter(transaction => {
+    const transactionDate = new Date(transaction.date);
+    if (transactionDate.getFullYear() !== year || transactionDate.getMonth() !== month) {
+      return false;
+    }
+    
+    // Exclui transações com cartão de crédito preenchido
+    const raw = (transaction as any)._raw;
+    const hasCreditCard = transaction.creditCard || (raw && raw.credit_card_id);
+    return !hasCreditCard;
   });
 };
 
