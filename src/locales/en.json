@@ -56,6 +56,15 @@
         "Ativar tema escuro no app": "Enable dark theme in the app",
         "Categorias": "Categories"
     },
+    "categories": {
+        "Alimentação": "Food",
+        "Transporte": "Transportation",
+        "Moradia": "Housing",
+        "Lazer": "Leisure",
+        "Saúde": "Health",
+        "Salário": "Salary",
+        "Investimentos": "Investments"
+    },
     "auth": {
         "Entrar": "Login",
         "Sair": "Logout"

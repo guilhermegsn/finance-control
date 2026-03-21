@@ -25,7 +25,7 @@ interface FormData {
 
 export default function TransactionFormScreen() {
   const { user } = useAuth();
-    const { t } = useTranslation();
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const [recurringDialogVisible, setRecurringDialogVisible] = useState(false);
@@ -300,7 +300,7 @@ export default function TransactionFormScreen() {
               .filter((cat: Category) => !formData.type || cat.type === formData.type)
               .map((category: Category) => ({
                 id: category.id,
-                label: category.name,
+                label: t(`categories:${category.name}`),
                 value: category.id,
                 icon: category.icon
               }))}
@@ -398,7 +398,7 @@ export default function TransactionFormScreen() {
         <Button
           mode="outlined"
           onPress={() => {
-           // onCancel?.();
+            // onCancel?.();
             navigation.goBack();
           }}
           style={{ flex: 1 }}

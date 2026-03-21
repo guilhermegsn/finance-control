@@ -4,9 +4,13 @@ import { List, IconButton, Text, Surface } from 'react-native-paper';
 import { withObservables } from '@nozbe/watermelondb/react';
 import Category from '../models/Caterogy';
 import { CategoryService } from '../service/CategoryService';
+import { useTranslation } from 'react-i18next';
 
 // Componente de Item Individual
 const CategoryItem = ({ category, onEdit }: { category: Category; onEdit?: (category: Category) => void }) => {
+
+  const { t } = useTranslation();
+
   const handleDelete = () => {
     CategoryService.delete(category.id);
   };
@@ -20,7 +24,7 @@ const CategoryItem = ({ category, onEdit }: { category: Category; onEdit?: (cate
   return (
     <Surface style={styles.card} elevation={1}>
       <List.Item
-        title={category.name}
+        title={category.isSystem ? t(`categories:${category.name}`) : category.name}
         description={`Tipo: ${category.type === 'income' ? 'Receita' : 'Despesa'} | Ícone: ${category.icon}`}
         left={props => <List.Icon {...props} icon={category.icon} color={category.color} />}
         right={props => (
