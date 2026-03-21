@@ -40,14 +40,25 @@ export const Select: React.FC<SelectProps> = ({
   const handleOpen = () => {
     if (disabled) return;
 
-    anchorRef.current?.measureInWindow((x, y, width, height) => {
+    // Tenta medir a posição do elemento
+    if (anchorRef.current?.measureInWindow) {
+      anchorRef.current.measureInWindow((x, y, width, height) => {
+        setDropdownPosition({
+          top: y + height,
+          left: x,
+          width: Math.max(width, 200), // Garante largura mínima
+        });
+        setModalVisible(true);
+      });
+    } else {
+      // Fallback: usa posição padrão (centro da tela)
       setDropdownPosition({
-        top: y + height,
-        left: x,
-        width,
+        top: 200,
+        left: 20,
+        width: 300,
       });
       setModalVisible(true);
-    });
+    }
   };
 
   const handleSelect = (value: string) => {

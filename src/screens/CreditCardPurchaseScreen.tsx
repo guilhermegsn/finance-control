@@ -9,6 +9,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Category from '../models/Caterogy';
 import CreditCard from '../models/CreditCard';
+import { withObservables } from '@nozbe/watermelondb/react';
+import CreditCardService from '../service/CreditCardService';
+import { database } from '../database';
+import { Q } from '@nozbe/watermelondb';
 
 interface CreditCardPurchaseFormData {
   amount: string;
@@ -20,7 +24,11 @@ interface CreditCardPurchaseFormData {
   interestRate: string;
 }
 
-export default function CreditCardPurchaseScreen() {
+interface CreditCardPurchaseScreenProps {
+  creditCards: CreditCard[];
+}
+
+function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps) {
   const { user } = useAuth();
   const { t } = useTranslation();
   const navigation = useNavigation<any>();
@@ -37,7 +45,7 @@ export default function CreditCardPurchaseScreen() {
     show: false,
   });
 
-  const { categories = [], creditCards = [], onSave } = route.params || {};
+  const { categories = [], onSave } = route.params || {};
 
   const [formData, setFormData] = useState<CreditCardPurchaseFormData>(() => {
     const today = new Date();
@@ -47,11 +55,24 @@ export default function CreditCardPurchaseScreen() {
       description: '',
       date: today,
       creditCardId: creditCards.length > 0 ? creditCards[0].id : '',
-      categoryId: categories.length > 0 ? categories[0].id : '',
+      categoryId: '',
       installments: 1,
       interestRate: '0',
     };
   });
+
+  // Atualizar categoryId quando as categorias chegarem
+  useEffect(() => {
+    if (categories.length > 0 && !formData.categoryId) {
+      const expenseCategories = categories.filter((cat: Category) => cat.type === 'expense');
+      if (expenseCategories.length > 0) {
+        setFormData(prev => ({
+          ...prev,
+          categoryId: expenseCategories[0].id
+        }));
+      }
+    }
+  }, [categories]);
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
     if (selectedDate) {
@@ -229,16 +250,25 @@ export default function CreditCardPurchaseScreen() {
           <Select
             items={categories
               .filter((cat: Category) => cat.type === 'expense')
-              .map((category: Category) => ({
-                id: category.id,
-                label: t(`categories:${category.name}`),
-                value: category.id,
-                icon: category.icon
-              }))}
+              .map((category: Category) => {
+                const translatedLabel = t(`categories:${category.name}`);
+                const label = translatedLabel.includes('categories:') ? category.name : translatedLabel;
+                return {
+                  id: category.id,
+                  label: label,
+                  value: category.id,
+                  icon: category.icon
+                };
+              })}
             selectedValue={formData.categoryId}
             onSelect={(value) => setFormData(prev => ({ ...prev, categoryId: value }))}
-            placeholder={t("Selecione")}
+            placeholder={categories.length === 0 ? t("Carregando...") : t("Selecione")}
           />
+          {categories.length === 0 && (
+            <HelperText type="info">
+              {t('Aguarde enquanto as categorias são carregadas...')}
+            </HelperText>
+          )}
         </View>
 
         {/* Descrição */}
@@ -358,3 +388,20 @@ export default function CreditCardPurchaseScreen() {
     </View>
   );
 }
+
+const CreditCardPurchaseScreenWrapper = () => {
+  const { user } = useAuth();
+  
+  const ScreenWithData = withObservables(['userId'], ({ userId }: { userId: string }) => ({
+    creditCards: userId 
+      ? CreditCardService.getCollection().query(
+          Q.where('user_id', userId),
+          Q.where('deleted_at', null)
+        ).observe()
+      : [],
+  }))(CreditCardPurchaseScreen);
+  
+  return <ScreenWithData userId={user?.id || ''} />;
+};
+
+export default CreditCardPurchaseScreenWrapper;

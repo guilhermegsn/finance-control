@@ -6,14 +6,18 @@ import { withObservables } from '@nozbe/watermelondb/react';
 import { TransactionService } from '../service/TransactionService';
 import { AccountService } from '../service/AccountService';
 import { CategoryService } from '../service/CategoryService';
+import CreditCardService from '../service/CreditCardService';
 import Transaction from '../models/Transactions';
+import CreditCard from '../models/CreditCard';
 import { Q } from '@nozbe/watermelondb';
 import { database } from '../database';
 import SummaryFooter from '../components/SummaryFooter';
 import AccountsTable from '../components/AccountsTable';
 import TransactionTypeModal from '../components/TransactionTypeModal';
+import { useAuth } from '../contexts/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from "react-i18next";
+import CreditCardSectionComponent from "../components/CreditCardSection";
 
 interface AccountTransactionGroup {
   accountId: string;
@@ -32,12 +36,14 @@ interface AccountTransactionGroup {
 }
 
 interface MonthlyControlScreenProps {
-  transactions: Transaction[];
+  transactions: Transaction[]; // Transações sem cartão (filtradas)
+  allTransactions: Transaction[]; // Todas as transações (incluindo cartão)
+  creditCards: CreditCard[];
   accounts: any[];
   categories: any[];
 }
 
-function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyControlScreenProps) {
+function MonthlyControlScreen({ transactions, allTransactions, creditCards, accounts, categories }: MonthlyControlScreenProps) {
   const { t } = useTranslation();
   const navigation = useNavigation();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -102,7 +108,25 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
     if (type === 'income' || type === 'expense') {
       openTransactionForm(undefined, type);
     } else {
-      navigation.navigate('CreditCardPurchase')
+      // Preparar categorias e contas para a tela de compra no cartão
+      const safeCategories = categories.map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        icon: cat.icon,
+        type: cat.type
+      }));
+      
+      const safeAccounts = accounts.map(acc => ({
+        id: acc.id,
+        name: acc.name,
+        logoUrl: acc.logoUrl,
+        bankCode: acc.bankCode
+      }));
+      
+      navigation.navigate('CreditCardPurchase', {
+        categories: safeCategories,
+        accounts: safeAccounts
+      });
     }
   };
 
@@ -213,26 +237,12 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
         />
 
 
-        {/* Cartões - TODO */}
-        <Text style={styles.sectionTitle}>{t("Cartão de crédito")}</Text>
-        <DataTable>
-          <DataTable.Header>
-            <DataTable.Title style={{ maxWidth: 70 }}><Text>{t("Data")}</Text></DataTable.Title>
-            <DataTable.Title><Text>{t("Descrição")}</Text></DataTable.Title>
-            <DataTable.Title numeric><Text>{t("Valor")}</Text></DataTable.Title>
-          </DataTable.Header>
-          <DataTable.Row>
-            <DataTable.Cell>
-              <Text style={{ opacity: 0.7 }}>---</Text>
-            </DataTable.Cell>
-            <DataTable.Cell><Text>{""}</Text></DataTable.Cell>
-            <DataTable.Cell numeric><Text>{""}</Text></DataTable.Cell>
-          </DataTable.Row>
-          <DataTable.Row>
-            <DataTable.Cell><Text>TOTAL</Text></DataTable.Cell>
-            <DataTable.Cell numeric><Text style={{ fontWeight: 'bold' }}> R$ 0,00 </Text></DataTable.Cell>
-          </DataTable.Row>
-        </DataTable>
+        <CreditCardSectionComponent 
+          creditCards={creditCards}
+          allTransactions={allTransactions}
+          currentDate={currentDate}
+          onEditTransaction={openTransactionForm}
+        />
 
         <SummaryFooter currentDate={currentDate} isFutureMonth={isFutureMonth} />
         <View style={{ height: 100 }} />
@@ -297,10 +307,28 @@ const calculateTotals = (transactions: Transaction[]) => {
   return { totalIncome, totalExpense, balance: totalIncome - totalExpense };
 };
 
-const enhance = withObservables([], () => ({
-  transactions: database.get<Transaction>('transactions').query(Q.sortBy('date', Q.desc)).observe(),
-  accounts: AccountService.observeAccounts(),
-  categories: CategoryService.observeCategories(),
-}));
+const MonthlyControlScreenWrapper = () => {
+  const { user } = useAuth();
+  
+  const ScreenWithData = withObservables(['userId'], ({ userId }: { userId: string }) => ({
+    transactions: database.get<Transaction>('transactions').query(
+      Q.where('credit_card_id', null),
+      Q.sortBy('date', Q.desc)
+    ).observe(),
+    allTransactions: database.get<Transaction>('transactions').query(
+      Q.sortBy('date', Q.desc)
+    ).observe(),
+    creditCards: userId 
+      ? CreditCardService.getCollection().query(
+          Q.where('user_id', userId),
+          Q.where('deleted_at', null)
+        ).observe()
+      : [],
+    accounts: AccountService.observeAccounts(),
+    categories: CategoryService.observeCategories(),
+  }))(MonthlyControlScreen);
+  
+  return <ScreenWithData userId={user?.id || ''} />;
+};
 
-export default enhance(MonthlyControlScreen);
+export default MonthlyControlScreenWrapper;

@@ -24,6 +24,13 @@ class CreditCardService {
     ).fetch();
   }
 
+  observeAll(userId: string) {
+    return this.getCollection().query(
+      Q.where('user_id', userId),
+      Q.where('deleted_at', null)
+    ).observe();
+  }
+
   async create(data: CreditCardInput): Promise<CreditCard> {
     this.validate(data);
     return await database.write(async () => {
