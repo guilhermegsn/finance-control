@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const mySchema = appSchema({
-  version: 7,
+  version: 8,
   tables: [
     // 1. ACCOUNTS
     tableSchema({
@@ -64,13 +64,14 @@ export const mySchema = appSchema({
         { name: 'user_id', type: 'string' },
         { name: 'account_id', type: 'string', isIndexed: true, isOptional: true },
         { name: 'name', type: 'string' },
+        { name: 'brand', type: 'string' },
         { name: 'closing_day', type: 'number' },
         { name: 'due_day', type: 'number' },
         { name: 'limit', type: 'number' },
         { name: 'color', type: 'string' },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
-        { name: 'deleted_at', type: 'number' },
+        { name: 'deleted_at', type: 'number', isOptional: true },
       ],
     }),
     // As tabelas de Credit Purchases e Installments fazemos depois para não complicar agora

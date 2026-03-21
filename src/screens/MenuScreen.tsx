@@ -27,6 +27,12 @@ export default function MenuScreen() {
       onPress: () => navigation.navigate('Categories')
     },
     {
+      nome: t('Cartões de Crédito'),
+      descricao: t('Gerenciar seus cartões'),
+      icone: 'credit-card-outline',
+      onPress: () => navigation.navigate('CreditCardList')
+    },
+    {
       nome: t('Relatórios'),
       descricao: t('Visualize gráficos e estatísticas'),
       icone: 'chart-bar'
