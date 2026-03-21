@@ -39,9 +39,17 @@ export default function CreditCardPurchaseScreen() {
 
   const { categories = [], creditCards = [], onSave } = route.params || {};
 
+  console.log('CreditCardPurchaseScreen - Params recebidos:', {
+    creditCardsCount: creditCards.length,
+    creditCards: creditCards,
+    categoriesCount: categories.length,
+    categories: categories
+  });
+
   const [formData, setFormData] = useState<CreditCardPurchaseFormData>(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    console.log('Inicializando formData, creditCards disponíveis:', creditCards.length);
     return {
       amount: '',
       description: '',

@@ -10,6 +10,8 @@ export type CreditCardInput = {
   limit: number;
   color: string;
   userId: string;
+  accountId?: string | null;
+  autoDebit?: boolean;
 };
 
 class CreditCardService {
@@ -35,6 +37,12 @@ class CreditCardService {
         card.limit = data.limit;
         card.color = data.color;
         card.userId = data.userId;
+        if (data.accountId !== undefined) {
+          card.accountId = data.accountId;
+        }
+        if (data.autoDebit !== undefined) {
+          card.autoDebit = data.autoDebit;
+        }
       });
     });
   }
@@ -49,6 +57,12 @@ class CreditCardService {
         if (data.dueDay) c.dueDay = data.dueDay;
         if (data.limit !== undefined) c.limit = data.limit;
         if (data.color) c.color = data.color;
+        if (data.accountId !== undefined) {
+          c.accountId = data.accountId;
+        }
+        if (data.autoDebit !== undefined) {
+          c.autoDebit = data.autoDebit;
+        }
       });
     });
   }

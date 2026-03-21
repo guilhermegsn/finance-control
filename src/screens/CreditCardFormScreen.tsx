@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
-import { View, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import CreditCardService from '../service/CreditCardService';
+import { AccountService } from '../service/AccountService';
+import BankService from '../service/BankService';
 import CreditCard from '../models/CreditCard';
+import Account from '../models/Accounts';
 import { brandLogos } from '../utils/brandLogos';
 import { Select } from '../components/Select';
-import { TextInput, Text, Button } from 'react-native-paper';
+import { TextInput, Text, Button, Switch, HelperText, Divider } from 'react-native-paper';
 
 const CreditCardFormScreen = () => {
   const { t } = useTranslation();
@@ -25,6 +28,33 @@ const CreditCardFormScreen = () => {
   const [closingDay, setClosingDay] = useState(editingCard?.closingDay?.toString() || '');
   const [dueDay, setDueDay] = useState(editingCard?.dueDay?.toString() || '');
   const [color, setColor] = useState(editingCard?.color || '#000000');
+  const [accountId, setAccountId] = useState<string | null>(editingCard?.accountId || null);
+  const [autoDebit, setAutoDebit] = useState<boolean>(editingCard?.autoDebit || false);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+
+  // Carregar contas quando o componente montar
+  useEffect(() => {
+    const loadAccounts = async () => {
+      if (!user) {
+        console.log('Usuário não autenticado');
+        return;
+      }
+      try {
+        setLoading(true);
+        console.log('Carregando contas...');
+        const fetchedAccounts = await AccountService.fetchAll();
+        console.log(`Contas carregadas: ${fetchedAccounts.length}`);
+        setAccounts(fetchedAccounts);
+      } catch (error) {
+        console.error('Erro ao carregar contas:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAccounts();
+  }, [user]);
 
   const brandOptions = Object.keys(brandLogos).map(key => ({
     id: key,
@@ -47,7 +77,9 @@ const CreditCardFormScreen = () => {
         closingDay: parseInt(closingDay, 10),
         dueDay: parseInt(dueDay, 10),
         color,
-        userId: user?.id || 'default_user'
+        userId: user?.id || 'default_user',
+        accountId: accountId || undefined,
+        autoDebit
       };
 
       console.log('data', data)
@@ -122,17 +154,73 @@ const CreditCardFormScreen = () => {
           </View>
         </View>
 
+        {/* Conta de Pagamento Padrão */}
+        <View style={styles.formGroup}>
+          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Conta de Pagamento Padrão')}</Text>
+          {loading ? (
+            <Text style={{ paddingVertical: 12, textAlign: 'center', opacity: 0.7 }}>
+              {t('Carregando contas...')}
+            </Text>
+          ) : (
+            <Select
+              items={[
+                { id: 'none', label: t('Nenhuma'), value: '' },
+                ...accounts.map((account: Account) => {
+                  let imageSource = account.logoUrl;
+                  if (!imageSource && account.bankCode && account.bankCode.trim() !== '') {
+                    const bank = BankService.getBankByCode(account.bankCode);
+                    if (bank) {
+                      imageSource = bank.logoUrl;
+                    }
+                  }
+                  // Garantir que imageSource seja undefined se não houver imagem
+                  const image = imageSource && imageSource !== '' ? imageSource : undefined;
+                  return {
+                    id: account.id,
+                    label: account.name,
+                    value: account.id,
+                    image: image
+                  };
+                })
+              ]}
+              selectedValue={accountId || ''}
+              onSelect={(value) => {
+                console.log('Conta selecionada:', value);
+                setAccountId(value || null);
+              }}
+              placeholder={t('Selecione uma conta')}
+            />
+          )}
+          <HelperText type="info">
+            {t('Conta usada para pagar a fatura deste cartão')}
+          </HelperText>
+        </View>
+
+        {/* Débito Automático */}
+        <View style={styles.formGroup}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: '600' }}>{t('Débito Automático')}</Text>
+              <Text style={{ fontSize: 12, opacity: 0.7 }}>{t('Ativar Débito Automático')}</Text>
+            </View>
+            <Switch
+              value={autoDebit}
+              onValueChange={setAutoDebit}
+            />
+          </View>
+          <HelperText type="info">
+            {t('Ao ativar, a fatura será consolidada automaticamente no dia do vencimento.')}
+          </HelperText>
+        </View>
+
+        <Divider style={{ marginVertical: 16 }} />
+
       </ScrollView>
 
       <View style={styles.footer}>
         <Button mode="contained" onPress={handleSave}>
-          Salvar
+          {t('Salvar')}
         </Button>
-        {/* <TouchableOpacity 
-          onPress={handleSave}
-        >
-          <Text style={styles.saveButtonText}>{t('Salvar Cartão')}</Text>
-        </TouchableOpacity> */}
       </View>
     </SafeAreaView>
   );

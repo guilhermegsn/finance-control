@@ -6,6 +6,7 @@ import { withObservables } from '@nozbe/watermelondb/react';
 import { TransactionService } from '../service/TransactionService';
 import { AccountService } from '../service/AccountService';
 import { CategoryService } from '../service/CategoryService';
+import CreditCardService from '../service/CreditCardService';
 import Transaction from '../models/Transactions';
 import { Q } from '@nozbe/watermelondb';
 import { database } from '../database';
@@ -14,6 +15,7 @@ import AccountsTable from '../components/AccountsTable';
 import TransactionTypeModal from '../components/TransactionTypeModal';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from "react-i18next";
+import { useAuth } from '../contexts/AuthContext';
 
 interface AccountTransactionGroup {
   accountId: string;
@@ -40,10 +42,48 @@ interface MonthlyControlScreenProps {
 function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyControlScreenProps) {
   const { t } = useTranslation();
   const navigation = useNavigation();
+  const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [previousBalances, setPreviousBalances] = useState<Record<string, number>>({});
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
   const [typeModalVisible, setTypeModalVisible] = useState(false);
+  const [creditCards, setCreditCards] = useState<any[]>([]);
+
+  // Carregar cartões de crédito quando o componente montar
+  useEffect(() => {
+    const loadCreditCards = async () => {
+      const userId = user?.id || 'default_user';
+      console.log('Carregando cartões - userId:', userId, 'accounts.length:', accounts.length, 'user:', user);
+      
+      if (!accounts.length) {
+        console.log('Não carregando cartões: accounts.length = 0');
+        return;
+      }
+      try {
+        console.log('Chamando CreditCardService.getAll para userId:', userId);
+        const cards = await CreditCardService.getAll(userId);
+        console.log(`Cartões carregados: ${cards.length}`);
+        if (cards.length > 0) {
+          cards.forEach((card, index) => {
+            console.log(`Cartão ${index}:`, {
+              id: card.id,
+              name: card.name,
+              brand: card.brand,
+              userId: card.userId,
+              deletedAt: card.deletedAt
+            });
+          });
+        } else {
+          console.log('Nenhum cartão encontrado para userId:', userId);
+        }
+        setCreditCards(cards);
+      } catch (error) {
+        console.error('Erro ao carregar cartões de crédito:', error);
+      }
+    };
+
+    loadCreditCards();
+  }, [accounts, user?.id]);
 
   const isFutureMonth = useMemo(() => {
     const now = new Date();
@@ -102,7 +142,34 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
     if (type === 'income' || type === 'expense') {
       openTransactionForm(undefined, type);
     } else {
-      navigation.navigate('CreditCardPurchase')
+      // Passar cartões de crédito e categorias para a tela de compra no cartão
+      const safeCreditCards = creditCards.map(card => ({
+        id: card.id,
+        name: card.name,
+        brand: card.brand,
+        closingDay: card.closingDay,
+        dueDay: card.dueDay,
+        limit: card.limit,
+        color: card.color,
+        accountId: card.accountId,
+        autoDebit: card.autoDebit
+      }));
+
+      const safeCategories = categories.map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        icon: cat.icon,
+        type: cat.type
+      }));
+
+      navigation.navigate('CreditCardPurchase', {
+        creditCards: safeCreditCards,
+        categories: safeCategories,
+        onSave: () => {
+          // Recarregar dados após salvar (se necessário)
+          console.log('Compra no cartão salva com sucesso');
+        }
+      });
     }
   };
 
