@@ -5,7 +5,19 @@ import TransactionItem from './TransactionItem';
 import BankService from '../service/BankService';
 import Transaction from '../models/Transactions';
 
-interface AccountTransactionGroup {
+export type SyntheticTransaction = {
+  id: string;
+  description: string;
+  amount: number;
+  type: 'expense';
+  date: Date;
+  isVirtualInvoice: true;
+  creditCardId: string;
+};
+
+export type MixedTransaction = Transaction | SyntheticTransaction;
+
+export interface AccountTransactionGroup {
   accountId: string;
   accountName: string;
   accountColor: string;
@@ -17,7 +29,7 @@ interface AccountTransactionGroup {
   };
   expense: {
     total: number;
-    transactions: Transaction[];
+    transactions: MixedTransaction[];
   };
 }
 
@@ -28,6 +40,7 @@ interface AccountsTableProps {
   onToggleAccount: (accountId: string) => void;
   onEditTransaction: (transaction: Transaction) => void;
   totalBalance: number;
+  currentDate: Date;
 }
 
 export default function AccountsTable({
@@ -37,6 +50,7 @@ export default function AccountsTable({
   onToggleAccount,
   onEditTransaction,
   totalBalance,
+  currentDate,
 }: AccountsTableProps) {
   
   const renderAccountLogo = (group: AccountTransactionGroup) => {
@@ -153,13 +167,38 @@ export default function AccountsTable({
                         <Text style={{ color: '#CC4A4A', fontWeight: '600' }}>R$ {group.expense.total.toFixed(2)}</Text>
                       </DataTable.Cell>
                     </DataTable.Row>
-                    {group.expense.transactions.map((item) => (
-                      <DataTable.Row key={item.id} onLongPress={() => onEditTransaction(item)}>
-                        <DataTable.Cell style={{ paddingLeft: 10 }}>
-                          <TransactionItem transaction={item} onLongPress={() => onEditTransaction(item)} />
-                        </DataTable.Cell>
-                      </DataTable.Row>
-                    ))}
+                    {group.expense.transactions.map((item) => {
+                      if ('isVirtualInvoice' in item) {
+                        return (
+                          <DataTable.Row key={item.id}>
+                            <DataTable.Cell style={{ paddingLeft: 10 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                                  <Text style={{ width: 70, paddingLeft: 10 }}>
+                                    {item.date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                  </Text>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingLeft: 40 }}>
+                                    <Icon source="credit-card-outline" size={16} color="#666" />
+                                    <Text style={{ marginLeft: 6 }}>{item.description}</Text>
+                                  </View>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Text style={{ marginRight: 8 }}>R$ {item.amount.toFixed(2)}</Text>
+                                    <Icon source="check-circle" size={20} color="#2E9E57" />
+                                  </View>
+                                </View>
+                              </View>
+                            </DataTable.Cell>
+                          </DataTable.Row>
+                        );
+                      }
+                      return (
+                        <DataTable.Row key={item.id} onLongPress={() => onEditTransaction(item as Transaction)}>
+                          <DataTable.Cell style={{ paddingLeft: 10 }}>
+                            <TransactionItem transaction={item as Transaction} onLongPress={() => onEditTransaction(item as Transaction)} />
+                          </DataTable.Cell>
+                        </DataTable.Row>
+                      );
+                    })}
                   </>
                 )}
               </>

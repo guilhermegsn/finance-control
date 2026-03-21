@@ -19,21 +19,8 @@ import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from "react-i18next";
 import CreditCardSectionComponent from "../components/CreditCardSection";
 
-interface AccountTransactionGroup {
-  accountId: string;
-  accountName: string;
-  accountColor: string;
-  previousBalance: number;
-  totalBalance: number;
-  income: {
-    total: number;
-    transactions: Transaction[];
-  };
-  expense: {
-    total: number;
-    transactions: Transaction[];
-  };
-}
+import { MixedTransaction, SyntheticTransaction, AccountTransactionGroup } from '../components/AccountsTable';
+import { isTransactionInInvoiceMonth } from '../utils/creditCardInvoiceHelper';
 
 interface MonthlyControlScreenProps {
   transactions: Transaction[]; // Transações sem cartão (filtradas)
@@ -163,6 +150,13 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
 
   const accountTransactionGroups = useMemo(() => {
     const groups: AccountTransactionGroup[] = [];
+    
+    // Transações de cartão não devem ser pré-filtradas por mês aqui,
+    // pois a data de compra pode ser do mês passado e a fatura ser deste mês.
+    const allCreditCardTransactions = allTransactions.filter(t => {
+      // @ts-ignore
+      return t._raw?.credit_card_id != null;
+    });
 
     accounts.forEach(account => {
       const previousBalance = previousBalances[account.id] || 0;
@@ -174,7 +168,39 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
       });
 
       const incomeTransactions = accountTransactions.filter(t => t.type === 'income');
-      const expenseTransactions = accountTransactions.filter(t => t.type === 'expense');
+      const expenseTransactions: MixedTransaction[] = accountTransactions.filter(t => t.type === 'expense');
+
+      // Calcular Faturas de Cartão de Crédito vinculadas a essa conta
+      const accountCreditCards = creditCards.filter(card => card.accountId === account.id);
+      
+      accountCreditCards.forEach(card => {
+        const cardTransactions = allCreditCardTransactions.filter(t => {
+          // @ts-ignore
+          return t._raw?.credit_card_id === card.id;
+        });
+        
+        const invoiceTransactions = cardTransactions.filter(t => isTransactionInInvoiceMonth(t, card, currentDate));
+        const cardTotal = invoiceTransactions.reduce((sum, t) => sum + t.amount, 0);
+        
+        if (cardTotal > 0) {
+          let dueDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), card.dueDay);
+          // Se o dueDay não for válido (ex: 31 em fevereiro), o JS ajusta sozinho, mas para garantir
+          if (dueDate.getDate() !== card.dueDay) {
+            dueDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+          }
+
+          const syntheticInvoice: SyntheticTransaction = {
+            id: 'fatura_virtual_' + card.id + '_' + currentDate.getMonth(),
+            description: `Fatura ${card.name}`,
+            amount: cardTotal,
+            type: 'expense',
+            date: dueDate,
+            isVirtualInvoice: true,
+            creditCardId: card.id
+          };
+          expenseTransactions.push(syntheticInvoice);
+        }
+      });
 
       const incomeTotal = incomeTransactions.reduce((sum, t) => sum + t.amount, 0);
       const expenseTotal = expenseTransactions.reduce((sum, t) => sum + t.amount, 0);
@@ -192,13 +218,17 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
         },
         expense: {
           total: expenseTotal,
-          transactions: expenseTransactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+          transactions: expenseTransactions.sort((a, b) => {
+            const dateA = new Date(a.date).getTime();
+            const dateB = new Date(b.date).getTime();
+            return dateA - dateB;
+          })
         }
       });
     });
 
     return groups.sort((a, b) => b.totalBalance - a.totalBalance);
-  }, [filteredTransactions, accounts, previousBalances]);
+  }, [filteredTransactions, allTransactions, creditCards, accounts, previousBalances, currentDate]);
 
   const toggleAccountExpansion = (accountId: string) => {
     const newExpanded = new Set(expandedAccounts);
@@ -234,6 +264,7 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
           onToggleAccount={toggleAccountExpansion}
           onEditTransaction={openTransactionForm}
           totalBalance={totals.balance}
+          currentDate={currentDate}
         />
 
 

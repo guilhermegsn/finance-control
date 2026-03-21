@@ -10,6 +10,8 @@ export type CreditCardInput = {
   limit: number;
   color: string;
   userId: string;
+  accountId?: string | null;
+  autoDebit?: boolean;
 };
 
 class CreditCardService {
@@ -42,6 +44,8 @@ class CreditCardService {
         card.limit = data.limit;
         card.color = data.color;
         card.userId = data.userId;
+        if (data.accountId) card.accountId = data.accountId;
+        if (data.autoDebit !== undefined) card.autoDebit = data.autoDebit;
       });
     });
   }
@@ -50,12 +54,14 @@ class CreditCardService {
     this.validate({ ...card, ...data } as CreditCardInput);
     return await database.write(async () => {
       return await card.update((c) => {
-        if (data.name) c.name = data.name;
-        if (data.brand) c.brand = data.brand;
-        if (data.closingDay) c.closingDay = data.closingDay;
-        if (data.dueDay) c.dueDay = data.dueDay;
+        if (data.name !== undefined) c.name = data.name;
+        if (data.brand !== undefined) c.brand = data.brand;
+        if (data.closingDay !== undefined) c.closingDay = data.closingDay;
+        if (data.dueDay !== undefined) c.dueDay = data.dueDay;
         if (data.limit !== undefined) c.limit = data.limit;
-        if (data.color) c.color = data.color;
+        if (data.color !== undefined) c.color = data.color;
+        if (data.accountId !== undefined) c.accountId = data.accountId || null;
+        if (data.autoDebit !== undefined) c.autoDebit = data.autoDebit;
       });
     });
   }

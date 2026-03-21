@@ -25,6 +25,22 @@ const CreditCardFormScreen = () => {
   const [closingDay, setClosingDay] = useState(editingCard?.closingDay?.toString() || '');
   const [dueDay, setDueDay] = useState(editingCard?.dueDay?.toString() || '');
   const [color, setColor] = useState(editingCard?.color || '#000000');
+  const [accountId, setAccountId] = useState(editingCard?.accountId || '');
+  const [accounts, setAccounts] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    import('../service/AccountService').then(({ AccountService }) => {
+      AccountService.fetchAll().then(activeAccounts => {
+        setAccounts(
+          activeAccounts.map(acc => ({
+            id: acc.id,
+            label: acc.name,
+            value: acc.id
+          }))
+        );
+      });
+    });
+  }, []);
 
   const brandOptions = Object.keys(brandLogos).map(key => ({
     id: key,
@@ -47,7 +63,8 @@ const CreditCardFormScreen = () => {
         closingDay: parseInt(closingDay, 10),
         dueDay: parseInt(dueDay, 10),
         color,
-        userId: user?.id || 'default_user'
+        userId: user?.id || 'default_user',
+        accountId: accountId || null
       };
 
       console.log('data', data)
@@ -86,6 +103,16 @@ const CreditCardFormScreen = () => {
             selectedValue={brand}
             onSelect={(val: string) => setBrand(val)}
             placeholder={t('Selecione a bandeira')}
+          />
+        </View>
+
+        <View style={styles.formGroup}>
+          <Text>{t('Conta de Pagamento Padrão')}</Text>
+          <Select
+            items={accounts}
+            selectedValue={accountId}
+            onSelect={(val: string) => setAccountId(val)}
+            placeholder={t('Selecione a conta (opcional)')}
           />
         </View>
 
