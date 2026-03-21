@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const mySchema = appSchema({
-  version: 9,
+  version: 10,
   tables: [
     // 1. ACCOUNTS
     tableSchema({
@@ -47,6 +47,7 @@ export const mySchema = appSchema({
         { name: 'amount', type: 'number' },
         { name: 'type', type: 'string' },
         { name: 'date', type: 'number' }, // Data da competência
+        { name: 'purchase_date', type: 'number', isOptional: true }, // Data real da compra (para cartão de crédito)
         { name: 'is_consolidated', type: 'boolean' },
         { name: 'consolidated_at', type: 'number', isOptional: true },
         { name: 'observation', type: 'string', isOptional: true },

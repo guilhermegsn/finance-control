@@ -524,9 +524,12 @@ export const TransactionService = {
         transaction.amount = installmentAmount;
         transaction.type = 'expense';
         
-        // Data de vencimento da primeira parcela
+        // Data de vencimento da primeira parcela (competência)
         const firstDueDate = calculateDueDate(firstInvoiceMonth);
         transaction.date = firstDueDate;
+        
+        // Data real da compra (purchase_date)
+        transaction.purchaseDate = new Date(data.date);
         
         transaction.userId = data.userId;
         transaction.isConsolidated = false;
@@ -563,6 +566,7 @@ export const TransactionService = {
             transaction.amount = installmentAmount;
             transaction.type = 'expense';
             transaction.date = dueDate;
+            transaction.purchaseDate = new Date(data.date);
             transaction.userId = data.userId;
             transaction.isConsolidated = false;
             transaction.isRecurring = false;

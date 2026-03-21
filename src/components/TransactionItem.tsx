@@ -23,7 +23,9 @@ function TransactionItemComponent({ transaction, onLongPress }: TransactionItemP
     <TouchableOpacity onLongPress={onLongPress} style={{ flexDirection: 'row', alignItems: 'center' }}>
       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
         <Text style={{ width: 70, paddingLeft: 10 }}>
-          {new Date(transaction.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+          {transaction.purchaseDate 
+            ? new Date(transaction.purchaseDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+            : new Date(transaction.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
         </Text>
         <Text style={{ paddingLeft: 40, flex: 1 }}>{transaction.description}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>

@@ -17,6 +17,7 @@ export default class Transaction extends Model {
   @field('amount') amount!: number;
   @text('type') type!: 'income' | 'expense';
   @date('date') date!: Date;
+  @date('purchase_date') purchaseDate?: Date;
   @field('is_consolidated') isConsolidated!: boolean;
   @date('consolidated_at') consolidatedAt?: Date;
   @text('observation') observation?: string;
