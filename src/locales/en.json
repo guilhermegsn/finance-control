@@ -92,7 +92,15 @@
         "Cálculo baseado na Tabela Price": "Calculation based on Price Table",
         "Compra no cartão criada com sucesso!": "Credit card purchase created successfully!",
         "Taxa de juros não pode ser negativa": "Interest rate cannot be negative",
-        "Ocorreu um erro ao criar a compra no cartão.": "An error occurred while creating the credit card purchase."
+        "Ocorreu um erro ao criar a compra no cartão.": "An error occurred while creating the credit card purchase.",
+        "Cartões de Crédito": "Credit Cards",
+        "Gasto no Cartão de crédito": "Credit card spending",
+        "Nenhum cartão de crédito cadastrado": "No credit card registered",
+        "Fecha dia": "Closes on",
+        "Vence dia": "Due on",
+        "Limite:": "Limit:",
+        "Nenhuma transação nesta fatura": "No transaction in this invoice",
+        "TOTAL DAS FATURAS": "TOTAL INVOICES"
     },
     "categories": {
         "Alimentação": "Food",

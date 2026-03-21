@@ -5,11 +5,12 @@ import TransactionItem from './TransactionItem';
 import CreditCard from '../models/CreditCard';
 import Transaction from '../models/Transactions';
 import { brandLogos } from '../utils/brandLogos';
-import { 
-  calculateInvoiceTotal, 
+import {
+  calculateInvoiceTotal,
   filterTransactionsByInvoiceMonth,
-  getInvoiceMonthDescription 
+  getInvoiceMonthDescription
 } from '../utils/creditCardInvoiceHelper';
+import { useTranslation } from 'react-i18next';
 
 interface CreditCardSectionProps {
   creditCards: CreditCard[];
@@ -30,27 +31,28 @@ interface CreditCardInvoiceGroup {
   invoiceTransactions: Transaction[];
 }
 
-function CreditCardSectionComponent({ 
-  creditCards, 
-  allTransactions, 
+function CreditCardSectionComponent({
+  creditCards,
+  allTransactions,
   currentDate,
-  onEditTransaction 
+  onEditTransaction
 }: CreditCardSectionProps) {
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  const { t } = useTranslation();
 
   // Filtrar transações que têm credit_card_id (são transações de cartão)
-  const creditCardTransactions = allTransactions.filter(t => 
+  const creditCardTransactions = allTransactions.filter(t =>
     // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
     t._raw?.credit_card_id && t._raw.credit_card_id !== null
   );
 
   // Agrupar transações por cartão e calcular totais da fatura
   const creditCardGroups: CreditCardInvoiceGroup[] = creditCards.map(card => {
-    const cardTransactions = creditCardTransactions.filter(t => 
+    const cardTransactions = creditCardTransactions.filter(t =>
       // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
       t._raw?.credit_card_id === card.id
     );
-    
+
     const invoiceTransactions = filterTransactionsByInvoiceMonth(card, cardTransactions, currentDate);
     const invoiceTotal = calculateInvoiceTotal(card, cardTransactions, currentDate);
 
@@ -86,7 +88,7 @@ function CreditCardSectionComponent({
         />
       );
     }
-    
+
     return (
       <View style={{
         width: 24,
@@ -97,7 +99,7 @@ function CreditCardSectionComponent({
         justifyContent: 'center',
         alignItems: 'center',
       }}>
-        <Icon source="credit-card-outline" size={16} color="#fff" />
+        <Icon source="credit-card-outline" size={16} />
       </View>
     );
   };
@@ -107,7 +109,7 @@ function CreditCardSectionComponent({
       <View style={{ padding: 16, alignItems: 'center' }}>
         <Icon source="credit-card-outline" size={48} />
         <Text style={{ marginTop: 8, opacity: 0.6 }}>
-          Nenhum cartão de crédito cadastrado
+          {t("Nenhum cartão de crédito cadastrado", { ns: "common" })}
         </Text>
       </View>
     );
@@ -118,9 +120,9 @@ function CreditCardSectionComponent({
   return (
     <DataTable>
       <Text style={{ fontSize: 16, fontWeight: "600", marginTop: 20, marginBottom: 8 }}>
-        Cartões de Crédito
+        {t("Cartões de Crédito", { ns: "common" })}
       </Text>
-      
+
       {creditCardGroups.map((group) => {
         const isExpanded = expandedCards.has(group.cardId);
 
@@ -134,7 +136,7 @@ function CreditCardSectionComponent({
                   <View>
                     <Text style={{ fontWeight: 'bold' }}>{group.cardName}</Text>
                     <Text style={{ fontSize: 12, opacity: 0.6 }}>
-                      Fecha dia {group.closingDay} • Vence dia {group.dueDay}
+                      {t("Fecha dia", { ns: "common" })} {group.closingDay} • {t("Vence dia", { ns: "common" })} {group.dueDay}
                     </Text>
                   </View>
                 </View>
@@ -164,7 +166,7 @@ function CreditCardSectionComponent({
                   </DataTable.Cell>
                   <DataTable.Cell numeric>
                     <Text style={{ opacity: 0.6, fontStyle: 'italic' }}>
-                      Limite: R$ {group.limit.toFixed(2)}
+                      {t("Limite:", { ns: "common" })} R$ {group.limit.toFixed(2)}
                     </Text>
                   </DataTable.Cell>
                 </DataTable.Row>
@@ -174,9 +176,9 @@ function CreditCardSectionComponent({
                   group.invoiceTransactions.map((transaction) => (
                     <DataTable.Row key={transaction.id} onLongPress={() => onEditTransaction?.(transaction)}>
                       <DataTable.Cell style={{ paddingLeft: 10 }}>
-                        <TransactionItem 
-                          transaction={transaction} 
-                          onLongPress={() => onEditTransaction?.(transaction)} 
+                        <TransactionItem
+                          transaction={transaction}
+                          onLongPress={() => onEditTransaction?.(transaction)}
                         />
                       </DataTable.Cell>
                     </DataTable.Row>
@@ -185,7 +187,7 @@ function CreditCardSectionComponent({
                   <DataTable.Row>
                     <DataTable.Cell style={{ paddingLeft: 10 }}>
                       <Text style={{ opacity: 0.6, fontStyle: 'italic', padding: 8 }}>
-                        Nenhuma transação nesta fatura
+                        {t("Nenhuma transação nesta fatura", { ns: "common" })}
                       </Text>
                     </DataTable.Cell>
                   </DataTable.Row>
@@ -199,7 +201,7 @@ function CreditCardSectionComponent({
       {/* Total das Faturas */}
       <DataTable.Row>
         <DataTable.Cell>
-          <Text style={{ fontWeight: 'bold' }}>TOTAL DAS FATURAS</Text>
+          <Text style={{ fontWeight: 'bold' }}>{t("TOTAL DAS FATURAS", { ns: "common" })}</Text>
         </DataTable.Cell>
         <DataTable.Cell numeric>
           <Text style={{ fontWeight: 'bold', color: '#CC4A4A' }}>
