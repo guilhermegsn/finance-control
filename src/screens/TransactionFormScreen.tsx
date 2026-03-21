@@ -199,15 +199,16 @@ export default function TransactionFormScreen() {
 
 
   return (
-    <ScrollView style={{ flex: 1, padding: 20 }}>
-      {activePicker && (
-        <DateTimePicker
-          value={activePicker === 'date' ? formData.date : (formData.recurringEndDate || new Date())}
-          mode="date"
-          display="default"
-          onChange={handleDateChange}
-        />
-      )}
+    <View style={{ flex: 1 }}>
+      <ScrollView style={{ flex: 1, padding: 20 }}>
+        {activePicker && (
+          <DateTimePicker
+            value={activePicker === 'date' ? formData.date : (formData.recurringEndDate || new Date())}
+            mode="date"
+            display="default"
+            onChange={handleDateChange}
+          />
+        )}
 
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <Text style={{ fontSize: 20, fontWeight: 'bold' }}>
@@ -391,67 +392,78 @@ export default function TransactionFormScreen() {
         )}
       </View>
 
-      {/* Botões de ação */}
-      <Divider style={{ marginVertical: 24 }} />
+        <View style={{ height: 100 }} />
+      </ScrollView>
 
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
-        <Button
-          mode="outlined"
-          onPress={() => {
-            // onCancel?.();
-            navigation.goBack();
-          }}
-          style={{ flex: 1 }}
-        >
-          {t('Cancelar')}
-        </Button>
-
-        {transaction && !isDeleting && (
+      {/* Botões de ação fixos no rodapé */}
+      <View style={{
+        padding: 20,
+        backgroundColor: '#fff',
+        borderTopWidth: 1,
+        borderTopColor: '#f0f0f0',
+        elevation: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
           <Button
-            mode="contained"
-            onPress={() => setIsDeleting(true)}
-            buttonColor="#FF6B6B"
+            mode="outlined"
+            onPress={() => {
+              // onCancel?.();
+              navigation.goBack();
+            }}
             style={{ flex: 1 }}
           >
-            {t('Excluir')}
+            {t('Cancelar')}
           </Button>
-        )}
 
-        {isDeleting ? (
-          <View style={{ backgroundColor: '#FFF5F5', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#FED7D7', marginTop: 16, width: '100%' }}>
-            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#C53030', marginBottom: 4 }}>{t('Confirmar exclusão?')}</Text>
-            <Text style={{ fontSize: 14, opacity: 0.7, marginBottom: 16 }}>{t('Esta ação não pode ser desfeita.')}</Text>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <Button
-                mode="outlined"
-                onPress={() => setIsDeleting(false)}
-                style={{ flex: 1 }}
-              >
-                {t('Cancelar')}
-              </Button>
-              <Button
-                mode="contained"
-                onPress={handleDelete}
-                buttonColor="#FF6B6B"
-                style={{ flex: 1 }}
-              >
-                {t('Excluir')}
-              </Button>
+          {transaction && !isDeleting && (
+            <Button
+              mode="contained"
+              onPress={() => setIsDeleting(true)}
+              buttonColor="#FF6B6B"
+              style={{ flex: 1 }}
+            >
+              {t('Excluir')}
+            </Button>
+          )}
+
+          {isDeleting ? (
+            <View style={{ backgroundColor: '#FFF5F5', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#FED7D7', marginTop: 16, width: '100%' }}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#C53030', marginBottom: 4 }}>{t('Confirmar exclusão?')}</Text>
+              <Text style={{ fontSize: 14, opacity: 0.7, marginBottom: 16 }}>{t('Esta ação não pode ser desfeita.')}</Text>
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <Button
+                  mode="outlined"
+                  onPress={() => setIsDeleting(false)}
+                  style={{ flex: 1 }}
+                >
+                  {t('Cancelar')}
+                </Button>
+                <Button
+                  mode="contained"
+                  onPress={handleDelete}
+                  buttonColor="#FF6B6B"
+                  style={{ flex: 1 }}
+                >
+                  {t('Excluir')}
+                </Button>
+              </View>
             </View>
-          </View>
-        ) : (
-          <Button
-            mode="contained"
-            onPress={handleSave}
-            disabled={isInvalidForm()}
-            style={{ flex: 1 }}
-          >
-            {transaction ? t('Atualizar') : t('Salvar')}
-          </Button>
-        )}
+          ) : (
+            <Button
+              mode="contained"
+              onPress={handleSave}
+              disabled={isInvalidForm()}
+              style={{ flex: 1 }}
+            >
+              {transaction ? t('Atualizar') : t('Salvar')}
+            </Button>
+          )}
+        </View>
       </View>
-
-      <View style={{ height: 100 }} />
 
       <Portal>
         <Dialog
@@ -473,6 +485,6 @@ export default function TransactionFormScreen() {
           </Dialog.Actions>
         </Dialog>
       </Portal>
-    </ScrollView>
+    </View>
   );
 }

@@ -54,7 +54,8 @@
         "Configurações": "Settings",
         "Modo Escuro": "Dark Mode",
         "Ativar tema escuro no app": "Enable dark theme in the app",
-        "Categorias": "Categories"
+        "Categorias": "Categories",
+        "Ícone": "Icon"
     },
     "categories": {
         "Alimentação": "Food",

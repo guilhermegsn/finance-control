@@ -25,14 +25,16 @@ const CategoryItem = ({ category, onEdit }: { category: Category; onEdit?: (cate
     <Surface style={styles.card} elevation={1}>
       <List.Item
         title={category.isSystem ? t(`categories:${category.name}`) : category.name}
-        description={`Tipo: ${category.type === 'income' ? 'Receita' : 'Despesa'} | Ícone: ${category.icon}`}
+        description={`${t("Tipo")}: ${category.type === 'income' ? t('Entrada') : t('Despesa')} | ${t("Ícone")}: ${category.icon}`}
         left={props => <List.Icon {...props} icon={category.icon} color={category.color} />}
         right={props => (
           <View style={{ flexDirection: 'row' }}>
-            {onEdit && (
+            {onEdit && !category.isSystem && (
               <IconButton {...props} icon="pencil" onPress={handleEdit} />
             )}
-            <IconButton {...props} icon="delete" onPress={handleDelete} />
+            {!category.isSystem &&
+              <IconButton {...props} icon="delete" onPress={handleDelete} />
+            }
           </View>
         )}
       />
