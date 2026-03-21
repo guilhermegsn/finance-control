@@ -104,7 +104,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
 
   const handleSelectTransfer = () => {
     setTypeModalVisible(false);
-    Alert.alert('Em breve', 'Funcionalidade de transferência entre contas será implementada em breve.');
+    navigation.navigate('TransferForm', {accounts: accounts})
   };
 
   const filteredTransactions = filterTransactionsByMonth(transactions, currentDate);

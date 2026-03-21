@@ -6,13 +6,17 @@ import AccountsScreen from '../screens/AccountsScreen';
 import CategoriesScreen from '../screens/CategoriesScreen';
 import TransactionFormScreen from '../screens/TransactionFormScreen';
 import { useTheme } from '../contexts/ThemeContext';
+import TransferFormScreen from '../screens/TransferFormScreen';
+import { useTranslation } from 'react-i18next';
 
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
+
+  const { t } = useTranslation();
   const { isDarkMode } = useTheme();
   const navigationTheme = isDarkMode ? NavigationDarkTheme : NavigationDefaultTheme;
-  
+
   return (
     <NavigationContainer theme={navigationTheme}>
       <Stack.Navigator>
@@ -26,7 +30,7 @@ export default function AppNavigator() {
           name="Accounts"
           component={AccountsScreen}
           options={{
-            title: 'Minhas contas',
+            title: t('Minhas contas'),
           }}
         />
 
@@ -34,7 +38,7 @@ export default function AppNavigator() {
           name="Categories"
           component={CategoriesScreen}
           options={{
-            title: 'Categorias',
+            title: t('Categorias'),
           }}
         />
 
@@ -42,7 +46,15 @@ export default function AppNavigator() {
           name="TransactionForm"
           component={TransactionFormScreen}
           options={{
-            title: 'Transação',
+            title: t('Transação'),
+          }}
+        />
+
+        <Stack.Screen
+          name="TransferForm"
+          component={TransferFormScreen}
+          options={{
+            title: t('Transferência'),
           }}
         />
       </Stack.Navigator>

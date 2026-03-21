@@ -365,6 +365,50 @@ export const TransactionService = {
     });
   },
 
+  // Criar transferência entre contas
+  createTransfer: async (data: {
+    amount: number;
+    date: Date;
+    description: string;
+    sourceAssetId: string;
+    destinationAssetId: string;
+    userId: string;
+  }) => {
+    await database.write(async () => {
+      const transactionCollection = database.get<Transaction>('transactions');
+      
+      const sourceTransaction = transactionCollection.prepareCreate((transaction) => {
+        // @ts-ignore
+        transaction._raw.account_id = data.sourceAssetId;
+        // @ts-ignore
+        transaction._raw.category_id = null; // Transferência não precisa de categoria específica, ou pode ter uma categoria "Transferência" se existir
+        transaction.description = `[Transferência] ${data.description}`;
+        transaction.amount = data.amount; // A modelagem de expense já subtrai no saldo
+        transaction.type = 'expense';
+        transaction.date = data.date;
+        transaction.userId = data.userId;
+        transaction.isConsolidated = true;
+        transaction.isRecurring = false;
+      });
+
+      const destinationTransaction = transactionCollection.prepareCreate((transaction) => {
+        // @ts-ignore
+        transaction._raw.account_id = data.destinationAssetId;
+        // @ts-ignore
+        transaction._raw.category_id = null;
+        transaction.description = `[Transferência] ${data.description}`;
+        transaction.amount = data.amount;
+        transaction.type = 'income';
+        transaction.date = data.date;
+        transaction.userId = data.userId;
+        transaction.isConsolidated = true;
+        transaction.isRecurring = false;
+      });
+
+      await database.batch(sourceTransaction, destinationTransaction);
+    });
+  },
+
   // Calcular saldo de uma conta antes de uma data específica
   getBalanceBeforeDate: async (accountId: string, date: Date): Promise<number> => {
     // Buscar todas as transações da conta com data anterior à data fornecida
