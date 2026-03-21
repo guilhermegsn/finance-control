@@ -10,6 +10,7 @@ import TransferFormScreen from '../screens/TransferFormScreen';
 import CreditCardListScreen from '../screens/CreditCardListScreen';
 import CreditCardFormScreen from '../screens/CreditCardFormScreen';
 import { useTranslation } from 'react-i18next';
+import CreditCardPurchaseScreen from '../screens/CreditCardPurchaseScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -59,19 +60,28 @@ export default function AppNavigator() {
             title: t('Transferência'),
           }}
         />
-        
+
         <Stack.Screen
           name="CreditCardList"
           component={CreditCardListScreen}
-           options={{
+          options={{
             title: t('Cartões de crédito'),
           }}
         />
-        
+
         <Stack.Screen
           name="CreditCardForm"
           component={CreditCardFormScreen}
-           options={{
+          options={{
+            title: t('Cartão de crédito'),
+          }}
+        />
+
+
+        <Stack.Screen
+          name="CreditCardPurchase"
+          component={CreditCardPurchaseScreen}
+          options={{
             title: t('Cartão de crédito'),
           }}
         />

@@ -12,6 +12,7 @@ export default class CreditCard extends Model {
     @field('due_day') dueDay!: number;
     @field('limit') limit!: number;
     @text('color') color!: string;
+    @field('auto_debit') autoDebit!: boolean;
     @date('deleted_at') deletedAt!: number | null;
     
     @readonly @date('created_at') createdAt!: Date;

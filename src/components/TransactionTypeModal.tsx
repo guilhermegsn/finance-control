@@ -9,6 +9,7 @@ interface TransactionTypeModalProps {
   onClose: () => void;
   onSelectIncome: () => void;
   onSelectExpense: () => void;
+  onSelectCredit: () => void;
   onSelectTransfer: () => void;
 }
 
@@ -17,6 +18,7 @@ export default function TransactionTypeModal({
   onClose,
   onSelectIncome,
   onSelectExpense,
+  onSelectCredit,
   onSelectTransfer,
 }: TransactionTypeModalProps) {
   const { isDarkMode } = useTheme();
@@ -76,6 +78,23 @@ export default function TransactionTypeModal({
               <Text style={[styles.optionTitle]}>{t("account:Saída")}</Text>
               <Text style={[styles.optionDescription]}>
                 {t("Despesas, compras, pagamentos")}
+              </Text>
+            </View>
+            <Icon source="chevron-right" size={24} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.option, { borderBottomColor: getBorderColor() }]}
+            onPress={onSelectCredit}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.iconContainer, { backgroundColor: '#6e5af0' }]}>
+              <Icon source="credit-card" size={28} color="#fff" />
+            </View>
+            <View style={styles.optionTextContainer}>
+              <Text style={[styles.optionTitle]}>{t("Cartão de crédito")}</Text>
+              <Text style={[styles.optionDescription]}>
+                {t("Gasto no Cartão de crédito")}
               </Text>
             </View>
             <Icon source="chevron-right" size={24} />

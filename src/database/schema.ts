@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const mySchema = appSchema({
-  version: 8,
+  version: 9,
   tables: [
     // 1. ACCOUNTS
     tableSchema({
@@ -69,6 +69,7 @@ export const mySchema = appSchema({
         { name: 'due_day', type: 'number' },
         { name: 'limit', type: 'number' },
         { name: 'color', type: 'string' },
+        { name: 'auto_debit', type: 'boolean' },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
         { name: 'deleted_at', type: 'number', isOptional: true },

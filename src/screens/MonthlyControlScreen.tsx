@@ -74,7 +74,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
       isConsolidated: transaction.isConsolidated,
       isRecurring: transaction.isRecurring,
     } : undefined;
-    
+
     const safeAccounts = accounts.map(acc => ({
       id: acc.id,
       name: acc.name,
@@ -97,14 +97,19 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
     });
   };
 
-  const handleSelectTransactionType = (type: 'income' | 'expense') => {
+  const handleSelectTransactionType = (type: 'income' | 'expense' | 'credit') => {
     setTypeModalVisible(false);
-    openTransactionForm(undefined, type);
+    if (type === 'income' || type === 'expense') {
+      openTransactionForm(undefined, type);
+    } else {
+      navigation.navigate('CreditCardPurchase')
+    }
   };
+
 
   const handleSelectTransfer = () => {
     setTypeModalVisible(false);
-    navigation.navigate('TransferForm', {accounts: accounts})
+    navigation.navigate('TransferForm', { accounts: accounts })
   };
 
   const filteredTransactions = filterTransactionsByMonth(transactions, currentDate);
@@ -195,7 +200,7 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
       </View>
 
       <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false}>
-        
+
         {/* Lista de Contas */}
         <Text style={styles.sectionTitle}>{t('Contas')}</Text>
         <AccountsTable
@@ -244,6 +249,8 @@ function MonthlyControlScreen({ transactions, accounts, categories }: MonthlyCon
         onClose={() => setTypeModalVisible(false)}
         onSelectIncome={() => handleSelectTransactionType('income')}
         onSelectExpense={() => handleSelectTransactionType('expense')}
+        onSelectCredit={() => handleSelectTransactionType('credit')}
+
         onSelectTransfer={handleSelectTransfer}
       />
     </View>

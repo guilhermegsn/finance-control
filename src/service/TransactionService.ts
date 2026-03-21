@@ -1,5 +1,6 @@
 import { database } from '../database';
 import Transaction from '../models/Transactions';
+import CreditCard from '../models/CreditCard';
 import { Q } from '@nozbe/watermelondb';
 
 export const TransactionService = {
@@ -431,5 +432,160 @@ export const TransactionService = {
     });
     
     return balance;
+  },
+
+  // Criar compra no cartão de crédito com parcelamento
+  createCreditCardPurchase: async (data: {
+    amount: number;
+    description: string;
+    date: Date;
+    creditCardId: string;
+    categoryId: string;
+    installments: number;
+    interestRate: number;
+    userId: string;
+  }) => {
+    await database.write(async () => {
+      // Validações básicas
+      if (data.installments < 1) {
+        throw new Error('O número de parcelas deve ser maior que zero');
+      }
+      if (data.interestRate < 0) {
+        throw new Error('A taxa de juros não pode ser negativa');
+      }
+
+      // Buscar o cartão de crédito
+      const creditCard = await database.get<CreditCard>('credit_cards').find(data.creditCardId);
+      
+      // Calcular valor da parcela e valor total
+      let installmentAmount = data.amount;
+      let totalAmount = data.amount;
+      
+      if (data.installments > 1) {
+        if (data.interestRate > 0) {
+          // Tabela Price: PMT = PV * i / (1 - (1 + i)^-n)
+          const i = data.interestRate / 100; // taxa decimal
+          const n = data.installments;
+          const pv = data.amount;
+          const pmt = pv * i / (1 - Math.pow(1 + i, -n));
+          installmentAmount = parseFloat(pmt.toFixed(2));
+          totalAmount = parseFloat((installmentAmount * n).toFixed(2));
+        } else {
+          // Sem juros: divisão simples
+          installmentAmount = parseFloat((data.amount / data.installments).toFixed(2));
+          totalAmount = data.amount;
+        }
+      }
+
+      // Determinar mês da primeira parcela baseado no closing_day
+      const purchaseDate = new Date(data.date);
+      const purchaseDay = purchaseDate.getDate();
+      const closingDay = creditCard.closingDay;
+      
+      // Se dia_da_compra >= closing_day: fatura atual já fechou, primeira parcela cai no mês seguinte
+      // Se dia_da_compra < closing_day: primeira parcela cai no mês atual
+      let firstInstallmentMonthOffset = 0;
+      if (purchaseDay >= closingDay) {
+        firstInstallmentMonthOffset = 1; // Próximo mês
+      }
+      
+      // Função para adicionar meses a uma data, tratando virada de ano
+      const addMonths = (date: Date, months: number): Date => {
+        const newDate = new Date(date);
+        newDate.setMonth(newDate.getMonth() + months);
+        return newDate;
+      };
+
+      // Função para calcular a data de vencimento (due_day) de uma fatura
+      const calculateDueDate = (baseDate: Date): Date => {
+        const dueDay = creditCard.dueDay;
+        const dueDate = new Date(baseDate);
+        dueDate.setDate(dueDay);
+        
+        // Ajustar se o dia não existe no mês (ex: 31 em fevereiro)
+        if (dueDate.getDate() !== dueDay) {
+          dueDate.setDate(0); // Último dia do mês anterior
+        }
+        
+        return dueDate;
+      };
+
+      // Calcular data da primeira fatura (mês base)
+      const firstInvoiceMonth = addMonths(purchaseDate, firstInstallmentMonthOffset);
+      firstInvoiceMonth.setDate(1); // Primeiro dia do mês para consistência
+      
+      // Criar a primeira parcela para obter seu ID
+      const firstTransaction = await database.get<Transaction>('transactions').create((transaction) => {
+        // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
+        transaction._raw.account_id = creditCard.accountId || '';
+        // @ts-ignore
+        transaction._raw.category_id = data.categoryId;
+        transaction.description = `${data.description} (1/${data.installments})`;
+        transaction.amount = installmentAmount;
+        transaction.type = 'expense';
+        
+        // Data de vencimento da primeira parcela
+        const firstDueDate = calculateDueDate(firstInvoiceMonth);
+        transaction.date = firstDueDate;
+        
+        transaction.userId = data.userId;
+        transaction.isConsolidated = false;
+        transaction.isRecurring = false;
+        // @ts-ignore - campo não definido no modelo mas existe no schema
+        transaction._raw.credit_card_id = data.creditCardId;
+        // related_transaction_id não preenchido para a primeira parcela
+      });
+
+      // Obter o ID da primeira transação
+      const firstTransactionId = firstTransaction.id;
+      
+      // Se houver mais parcelas, criar as demais
+      if (data.installments > 1) {
+        const records = [];
+        
+        for (let i = 1; i < data.installments; i++) {
+          // Mês da fatura: primeira fatura + i meses
+          const invoiceMonth = addMonths(firstInvoiceMonth, i);
+          
+          // Data de vencimento: due_day do mês da fatura
+          const dueDate = calculateDueDate(invoiceMonth);
+          
+          // Descrição com número da parcela
+          const installmentDescription = `${data.description} (${i + 1}/${data.installments})`;
+          
+          const transactionCollection = database.get<Transaction>('transactions');
+          const transactionRecord = transactionCollection.prepareCreate((transaction) => {
+            // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
+            transaction._raw.account_id = creditCard.accountId || '';
+            // @ts-ignore
+            transaction._raw.category_id = data.categoryId;
+            transaction.description = installmentDescription;
+            transaction.amount = installmentAmount;
+            transaction.type = 'expense';
+            transaction.date = dueDate;
+            transaction.userId = data.userId;
+            transaction.isConsolidated = false;
+            transaction.isRecurring = false;
+            // @ts-ignore - campo não definido no modelo mas existe no schema
+            transaction._raw.credit_card_id = data.creditCardId;
+            // @ts-ignore
+            transaction._raw.related_transaction_id = firstTransactionId;
+          });
+          
+          records.push(transactionRecord);
+        }
+        
+        // Executar batch para criar as parcelas restantes
+        await database.batch(...records);
+      }
+      
+      // Retornar informações sobre a compra criada (para possível uso futuro)
+      return {
+        firstTransactionId,
+        installmentAmount,
+        totalAmount,
+        installments: data.installments
+      };
+    });
   }
 };
