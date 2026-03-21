@@ -24,35 +24,28 @@ export function isTransactionDueInMonth(
  */
 export function isTransactionInInvoiceMonth(
   transaction: Transaction,
-  creditCard: CreditCard,
+  card: CreditCard,
   referenceDate: Date
 ): boolean {
-  // Se não tem purchaseDate, fallback para date (compatibilidade)
-  const purchaseDate = transaction.purchaseDate ? new Date(transaction.purchaseDate) : new Date(transaction.date);
-  const closingDay = creditCard.closingDay;
+  // 1. Usamos a data de vencimento da parcela (que já está correta no banco para cada mês)
+  const dueDate = new Date(transaction.date);
   
-  // O mês de referência é o mês da fatura que o usuário está visualizando
-  const refYear = referenceDate.getFullYear();
-  const refMonth = referenceDate.getMonth();
-  
-  // Calcular a data de fechamento do mês de referência
-  let closingDate = new Date(refYear, refMonth, closingDay);
-  // Ajustar se o dia não existe no mês (ex: 31 em fevereiro)
-  if (closingDate.getDate() !== closingDay) {
-    closingDate = new Date(refYear, refMonth + 1, 0); // último dia do mês
-  }
-  
-  // Calcular a data de fechamento do mês anterior
-  let prevClosingDate = new Date(refYear, refMonth - 1, closingDay);
-  if (prevClosingDate.getDate() !== closingDay) {
-    prevClosingDate = new Date(refYear, refMonth, 0); // último dia do mês anterior
-  }
-  
-  // A compra pertence ao ciclo da fatura se:
-  // purchaseDate > prevClosingDate AND purchaseDate <= closingDate
-  return purchaseDate > prevClosingDate && purchaseDate <= closingDate;
-}
+  let invoiceMonth = dueDate.getMonth();
+  let invoiceYear = dueDate.getFullYear();
 
+  // 2. A Engenharia Reversa: Se o dia de vencimento do cartão é numericamente menor que o dia de fechamento (Ex: Fecha dia 20, Vence dia 05), a fatura pertence ao mês ANTERIOR ao vencimento.
+  if (card.dueDay < card.closingDay) {
+    invoiceMonth -= 1;
+    // Trata a regressão de ano (Janeiro para Dezembro)
+    if (invoiceMonth < 0) {
+      invoiceMonth = 11;
+      invoiceYear -= 1;
+    }
+  }
+
+  // 3. Verifica se a parcela pertence ao mês que o usuário selecionou na tela
+  return invoiceMonth === referenceDate.getMonth() && invoiceYear === referenceDate.getFullYear();
+}
 /**
  * Calcula o total da fatura para um cartão em um determinado mês
  * usando a regra de data de compra (REGRA 1)
