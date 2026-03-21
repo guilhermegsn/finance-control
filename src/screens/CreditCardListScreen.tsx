@@ -2,7 +2,6 @@ import React from 'react';
 import { View, StyleSheet, Image, Alert, FlatList } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { FAB, Icon, Text } from 'react-native-paper';
 import { withObservables } from '@nozbe/watermelondb/react';
 import { useTheme } from '../contexts/ThemeContext';

@@ -210,34 +210,7 @@ export default function AccountsScreen() {
                   }
                 />
 
-                {/* Logo do banco selecionado */}
-                {/* {selectedBank && (
-                  <View style={styles.selectedBankContainer}>
-                    <Image
-                      source={selectedBank.logoUrl}
-                      style={styles.selectedBankLogo}
-                    />
-                    <View style={styles.selectedBankInfo}>
-                      <TextInput
-                        label="Nome do Banco"
-                        value={selectedBank.name}
-                        style={styles.input}
-                        mode="outlined"
-                        editable={false}
-                      />
-                      {selectedBank.code && (
-                        <TextInput
-                          label="Código do Banco"
-                          value={selectedBank.code}
-                          style={styles.input}
-                          mode="outlined"
-                          editable={false}
-                        />
-                      )}
-                    </View>
-                  </View>
-                )} */}
-
+               
                 {/* Lista de sugestões */}
                 {bankSuggestions.length > 0 && (
                   <Card style={styles.suggestionsCard}>
