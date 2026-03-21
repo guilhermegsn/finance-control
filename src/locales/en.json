@@ -55,7 +55,11 @@
         "Modo Escuro": "Dark Mode",
         "Ativar tema escuro no app": "Enable dark theme in the app",
         "Categorias": "Categories",
-        "Ícone": "Icon"
+        "Ícone": "Icon",
+        "Sim": "Yes",
+        "Não": "No",
+        "Confirmação": "Confirmation",
+        "Confirma a exclusão do registro?": "Are you sure you want to delete this record?"
     },
     "categories": {
         "Alimentação": "Food",

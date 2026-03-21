@@ -1,7 +1,7 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View, TouchableOpacity, ScrollView } from 'react-native';
+import { View, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { Button, TextInput, Divider, Switch, HelperText, Text, Icon, Portal, Dialog } from 'react-native-paper';
 import { Select } from '../components/Select';
 import { TransactionService } from '../service/TransactionService';
@@ -210,158 +210,41 @@ export default function TransactionFormScreen() {
           />
         )}
 
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <Text style={{ fontSize: 20, fontWeight: 'bold' }}>
-          {transaction ? t('Editar Transação') : t('Nova Transação')}
-        </Text>
-      </View>
-
-      {/* Tipo e Data */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
-        <View style={{ flex: 1, marginHorizontal: 4 }}>
-
-          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Tipo')}</Text>
-          <Select
-            backgroundColor={formData.type === 'income' ? '#2E9E57' : '#CC4A4A'}
-            fontColor='#ffff'
-            selectedValue={formData.type || ''}
-            onSelect={(value) => setFormData((prev: any) => ({ ...prev, type: value }))}
-            items={[
-              {
-                id: 'income',
-                label: t('Entrada'),
-                value: 'income',
-                icon: 'arrow-down-circle'
-              },
-              {
-                id: 'expense',
-                label: t('account:Saída'),
-                value: 'expense',
-                icon: 'arrow-up-circle'
-              }]}
-          />
-
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <Text style={{ fontSize: 20, fontWeight: 'bold' }}>
+            {transaction ? t('Editar Transação') : t('Nova Transação')}
+          </Text>
         </View>
 
-        <View style={{ flex: 1, marginHorizontal: 4 }}>
-          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Data')}</Text>
-          <TouchableOpacity
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              paddingVertical: 12,
-              paddingHorizontal: 16,
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: '#ddd',
-              gap: 8,
-            }}
-            onPress={() => setActivePicker('date')}
-          >
-            <Icon source="calendar" size={16} />
-            <Text style={{ fontSize: 14 }}>
-              {formData.date.toLocaleDateString('pt-BR')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+        {/* Tipo e Data */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
+          <View style={{ flex: 1, marginHorizontal: 4 }}>
 
-      {/* Conta e Categoria */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
-        <View style={{ flex: 1, marginHorizontal: 4 }}>
-          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Conta')}</Text>
-          <Select
-            items={accounts.map((account: Account) => {
-              // Resolvendo a imagem da conta da mesma forma que no AccountsTable
-              let imageSource = account.logoUrl;
-              if (!imageSource && account.bankCode && account.bankCode.trim() !== '') {
-                const bank = require('../service/BankService').default.getBankByCode(account.bankCode);
-                if (bank) {
-                  imageSource = bank.logoUrl;
-                }
-              }
-              return {
-                id: account.id,
-                label: account.name,
-                value: account.id,
-                image: imageSource
-              };
-            })}
-            selectedValue={formData.accountId}
-            onSelect={(value) => setFormData(prev => ({ ...prev, accountId: value }))}
-            placeholder={t("Selecionar conta")}
-          />
-        </View>
+            <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Tipo')}</Text>
+            <Select
+              backgroundColor={formData.type === 'income' ? '#2E9E57' : '#CC4A4A'}
+              fontColor='#ffff'
+              selectedValue={formData.type || ''}
+              onSelect={(value) => setFormData((prev: any) => ({ ...prev, type: value }))}
+              items={[
+                {
+                  id: 'income',
+                  label: t('Entrada'),
+                  value: 'income',
+                  icon: 'arrow-down-circle'
+                },
+                {
+                  id: 'expense',
+                  label: t('account:Saída'),
+                  value: 'expense',
+                  icon: 'arrow-up-circle'
+                }]}
+            />
 
-        <View style={{ flex: 1, marginHorizontal: 4 }}>
-          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Categoria')}</Text>
-          <Select
-            items={categories
-              .filter((cat: Category) => !formData.type || cat.type === formData.type)
-              .map((category: Category) => ({
-                id: category.id,
-                label: t(`categories:${category.name}`),
-                value: category.id,
-                icon: category.icon
-              }))}
-            selectedValue={formData.categoryId}
-            onSelect={(value) => setFormData(prev => ({ ...prev, categoryId: value }))}
-            placeholder={t("Selecione")}
-          />
-        </View>
-      </View>
+          </View>
 
-      {/* Descrição */}
-      <View style={{ marginBottom: 20 }}>
-        <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Descrição')}</Text>
-        <TextInput
-          value={formData.description}
-          onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
-          placeholder={t("Salário, Aluguel, Supermercado")}
-        />
-      </View>
-
-      {/* Valor */}
-      <View style={{ marginBottom: 20 }}>
-        <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Valor')}</Text>
-        <TextInput
-          value={formData.value}
-          onChangeText={(text) => setFormData(prev => ({ ...prev, value: text }))}
-          placeholder={t("0,00")}
-          keyboardType="numeric"
-          left={<TextInput.Affix text="R$ " />}
-        />
-      </View>
-
-      {/* Efetivado/Pago? */}
-      <View style={{ marginBottom: 20 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <Text style={{ fontSize: 14, fontWeight: '600' }}>{t('Efetivado/Pago?')}</Text>
-          <Switch
-            value={formData.isConsolidated}
-            onValueChange={(value) => setFormData(prev => ({ ...prev, isConsolidated: value }))}
-          />
-        </View>
-        <HelperText type="info">
-          {formData.isConsolidated ? t('Transação já efetivada/paga') : t('Transação pendente')}
-        </HelperText>
-      </View>
-
-      {/* Recorrência */}
-      <View style={{ marginBottom: 24 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <Text style={{ fontSize: 14, fontWeight: '600' }}>{t('Recorrência')}</Text>
-          <Switch
-            value={formData.isRecurring}
-            onValueChange={(value) => setFormData(prev => ({ ...prev, isRecurring: value }))}
-            disabled={!!transaction}
-          />
-        </View>
-
-        {formData.isRecurring && (
-          <View style={{ backgroundColor: '#f8f9fa', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#e9ecef' }}>
-            <Text style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>{t('Data Final (opcional)')}</Text>
+          <View style={{ flex: 1, marginHorizontal: 4 }}>
+            <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Data')}</Text>
             <TouchableOpacity
               style={{
                 flexDirection: 'row',
@@ -372,25 +255,142 @@ export default function TransactionFormScreen() {
                 borderRadius: 12,
                 borderWidth: 1,
                 borderColor: '#ddd',
-                backgroundColor: '#f8f9fa',
                 gap: 8,
               }}
-              onPress={() => setActivePicker('recurringEndDate')}
+              onPress={() => setActivePicker('date')}
             >
               <Icon source="calendar" size={16} />
               <Text style={{ fontSize: 14 }}>
-                {formData.recurringEndDate
-                  ? formData.recurringEndDate.toLocaleDateString('pt-BR')
-                  : t('Selecionar data final')
-                }
+                {formData.date.toLocaleDateString('pt-BR')}
               </Text>
             </TouchableOpacity>
-            <HelperText type="info" style={{ marginTop: 8 }}>
-              {t('Se não definir uma data final, a recorrência será criada para os próximos 2 anos')}
-            </HelperText>
           </View>
-        )}
-      </View>
+        </View>
+
+        {/* Conta e Categoria */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
+          <View style={{ flex: 1, marginHorizontal: 4 }}>
+            <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Conta')}</Text>
+            <Select
+              items={accounts.map((account: Account) => {
+                // Resolvendo a imagem da conta da mesma forma que no AccountsTable
+                let imageSource = account.logoUrl;
+                if (!imageSource && account.bankCode && account.bankCode.trim() !== '') {
+                  const bank = require('../service/BankService').default.getBankByCode(account.bankCode);
+                  if (bank) {
+                    imageSource = bank.logoUrl;
+                  }
+                }
+                return {
+                  id: account.id,
+                  label: account.name,
+                  value: account.id,
+                  image: imageSource
+                };
+              })}
+              selectedValue={formData.accountId}
+              onSelect={(value) => setFormData(prev => ({ ...prev, accountId: value }))}
+              placeholder={t("Selecionar conta")}
+            />
+          </View>
+
+          <View style={{ flex: 1, marginHorizontal: 4 }}>
+            <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Categoria')}</Text>
+            <Select
+              items={categories
+                .filter((cat: Category) => !formData.type || cat.type === formData.type)
+                .map((category: Category) => ({
+                  id: category.id,
+                  label: t(`categories:${category.name}`),
+                  value: category.id,
+                  icon: category.icon
+                }))}
+              selectedValue={formData.categoryId}
+              onSelect={(value) => setFormData(prev => ({ ...prev, categoryId: value }))}
+              placeholder={t("Selecione")}
+            />
+          </View>
+        </View>
+
+        {/* Descrição */}
+        <View style={{ marginBottom: 20 }}>
+          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Descrição')}</Text>
+          <TextInput
+            value={formData.description}
+            onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
+            placeholder={t("Salário, Aluguel, Supermercado")}
+          />
+        </View>
+
+        {/* Valor */}
+        <View style={{ marginBottom: 20 }}>
+          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Valor')}</Text>
+          <TextInput
+            value={formData.value}
+            onChangeText={(text) => setFormData(prev => ({ ...prev, value: text }))}
+            placeholder={t("0,00")}
+            keyboardType="numeric"
+            left={<TextInput.Affix text="R$ " />}
+          />
+        </View>
+
+        {/* Efetivado/Pago? */}
+        <View style={{ marginBottom: 20 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <Text style={{ fontSize: 14, fontWeight: '600' }}>{t('Efetivado/Pago?')}</Text>
+            <Switch
+              value={formData.isConsolidated}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, isConsolidated: value }))}
+            />
+          </View>
+          <HelperText type="info">
+            {formData.isConsolidated ? t('Transação já efetivada/paga') : t('Transação pendente')}
+          </HelperText>
+        </View>
+
+        {/* Recorrência */}
+        <View style={{ marginBottom: 24 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <Text style={{ fontSize: 14, fontWeight: '600' }}>{t('Recorrência')}</Text>
+            <Switch
+              value={formData.isRecurring}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, isRecurring: value }))}
+              disabled={!!transaction}
+            />
+          </View>
+
+          {formData.isRecurring && (
+            <View style={{ backgroundColor: '#f8f9fa', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#e9ecef' }}>
+              <Text style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>{t('Data Final (opcional)')}</Text>
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: '#ddd',
+                  backgroundColor: '#f8f9fa',
+                  gap: 8,
+                }}
+                onPress={() => setActivePicker('recurringEndDate')}
+              >
+                <Icon source="calendar" size={16} />
+                <Text style={{ fontSize: 14 }}>
+                  {formData.recurringEndDate
+                    ? formData.recurringEndDate.toLocaleDateString('pt-BR')
+                    : t('Selecionar data final')
+                  }
+                </Text>
+              </TouchableOpacity>
+              <HelperText type="info" style={{ marginTop: 8 }}>
+                {t('Se não definir uma data final, a recorrência será criada para os próximos 2 anos')}
+              </HelperText>
+            </View>
+          )}
+        </View>
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -398,14 +398,6 @@ export default function TransactionFormScreen() {
       {/* Botões de ação fixos no rodapé */}
       <View style={{
         padding: 20,
-        backgroundColor: '#fff',
-        borderTopWidth: 1,
-        borderTopColor: '#f0f0f0',
-        elevation: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
       }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
           <Button
@@ -419,49 +411,49 @@ export default function TransactionFormScreen() {
             {t('Cancelar')}
           </Button>
 
-          {transaction && !isDeleting && (
+
+          {transaction &&
             <Button
               mode="contained"
-              onPress={() => setIsDeleting(true)}
+              onPress={() => {
+                Alert.alert(
+                  t('Confirmação'),
+                  t('Confirma a exclusão do registro?'),
+                  [
+                    {
+                      text: t('Não'),
+                      style: 'cancel',
+                      onPress: () => {
+                        null
+                      },
+                    },
+                    {
+                      text: t('Sim'),
+                      onPress: () => {
+                        handleDelete()
+                      },
+                    },
+                  ],
+                  { cancelable: true }
+                );
+              }}
               buttonColor="#FF6B6B"
               style={{ flex: 1 }}
             >
               {t('Excluir')}
             </Button>
-          )}
+          }
 
-          {isDeleting ? (
-            <View style={{ backgroundColor: '#FFF5F5', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#FED7D7', marginTop: 16, width: '100%' }}>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#C53030', marginBottom: 4 }}>{t('Confirmar exclusão?')}</Text>
-              <Text style={{ fontSize: 14, opacity: 0.7, marginBottom: 16 }}>{t('Esta ação não pode ser desfeita.')}</Text>
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <Button
-                  mode="outlined"
-                  onPress={() => setIsDeleting(false)}
-                  style={{ flex: 1 }}
-                >
-                  {t('Cancelar')}
-                </Button>
-                <Button
-                  mode="contained"
-                  onPress={handleDelete}
-                  buttonColor="#FF6B6B"
-                  style={{ flex: 1 }}
-                >
-                  {t('Excluir')}
-                </Button>
-              </View>
-            </View>
-          ) : (
-            <Button
-              mode="contained"
-              onPress={handleSave}
-              disabled={isInvalidForm()}
-              style={{ flex: 1 }}
-            >
-              {transaction ? t('Atualizar') : t('Salvar')}
-            </Button>
-          )}
+
+          <Button
+            mode="contained"
+            onPress={handleSave}
+            disabled={isInvalidForm()}
+            style={{ flex: 1 }}
+          >
+            {transaction ? t('Atualizar') : t('Salvar')}
+          </Button>
+
         </View>
       </View>
 
