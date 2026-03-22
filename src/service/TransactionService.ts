@@ -607,5 +607,184 @@ export const TransactionService = {
         installments: data.installments
       };
     });
+  },
+
+  // Atualizar compra no cartão de crédito (TAREFA 4)
+  updateCreditCardPurchase: async (
+    transactionId: string,
+    mode: 'only_this' | 'all_pending',
+    data: {
+      amount: number;
+      description: string;
+      date: Date;
+      creditCardId: string;
+      categoryId: string;
+      installments: number;
+      interestRate: number;
+      userId: string;
+    }
+  ) => {
+    await database.write(async () => {
+      if (data.installments < 1) throw new Error('O número de parcelas deve ser maior que zero');
+      if (data.interestRate < 0) throw new Error('A taxa de juros não pode ser negativa');
+
+      const transaction = await database.get<Transaction>('transactions').find(transactionId);
+      
+      // Verificar se a transação está consolidada
+      if (transaction.isConsolidated) {
+        throw new Error('Transações já pagas não podem ser alteradas');
+      }
+
+      // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
+      const relatedTransactionId = transaction._raw?.related_transaction_id;
+      
+      if (mode === 'only_this') {
+        // Cenário A: Atualizar apenas esta transação
+        const creditCard = await database.get<CreditCard>('credit_cards').find(data.creditCardId);
+        
+        // Recalcular datas se necessário
+        const purchaseDate = new Date(data.date);
+        const getInstallmentDueDate = (installmentIndex: number) => {
+          let month = purchaseDate.getMonth();
+          let year = purchaseDate.getFullYear();
+
+          if (purchaseDate.getDate() >= creditCard.closingDay) {
+            month++;
+          }
+          if (creditCard.dueDay < creditCard.closingDay) {
+            month++;
+          }
+
+          month += installmentIndex;
+
+          while (month > 11) {
+            month -= 12;
+            year++;
+          }
+
+          const dueDate = new Date(year, month, creditCard.dueDay);
+          if (dueDate.getDate() !== creditCard.dueDay) {
+            dueDate.setDate(0); 
+          }
+          return dueDate;
+        };
+
+        // Determinar índice da parcela atual
+        let installmentIndex = 0;
+        if (relatedTransactionId) {
+          // Buscar transação original para determinar o índice
+          const originalTransaction = await database.get<Transaction>('transactions').find(relatedTransactionId);
+          const allRelatedTransactions = await database.get<Transaction>('transactions')
+            .query(
+              Q.or(
+                Q.where('id', relatedTransactionId),
+                Q.where('related_transaction_id', relatedTransactionId)
+              ),
+              Q.sortBy('date', Q.asc)
+            )
+            .fetch();
+          
+          installmentIndex = allRelatedTransactions.findIndex(t => t.id === transactionId);
+        }
+
+        await transaction.update((tx) => {
+          // @ts-ignore
+          tx._raw.account_id = creditCard.accountId || '';
+          // @ts-ignore
+          tx._raw.category_id = data.categoryId;
+          tx.description = data.installments > 1 ? `${data.description} (${installmentIndex + 1}/${data.installments})` : data.description;
+          tx.amount = data.amount;
+          tx.type = 'expense';
+          tx.date = getInstallmentDueDate(installmentIndex);
+          tx.purchaseDate = purchaseDate;
+          // @ts-ignore
+          tx._raw.credit_card_id = data.creditCardId;
+        });
+      } else {
+        // Cenário B: Atualizar todas as parcelas pendentes
+        let targetTransactionId = transactionId;
+        
+        // Se esta transação tem related_transaction_id, usar o ID original
+        if (relatedTransactionId) {
+          targetTransactionId = relatedTransactionId;
+        }
+        
+        // Buscar todas as transações relacionadas que NÃO estão consolidadas
+        const allRelatedTransactions = await database.get<Transaction>('transactions')
+          .query(
+            Q.or(
+              Q.where('id', targetTransactionId),
+              Q.where('related_transaction_id', targetTransactionId)
+            ),
+            Q.where('is_consolidated', false)
+          )
+          .fetch();
+        
+        if (allRelatedTransactions.length === 0) {
+          throw new Error('Nenhuma parcela pendente encontrada para atualização');
+        }
+
+        const creditCard = await database.get<CreditCard>('credit_cards').find(data.creditCardId);
+        const purchaseDate = new Date(data.date);
+        
+        // Recalcular valor da parcela
+        let installmentAmount = data.amount;
+        if (data.installments > 1) {
+          if (data.interestRate > 0) {
+            const i = data.interestRate / 100;
+            const n = data.installments;
+            const pv = data.amount;
+            const pmt = pv * i / (1 - Math.pow(1 + i, -n));
+            installmentAmount = parseFloat(pmt.toFixed(2));
+          } else {
+            installmentAmount = parseFloat((data.amount / data.installments).toFixed(2));
+          }
+        }
+
+        const getInstallmentDueDate = (installmentIndex: number) => {
+          let month = purchaseDate.getMonth();
+          let year = purchaseDate.getFullYear();
+
+          if (purchaseDate.getDate() >= creditCard.closingDay) {
+            month++;
+          }
+          if (creditCard.dueDay < creditCard.closingDay) {
+            month++;
+          }
+
+          month += installmentIndex;
+
+          while (month > 11) {
+            month -= 12;
+            year++;
+          }
+
+          const dueDate = new Date(year, month, creditCard.dueDay);
+          if (dueDate.getDate() !== creditCard.dueDay) {
+            dueDate.setDate(0); 
+          }
+          return dueDate;
+        };
+
+        // Preparar atualizações em batch
+        const updates = allRelatedTransactions.map((tx, index) => 
+          tx.prepareUpdate((record) => {
+            // @ts-ignore
+            record._raw.account_id = creditCard.accountId || '';
+            // @ts-ignore
+            record._raw.category_id = data.categoryId;
+            record.description = data.installments > 1 ? `${data.description} (${index + 1}/${data.installments})` : data.description;
+            record.amount = installmentAmount;
+            record.type = 'expense';
+            record.date = getInstallmentDueDate(index);
+            record.purchaseDate = purchaseDate;
+            // @ts-ignore
+            record._raw.credit_card_id = data.creditCardId;
+          })
+        );
+        
+        await database.batch(...updates);
+      }
+    });
   }
 }

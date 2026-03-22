@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Category from '../models/Caterogy';
 import CreditCard from '../models/CreditCard';
+import Transaction from '../models/Transactions';
 import { withObservables } from '@nozbe/watermelondb/react';
 import CreditCardService from '../service/CreditCardService';
 import { database } from '../database';
@@ -45,7 +46,9 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
     show: false,
   });
 
-  const { categories = [], onSave } = route.params || {};
+  const { transactionId, categories = [], onSave } = route.params || {};
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentTransaction, setCurrentTransaction] = useState<Transaction | null>(null);
 
   const [formData, setFormData] = useState<CreditCardPurchaseFormData>(() => {
     const today = new Date();
@@ -60,6 +63,41 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
       interestRate: '0',
     };
   });
+
+  // Carregar dados da transação se estiver em modo edição
+  useEffect(() => {
+    const loadTransactionData = async () => {
+      if (transactionId) {
+        try {
+          const transaction = await TransactionService.findById(transactionId);
+          if (transaction) {
+            setCurrentTransaction(transaction);
+            setIsEditing(true);
+            
+            // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
+            const creditCardId = transaction._raw?.credit_card_id;
+            // @ts-ignore
+            const categoryId = transaction._raw?.category_id;
+            const purchaseDate = transaction.purchaseDate || transaction.date;
+            
+            setFormData({
+              amount: transaction.amount.toString(),
+              description: transaction.description.replace(/ \(\d+\/\d+\)$/, ''), // Remove (1/12) do final
+              date: new Date(purchaseDate),
+              creditCardId: creditCardId || '',
+              categoryId: categoryId || '',
+              installments: 1, // Será calculado depois
+              interestRate: '0',
+            });
+          }
+        } catch (error) {
+          console.error('Erro ao carregar transação para edição:', error);
+        }
+      }
+    };
+
+    loadTransactionData();
+  }, [transactionId]);
 
   // Atualizar categoryId quando as categorias chegarem
   useEffect(() => {
@@ -153,25 +191,132 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
 
     setCalculating(true);
     try {
-      await TransactionService.createCreditCardPurchase({
-        amount,
-        description: formData.description,
-        date: formData.date,
-        creditCardId: formData.creditCardId,
-        categoryId: formData.categoryId,
-        installments: formData.installments,
-        interestRate,
-        userId: user.id,
-      });
+      if (isEditing && currentTransaction) {
+        // Verificar se é uma transação parcelada
+        // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
+        const relatedTransactionId = currentTransaction._raw?.related_transaction_id;
+        const isInstallment = !!relatedTransactionId;
+        
+        if (isInstallment) {
+          // Mostrar alerta para escolher o tipo de edição
+          Alert.alert(
+            t('Editar Compra Parcelada'),
+            t('Esta compra faz parte de um parcelamento. Como deseja editar?'),
+            [
+              {
+                text: t('Cancelar'),
+                style: 'cancel',
+                onPress: () => {
+                  setCalculating(false);
+                }
+              },
+              {
+                text: t('Editar apenas esta parcela'),
+                onPress: async () => {
+                  try {
+                    await TransactionService.updateCreditCardPurchase(
+                      currentTransaction.id,
+                      'only_this',
+                      {
+                        amount,
+                        description: formData.description,
+                        date: formData.date,
+                        creditCardId: formData.creditCardId,
+                        categoryId: formData.categoryId,
+                        installments: formData.installments,
+                        interestRate,
+                        userId: user.id,
+                      }
+                    );
+                    Alert.alert(t('Sucesso'), t('Parcela atualizada com sucesso!'));
+                    onSave?.();
+                    navigation.goBack();
+                  } catch (error: any) {
+                    console.error('Erro ao atualizar parcela:', error);
+                    Alert.alert(
+                      t('Erro'),
+                      error.message || t('Ocorreu um erro ao atualizar a parcela.')
+                    );
+                    setCalculating(false);
+                  }
+                }
+              },
+              {
+                text: t('Editar todas as parcelas pendentes'),
+                onPress: async () => {
+                  try {
+                    await TransactionService.updateCreditCardPurchase(
+                      currentTransaction.id,
+                      'all_pending',
+                      {
+                        amount,
+                        description: formData.description,
+                        date: formData.date,
+                        creditCardId: formData.creditCardId,
+                        categoryId: formData.categoryId,
+                        installments: formData.installments,
+                        interestRate,
+                        userId: user.id,
+                      }
+                    );
+                    Alert.alert(t('Sucesso'), t('Todas as parcelas pendentes atualizadas com sucesso!'));
+                    onSave?.();
+                    navigation.goBack();
+                  } catch (error: any) {
+                    console.error('Erro ao atualizar parcelas:', error);
+                    Alert.alert(
+                      t('Erro'),
+                      error.message || t('Ocorreu um erro ao atualizar as parcelas.')
+                    );
+                    setCalculating(false);
+                  }
+                }
+              }
+            ]
+          );
+          return;
+        } else {
+          // Transação não parcelada, atualizar normalmente
+          await TransactionService.updateCreditCardPurchase(
+            currentTransaction.id,
+            'only_this',
+            {
+              amount,
+              description: formData.description,
+              date: formData.date,
+              creditCardId: formData.creditCardId,
+              categoryId: formData.categoryId,
+              installments: formData.installments,
+              interestRate,
+              userId: user.id,
+            }
+          );
+          Alert.alert(t('Sucesso'), t('Compra atualizada com sucesso!'));
+          onSave?.();
+          navigation.goBack();
+        }
+      } else {
+        // Criar nova compra
+        await TransactionService.createCreditCardPurchase({
+          amount,
+          description: formData.description,
+          date: formData.date,
+          creditCardId: formData.creditCardId,
+          categoryId: formData.categoryId,
+          installments: formData.installments,
+          interestRate,
+          userId: user.id,
+        });
 
-      Alert.alert(t('Sucesso'), t('Compra no cartão criada com sucesso!'));
-      onSave?.();
-      navigation.goBack();
+        Alert.alert(t('Sucesso'), t('Compra no cartão criada com sucesso!'));
+        onSave?.();
+        navigation.goBack();
+      }
     } catch (error: any) {
-      console.error('Erro ao criar compra no cartão:', error);
+      console.error('Erro ao salvar compra no cartão:', error);
       Alert.alert(
         t('Erro'),
-        error.message || t('Ocorreu um erro ao criar a compra no cartão.')
+        error.message || t('Ocorreu um erro ao salvar a compra no cartão.')
       );
     } finally {
       setCalculating(false);
@@ -199,7 +344,7 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <Text style={{ fontSize: 20, fontWeight: 'bold' }}>
-            {t('Lançar Compra')}
+            {isEditing ? t('Editar Compra') : t('Lançar Compra')}
           </Text>
         </View>
 
@@ -381,7 +526,7 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
             loading={calculating}
             style={{ flex: 1 }}
           >
-            {t('Lançar Compra')}
+            {isEditing ? t('Atualizar') : t('Lançar Compra')}
           </Button>
         </View>
       </View>

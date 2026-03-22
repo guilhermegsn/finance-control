@@ -59,15 +59,14 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
   };
 
   const openTransactionForm = (transaction?: Transaction, type?: 'income' | 'expense') => {
-    const safeTransaction = transaction ? {
-      id: transaction.id,
-      description: transaction.description,
-      amount: transaction.amount,
-      type: transaction.type,
-      date: transaction.date,
-      isConsolidated: transaction.isConsolidated,
-      isRecurring: transaction.isRecurring,
-    } : undefined;
+    // TAREFA 2: Proteção de transações consolidadas
+    if (transaction?.isConsolidated) {
+      Alert.alert(
+        t('Bloqueado'),
+        t('Transações já pagas não podem ser alteradas.')
+      );
+      return;
+    }
 
     const safeAccounts = accounts.map(acc => ({
       id: acc.id,
@@ -82,6 +81,34 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
       icon: cat.icon,
       type: cat.type
     }));
+
+    // TAREFA 1: Verificar se é transação de cartão de crédito
+    if (transaction) {
+      // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
+      const creditCardId = transaction._raw?.credit_card_id;
+      
+      if (creditCardId) {
+        // Navegar para tela de edição de compra no cartão
+        navigation.navigate('CreditCardPurchase', {
+          transactionId: transaction.id,
+          categories: safeCategories,
+          accounts: safeAccounts,
+          onSave: () => {},
+        });
+        return;
+      }
+    }
+
+    // Fluxo normal para transações sem cartão
+    const safeTransaction = transaction ? {
+      id: transaction.id,
+      description: transaction.description,
+      amount: transaction.amount,
+      type: transaction.type,
+      date: transaction.date,
+      isConsolidated: transaction.isConsolidated,
+      isRecurring: transaction.isRecurring,
+    } : undefined;
 
     navigation.navigate('TransactionForm', {
       transaction: safeTransaction,
