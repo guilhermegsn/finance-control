@@ -343,9 +343,6 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
           <Text style={styles.monthText}>{`${dayjs(currentDate).format('MMMM/YYYY')}`}</Text>
           <View style={styles.headerSummary}>
             {/* Card de Balanço */}
-
-
-
             <View style={[
               styles.summaryCard,
               {
@@ -392,7 +389,7 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
                 styles.cardValue,
                 { color: totals.balance >= 0 ? '#56D6A3' : '#FF7285' }
               ]}>
-                R$   {totals.balance.toFixed(2)}
+                R$ {totals.balance.toFixed(2)}
               </Text>
             </View>
 
@@ -452,7 +449,7 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 10, marginTop: 10 },
+  container: { flex: 1, paddingHorizontal: 10 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 16 },
   headerCenter: { alignItems: "center" },
   headerSummary: { flexDirection: "row", marginTop: 8 },
@@ -461,8 +458,9 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: "600", marginTop: 20, marginBottom: 8 },
   summaryCard: {
     flexDirection: 'row',
-    paddingHorizontal: 10,
+    paddingHorizontal: 30,
     paddingVertical: 4,
+    justifyContent: 'center',
     borderRadius: 8,
     borderWidth: 1,
     elevation: 2,
@@ -485,6 +483,7 @@ const styles = StyleSheet.create({
   cardValue: {
     fontSize: 12,
     fontWeight: "700",
+    marginLeft: 5
   },
   fab: {
     position: 'absolute',

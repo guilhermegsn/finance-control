@@ -166,7 +166,6 @@ const SummaryFooterComponent = ({ isFutureMonth, transactions, pastTransactions 
           style={[
             styles.card,
             styles.cardElevated,
-            styles.balanceCard,
             {
               backgroundColor: getCardBackgroundColor(),
               borderColor: getBorderColor(),
@@ -198,7 +197,6 @@ const SummaryFooterComponent = ({ isFutureMonth, transactions, pastTransactions 
             style={[
               styles.card,
               styles.cardElevated,
-              styles.currentBalanceCard,
               {
                 backgroundColor: getCardBackgroundColor(),
                 borderColor: getBorderColor(),
@@ -280,9 +278,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     padding: 12,
     gap: 12,
+    justifyContent: 'space-between'
   },
   card: {
-    width: (Dimensions.get('window').width - 76) / 2,
+    width: (Dimensions.get('window').width - 57) / 2,
     padding: 16,
     borderRadius: 12,
   },
@@ -291,12 +290,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-  },
-  balanceCard: {
-    // Estilo específico se necessário
-  },
-  currentBalanceCard: {
-    // Estilo específico se necessário
   },
   cardHeader: {
     flexDirection: 'row',
