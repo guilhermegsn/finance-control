@@ -18,6 +18,18 @@ function convertToTimestamp(isoString: string | null): number {
     return new Date(isoString).getTime();
 }
 
+// Função para converter campos de data de negócio (ex: purchase_date) de número para ISO string
+function convertBusinessDateToISO(timestamp: number | null | undefined): string | null {
+    if (timestamp === null || timestamp === undefined) return null;
+    return new Date(timestamp).toISOString();
+}
+
+// Função para converter campos de data de negócio de ISO string para número
+function convertBusinessDateToTimestamp(isoString: string | null): number | null {
+    if (!isoString) return null;
+    return new Date(isoString).getTime();
+}
+
 // Função para verificar se uma tabela existe no Supabase
 async function tableExists(tableName: string): Promise<boolean> {
     try {
@@ -111,21 +123,34 @@ export async function sync() {
                         const deleted: string[] = [];
 
                         (data || []).forEach((item) => {
-                            // Converter timestamps ISO para números (WatermelonDB)
-                            const itemWithTimestamps = {
+                            // Converter timestamps ISO para números (WatermelonDB) - campos padrão
+                            let processedItem: any = {
                                 ...item,
                                 created_at: convertToTimestamp(item.created_at),
                                 updated_at: convertToTimestamp(item.updated_at),
                                 deleted_at: item.deleted_at ? convertToTimestamp(item.deleted_at) : null,
                             };
 
+                            // Converter campos específicos por tabela
+                            if (table === 'transactions') {
+                                // Converter purchase_date de ISO para timestamp (se existir)
+                                if (item.purchase_date !== undefined && item.purchase_date !== null) {
+                                    processedItem.purchase_date = convertBusinessDateToTimestamp(item.purchase_date);
+                                }
+                                // is_consolidated já é boolean, manter como está
+                                // credit_card_id e related_transaction_id já são strings, manter
+                            } else if (table === 'credit_cards') {
+                                // account_id já é string, manter como está
+                                // Não há conversões especiais além dos timestamps padrão
+                            }
+
                             if (item.deleted_at) {
                                 deleted.push(item.id);
                             } else {
                                 if (!lastPulledAt) {
-                                    created.push(itemWithTimestamps);
+                                    created.push(processedItem);
                                 } else {
-                                    updated.push(itemWithTimestamps);
+                                    updated.push(processedItem);
                                 }
                             }
                         });
@@ -166,7 +191,8 @@ export async function sync() {
                             // Extraímos campos internos do WatermelonDB
                             const { _status, _changed, id, created_at, updated_at, deleted_at, ...dataClean } = data;
 
-                            return {
+                            // Preparar objeto base
+                            let recordToSend: any = {
                                 ...dataClean,
                                 id: record.id,
                                 user_id: userId,
@@ -174,6 +200,21 @@ export async function sync() {
                                 updated_at: new Date().toISOString(),
                                 deleted_at: null,
                             };
+
+                            // Converter campos específicos por tabela para formato Supabase
+                            if (table === 'transactions') {
+                                // Converter purchase_date de timestamp para ISO string (se existir)
+                                if (dataClean.purchase_date !== undefined && dataClean.purchase_date !== null) {
+                                    recordToSend.purchase_date = convertBusinessDateToISO(dataClean.purchase_date);
+                                }
+                                // is_consolidated já é boolean, manter como está
+                                // credit_card_id e related_transaction_id já são strings, manter
+                            } else if (table === 'credit_cards') {
+                                // account_id já é string, manter como está
+                                // Não há conversões especiais além dos timestamps padrão
+                            }
+
+                            return recordToSend;
                         });
 
                         const { error } = await supabase.from(table).insert(records);
@@ -190,12 +231,28 @@ export async function sync() {
                             const data = record._raw || record;
                             const { _status, _changed, id, created_at, updated_at, deleted_at, ...dataClean } = data;
 
-                            return {
+                            // Preparar objeto base
+                            let recordToSend: any = {
                                 ...dataClean,
                                 id: record.id,
                                 user_id: userId,
                                 updated_at: new Date().toISOString(),
                             };
+
+                            // Converter campos específicos por tabela para formato Supabase
+                            if (table === 'transactions') {
+                                // Converter purchase_date de timestamp para ISO string (se existir)
+                                if (dataClean.purchase_date !== undefined && dataClean.purchase_date !== null) {
+                                    recordToSend.purchase_date = convertBusinessDateToISO(dataClean.purchase_date);
+                                }
+                                // is_consolidated já é boolean, manter como está
+                                // credit_card_id e related_transaction_id já são strings, manter
+                            } else if (table === 'credit_cards') {
+                                // account_id já é string, manter como está
+                                // Não há conversões especiais além dos timestamps padrão
+                            }
+
+                            return recordToSend;
                         });
 
                         const { error } = await supabase.from(table).upsert(records);

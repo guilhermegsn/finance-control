@@ -5,6 +5,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import { CategoryService } from './src/service/CategoryService';
+import useAutoSync from './src/service/useAutoSync';
 import './src/i18n';
 
 // 1. Componente de Login (Simples e Direto)
@@ -33,6 +34,10 @@ const LoginScreen = () => {
 // 2. Componente que decide o que mostrar (O "Guarda de Trânsito")
 const RootNavigation = () => {
   const { user, loading } = useAuth();
+  
+  // Inicializar sincronização automática quando o usuário estiver logado
+  // O hook monitora AppState e dispara sync automaticamente
+  const { isSyncing } = useAutoSync();
 
   // Inicializar categorias padrão quando o usuário estiver logado
   useEffect(() => {
