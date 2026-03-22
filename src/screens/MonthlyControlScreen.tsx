@@ -413,10 +413,10 @@ const MonthlyControlScreenWrapper = () => {
     transactions: database.get<Transaction>('transactions').query(
       Q.where('credit_card_id', null),
       Q.sortBy('date', Q.desc)
-    ).observe(),
+    ).observeWithColumns(['date', 'purchase_date', 'amount', 'description', 'category_id', 'is_consolidated', 'credit_card_id']),
     allTransactions: database.get<Transaction>('transactions').query(
       Q.sortBy('date', Q.desc)
-    ).observe(),
+    ).observeWithColumns(['date', 'purchase_date', 'amount', 'description', 'category_id', 'is_consolidated', 'credit_card_id', 'related_transaction_id']),
     creditCards: userId 
       ? CreditCardService.getCollection().query(
           Q.where('user_id', userId),

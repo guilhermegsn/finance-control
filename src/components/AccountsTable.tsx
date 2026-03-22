@@ -107,7 +107,7 @@ export default function AccountsTable({
                   <Text style={{ fontWeight: 'bold' }}>{group.accountName}</Text>
                 </View>
               </DataTable.Cell>
-              <DataTable.Cell>
+              <DataTable.Cell numeric>
                 <Icon source={isExpanded ? "chevron-up" : "chevron-down"} size={16} />
               </DataTable.Cell>
               <DataTable.Cell numeric>

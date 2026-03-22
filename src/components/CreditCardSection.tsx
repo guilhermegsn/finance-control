@@ -146,7 +146,7 @@ function CreditCardSectionComponent({
                   </View>
                 </View>
               </DataTable.Cell>
-              <DataTable.Cell>
+              <DataTable.Cell numeric>
                 <Icon source={isExpanded ? "chevron-up" : "chevron-down"} size={16} />
               </DataTable.Cell>
               <DataTable.Cell numeric>

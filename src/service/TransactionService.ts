@@ -786,5 +786,56 @@ export const TransactionService = {
         await database.batch(...updates);
       }
     });
+  },
+
+  // Excluir compra no cartão de crédito (TAREFA 3)
+  deleteCreditCardPurchase: async (
+    transactionId: string,
+    deleteType: 'only_this' | 'all_pending'
+  ) => {
+    await database.write(async () => {
+      const transaction = await database.get<Transaction>('transactions').find(transactionId);
+      
+      // Verificar se a transação está consolidada
+      if (transaction.isConsolidated) {
+        throw new Error('Transações já pagas não podem ser excluídas');
+      }
+
+      // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
+      const relatedTransactionId = transaction._raw?.related_transaction_id;
+      
+      if (deleteType === 'only_this') {
+        // Cenário A: Excluir apenas esta transação
+        await transaction.markAsDeleted();
+      } else {
+        // Cenário B: Excluir todas as parcelas pendentes
+        let targetTransactionId = transactionId;
+        
+        // Se esta transação tem related_transaction_id, usar o ID original
+        if (relatedTransactionId) {
+          targetTransactionId = relatedTransactionId;
+        }
+        
+        // Buscar todas as transações relacionadas que NÃO estão consolidadas
+        const allRelatedTransactions = await database.get<Transaction>('transactions')
+          .query(
+            Q.or(
+              Q.where('id', targetTransactionId),
+              Q.where('related_transaction_id', targetTransactionId)
+            ),
+            Q.where('is_consolidated', false)
+          )
+          .fetch();
+        
+        if (allRelatedTransactions.length === 0) {
+          throw new Error('Nenhuma parcela pendente encontrada para exclusão');
+        }
+
+        // Preparar exclusões em batch
+        const deletions = allRelatedTransactions.map(tx => tx.prepareMarkAsDeleted());
+        
+        await database.batch(...deletions);
+      }
+    });
   }
 }

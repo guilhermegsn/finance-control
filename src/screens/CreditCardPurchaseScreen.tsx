@@ -12,7 +12,6 @@ import CreditCard from '../models/CreditCard';
 import Transaction from '../models/Transactions';
 import { withObservables } from '@nozbe/watermelondb/react';
 import CreditCardService from '../service/CreditCardService';
-import { database } from '../database';
 import { Q } from '@nozbe/watermelondb';
 
 interface CreditCardPurchaseFormData {
@@ -73,13 +72,13 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
           if (transaction) {
             setCurrentTransaction(transaction);
             setIsEditing(true);
-            
+
             // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
             const creditCardId = transaction._raw?.credit_card_id;
             // @ts-ignore
             const categoryId = transaction._raw?.category_id;
             const purchaseDate = transaction.purchaseDate || transaction.date;
-            
+
             setFormData({
               amount: transaction.amount.toString(),
               description: transaction.description.replace(/ \(\d+\/\d+\)$/, ''), // Remove (1/12) do final
@@ -174,6 +173,101 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
     );
   };
 
+  const handleDelete = async () => {
+    if (!user || !currentTransaction) return;
+
+    // Verificar se é uma transação parcelada
+    // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
+    const relatedTransactionId = currentTransaction._raw?.related_transaction_id;
+    const isInstallment = !!relatedTransactionId;
+
+    if (isInstallment) {
+      // Mostrar alerta para escolher o tipo de exclusão
+      Alert.alert(
+        t('Excluir Compra Parcelada'),
+        t('Esta compra faz parte de um parcelamento. Como deseja excluir?'),
+        [
+          {
+            text: t('Cancelar'),
+            style: 'cancel'
+          },
+          {
+            text: t('Excluir apenas esta parcela'),
+            onPress: async () => {
+              try {
+                await TransactionService.deleteCreditCardPurchase(
+                  currentTransaction.id,
+                  'only_this'
+                );
+                Alert.alert(t('Sucesso'), t('Parcela excluída com sucesso!'));
+                onSave?.();
+                navigation.goBack();
+              } catch (error: any) {
+                console.error('Erro ao excluir parcela:', error);
+                Alert.alert(
+                  t('Erro'),
+                  error.message || t('Ocorreu um erro ao excluir a parcela.')
+                );
+              }
+            }
+          },
+          {
+            text: t('Excluir todas as parcelas pendentes'),
+            onPress: async () => {
+              try {
+                await TransactionService.deleteCreditCardPurchase(
+                  currentTransaction.id,
+                  'all_pending'
+                );
+                Alert.alert(t('Sucesso'), t('Todas as parcelas pendentes excluídas com sucesso!'));
+                onSave?.();
+                navigation.goBack();
+              } catch (error: any) {
+                console.error('Erro ao excluir parcelas:', error);
+                Alert.alert(
+                  t('Erro'),
+                  error.message || t('Ocorreu um erro ao excluir as parcelas.')
+                );
+              }
+            }
+          }
+        ]
+      );
+    } else {
+      // Transação não parcelada, pedir confirmação simples
+      Alert.alert(
+        t('Confirmar Exclusão'),
+        t('Tem certeza que deseja excluir esta compra?'),
+        [
+          {
+            text: t('Cancelar'),
+            style: 'cancel'
+          },
+          {
+            text: t('Excluir'),
+            onPress: async () => {
+              try {
+                await TransactionService.deleteCreditCardPurchase(
+                  currentTransaction.id,
+                  'only_this'
+                );
+                Alert.alert(t('Sucesso'), t('Compra excluída com sucesso!'));
+                onSave?.();
+                navigation.goBack();
+              } catch (error: any) {
+                console.error('Erro ao excluir compra:', error);
+                Alert.alert(
+                  t('Erro'),
+                  error.message || t('Ocorreu um erro ao excluir a compra.')
+                );
+              }
+            }
+          }
+        ]
+      );
+    }
+  };
+
   const handleSave = async () => {
     if (!user) return;
 
@@ -196,7 +290,7 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
         // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
         const relatedTransactionId = currentTransaction._raw?.related_transaction_id;
         const isInstallment = !!relatedTransactionId;
-        
+
         if (isInstallment) {
           // Mostrar alerta para escolher o tipo de edição
           Alert.alert(
@@ -519,6 +613,19 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
             {t('Cancelar')}
           </Button>
 
+          {isEditing && !currentTransaction?.isConsolidated &&
+            < Button
+              mode="contained"
+              onPress={handleDelete}
+              style={{ flex: 1 }}
+              disabled={calculating}
+              buttonColor="#FF6B6B"
+            >
+              {t('Excluir')}
+            </Button>
+          }
+
+
           <Button
             mode="contained"
             onPress={handleSave}
@@ -530,22 +637,22 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
           </Button>
         </View>
       </View>
-    </View>
+    </View >
   );
 }
 
 const CreditCardPurchaseScreenWrapper = () => {
   const { user } = useAuth();
-  
+
   const ScreenWithData = withObservables(['userId'], ({ userId }: { userId: string }) => ({
-    creditCards: userId 
+    creditCards: userId
       ? CreditCardService.getCollection().query(
-          Q.where('user_id', userId),
-          Q.where('deleted_at', null)
-        ).observe()
+        Q.where('user_id', userId),
+        Q.where('deleted_at', null)
+      ).observe()
       : [],
   }))(CreditCardPurchaseScreen);
-  
+
   return <ScreenWithData userId={user?.id || ''} />;
 };
 
