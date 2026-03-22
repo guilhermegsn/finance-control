@@ -37,7 +37,7 @@ export default function BottomNavigator() {
         component={MonthlyControlScreen}
         options={{
           tabBarLabel: 'Controle',
-          title: 'Controle',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="today" size={size} color={color} />
           ),
