@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -35,7 +35,7 @@ const CreditCardFormScreen = () => {
           activeAccounts.map(acc => ({
             id: acc.id,
             label: acc.name,
-            value: acc.id
+            value: acc.id,
           }))
         );
       });
@@ -50,7 +50,7 @@ const CreditCardFormScreen = () => {
   }));
 
   const handleSave = async () => {
-    if (!name || !limit || !closingDay || !dueDay) {
+    if (!name || !limit || !closingDay || !dueDay || !accountId) {
       Alert.alert(t('Error'), t('Preencha todos os campos obrigatórios'));
       return;
     }
@@ -64,7 +64,7 @@ const CreditCardFormScreen = () => {
         dueDay: parseInt(dueDay, 10),
         color,
         userId: user?.id || 'default_user',
-        accountId: accountId || null
+        accountId: accountId 
       };
 
       console.log('data', data)
@@ -112,7 +112,7 @@ const CreditCardFormScreen = () => {
             items={accounts}
             selectedValue={accountId}
             onSelect={(val: string) => setAccountId(val)}
-            placeholder={t('Selecione a conta (opcional)')}
+            placeholder={t('Selecione a conta')}
           />
         </View>
 
