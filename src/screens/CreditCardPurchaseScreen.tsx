@@ -475,7 +475,7 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
               id: card.id,
               label: card.name,
               value: card.id,
-              image: null, // Pode-se adicionar logo do cartão no futuro
+              imageUri: null, // Pode-se adicionar logo do cartão no futuro
             }))}
             selectedValue={formData.creditCardId}
             onSelect={(value) => setFormData(prev => ({ ...prev, creditCardId: value }))}

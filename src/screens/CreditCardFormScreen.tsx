@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import CreditCardService from '../service/CreditCardService';
 import CreditCard from '../models/CreditCard';
 import { brandLogos } from '../utils/brandLogos';
+import { accountLogos, getAccountLogoByCode } from '../utils/accountLogos';
 import { Select } from '../components/Select';
 import { TextInput, Text, Button } from 'react-native-paper';
 
@@ -32,22 +33,69 @@ const CreditCardFormScreen = () => {
     import('../service/AccountService').then(({ AccountService }) => {
       AccountService.fetchAll().then(activeAccounts => {
         setAccounts(
-          activeAccounts.map(acc => ({
-            id: acc.id,
-            label: acc.name,
-            value: acc.id,
-          }))
+          activeAccounts.map(acc => {
+            // Obter logo da conta baseado no bankCode
+            let imageSource = acc.logoUrl;
+            if (!imageSource && acc.bankCode && acc.bankCode.trim() !== '') {
+              imageSource = getAccountLogoByCode(acc.bankCode);
+            }
+
+            // Converter require() para URI se necessário
+            let imageUri = imageSource;
+            if (imageSource && typeof imageSource !== 'string') {
+              try {
+                const Image = require('react-native').Image;
+                const resolvedSource = Image.resolveAssetSource(imageSource);
+                if (resolvedSource && resolvedSource.uri) {
+                  imageUri = resolvedSource.uri;
+                }
+              } catch (error) {
+                console.warn('Erro ao resolver imagem:', error);
+              }
+            }
+
+            return {
+              id: acc.id,
+              label: acc.name,
+              value: acc.id,
+              imageUri: imageUri
+            };
+          })
         );
       });
     });
   }, []);
 
-  const brandOptions = Object.keys(brandLogos).map(key => ({
-    id: key,
-    label: key.charAt(0).toUpperCase() + key.slice(1),
-    value: key,
-    image: brandLogos[key]
-  }));
+  useEffect(() => {
+    console.log('acc', accounts)
+    if (!editingCard && accounts[0]?.id) {
+      console.log('oi')
+      setAccountId(accounts[0].id)
+    }
+  }, [accounts])
+
+  const brandOptions = Object.keys(brandLogos).map(key => {
+    const imageSource = brandLogos[key];
+    let imageUri = imageSource;
+    if (imageSource && typeof imageSource !== 'string') {
+      // Se for um objeto require(), tentar extrair a URI
+      try {
+        const Image = require('react-native').Image;
+        const resolvedSource = Image.resolveAssetSource(imageSource);
+        if (resolvedSource && resolvedSource.uri) {
+          imageUri = resolvedSource.uri;
+        }
+      } catch (error) {
+        console.warn('Erro ao resolver imagem:', error);
+      }
+    }
+    return {
+      id: key,
+      label: key.charAt(0).toUpperCase() + key.slice(1),
+      value: key,
+      imageUri: imageUri
+    };
+  });
 
   const handleSave = async () => {
     if (!name || !limit || !closingDay || !dueDay || !accountId) {
@@ -64,7 +112,7 @@ const CreditCardFormScreen = () => {
         dueDay: parseInt(dueDay, 10),
         color,
         userId: user?.id || 'default_user',
-        accountId: accountId 
+        accountId: accountId
       };
 
       console.log('data', data)

@@ -7,7 +7,7 @@ interface SelectItem {
   label: string;
   value: string;
   icon?: string;
-  image?: any;
+  imageUri?: string | null;
 }
 
 interface SelectProps {
@@ -82,14 +82,14 @@ export const Select: React.FC<SelectProps> = ({
         activeOpacity={0.7}
       >
 
-        {selectedItem?.image && (
+        {selectedItem?.imageUri && (
           <Image
-            source={typeof selectedItem.image === 'string' ? { uri: selectedItem.image } : selectedItem.image}
+            source={{ uri: selectedItem.imageUri }}
             style={{ width: 24, height: 24, borderRadius: 12, marginRight: 8 }}
           />
         )}
 
-        {selectedItem?.icon && !selectedItem?.image && (
+        {selectedItem?.icon && !selectedItem?.imageUri && (
           <Icon source={selectedItem.icon} size={20} color={fontColor || theme.colors.onSurface} />
         )}
 
@@ -127,13 +127,13 @@ export const Select: React.FC<SelectProps> = ({
                     ]}
                     onPress={() => handleSelect(item.value)}
                   >
-                    {item.image && (
+                    {item.imageUri && (
                       <Image 
-                        source={typeof item.image === 'string' ? { uri: item.image } : item.image} 
+                        source={{ uri: item.imageUri }} 
                         style={styles.itemImage} 
                       />
                     )}
-                    {item.icon && !item.image && (
+                    {item.icon && !item.imageUri && (
                       <Icon source={item.icon} size={20} color="#333" />
                     )}
                     <Text style={[

@@ -8,6 +8,7 @@ import { TransactionService } from '../service/TransactionService';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Account from '../models/Accounts';
+import { getAccountLogoByCode } from '../utils/accountLogos';
 
 interface TransferFormData {
   value: string;
@@ -137,16 +138,28 @@ export default function TransferFormScreen() {
             items={accounts.map((account: Account) => {
               let imageSource = account.logoUrl;
               if (!imageSource && account.bankCode && account.bankCode.trim() !== '') {
-                const bank = require('../service/BankService').default.getBankByCode(account.bankCode);
-                if (bank) {
-                  imageSource = bank.logoUrl;
+                // Usar o novo accountLogos para obter a imagem pelo código do banco
+                imageSource = getAccountLogoByCode(account.bankCode);
+              }
+              // Converter require() para URI se necessário
+              let imageUri = imageSource;
+              if (imageSource && typeof imageSource !== 'string') {
+                // Se for um objeto require(), tentar extrair a URI
+                try {
+                  const Image = require('react-native').Image;
+                  const resolvedSource = Image.resolveAssetSource(imageSource);
+                  if (resolvedSource && resolvedSource.uri) {
+                    imageUri = resolvedSource.uri;
+                  }
+                } catch (error) {
+                  console.warn('Erro ao resolver imagem:', error);
                 }
               }
               return {
                 id: account.id,
                 label: account.name,
                 value: account.id,
-                image: imageSource
+                imageUri: imageUri
               };
             })}
             selectedValue={formData.sourceAssetId}
@@ -162,16 +175,28 @@ export default function TransferFormScreen() {
             items={accounts.map((account: Account) => {
               let imageSource = account.logoUrl;
               if (!imageSource && account.bankCode && account.bankCode.trim() !== '') {
-                const bank = require('../service/BankService').default.getBankByCode(account.bankCode);
-                if (bank) {
-                  imageSource = bank.logoUrl;
+                // Usar o novo accountLogos para obter a imagem pelo código do banco
+                imageSource = getAccountLogoByCode(account.bankCode);
+              }
+              // Converter require() para URI se necessário
+              let imageUri = imageSource;
+              if (imageSource && typeof imageSource !== 'string') {
+                // Se for um objeto require(), tentar extrair a URI
+                try {
+                  const Image = require('react-native').Image;
+                  const resolvedSource = Image.resolveAssetSource(imageSource);
+                  if (resolvedSource && resolvedSource.uri) {
+                    imageUri = resolvedSource.uri;
+                  }
+                } catch (error) {
+                  console.warn('Erro ao resolver imagem:', error);
                 }
               }
               return {
                 id: account.id,
                 label: account.name,
                 value: account.id,
-                image: imageSource
+                imageUri: imageUri
               };
             })}
             selectedValue={formData.destinationAssetId}
