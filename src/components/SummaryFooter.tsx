@@ -17,8 +17,8 @@ interface SummaryFooterProps {
 }
 
 const SummaryFooterComponent = ({ isFutureMonth, transactions, pastTransactions }: SummaryFooterProps) => {
-  
-    const { t } = useTranslation();
+
+  const { t } = useTranslation();
   const { isDarkMode } = useTheme(); // Assumindo que o tema tem essa propriedade
 
   const totals = useMemo(() => {
@@ -192,36 +192,35 @@ const SummaryFooterComponent = ({ isFutureMonth, transactions, pastTransactions 
         </Surface>
 
         {/* Saldo Atual (se não for mês futuro) */}
-        {!isFutureMonth && (
-          <Surface
-            style={[
-              styles.card,
-              styles.cardElevated,
-              {
-                backgroundColor: getCardBackgroundColor(),
-                borderColor: getBorderColor(),
-                borderWidth: isDarkMode ? 0 : 1,
-                shadowColor: getShadowColor(),
-              }
-            ]}
-          >
-            <View style={styles.cardHeader}>
-              <Icon source="wallet" size={24} color="#FFB156" />
-              <Text style={[
-                styles.cardLabel,
-                { color: getTextColor() }
-              ]}>
-                {t("Saldo Atual")}
-              </Text>
-            </View>
+
+        <Surface
+          style={[
+            styles.card,
+            styles.cardElevated,
+            {
+              backgroundColor: getCardBackgroundColor(),
+              borderColor: getBorderColor(),
+              borderWidth: isDarkMode ? 0 : 1,
+              shadowColor: getShadowColor(),
+            }
+          ]}
+        >
+          <View style={styles.cardHeader}>
+            <Icon source="wallet" size={24} color="#FFB156" />
             <Text style={[
-              styles.cardValue,
-              { color: totals.currentBalance >= 0 ? '#56D6A3' : '#FF7285' }
+              styles.cardLabel,
+              { color: getTextColor() }
             ]}>
-              R$ {totals.currentBalance.toFixed(2)}
+              {t("Saldo Atual")}
             </Text>
-          </Surface>
-        )}
+          </View>
+          <Text style={[
+            styles.cardValue,
+            { color: totals.currentBalance >= 0 ? '#56D6A3' : '#FF7285' }
+          ]}>
+            R$ {totals.currentBalance.toFixed(2)}
+          </Text>
+        </Surface>
       </View>
 
       {/* Previsão */}

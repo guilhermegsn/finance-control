@@ -10,10 +10,11 @@ import CreditCardService from '../service/CreditCardService';
 import CreditCard from '../models/CreditCard';
 import { brandLogos } from '../utils/brandLogos';
 
-import { List, IconButton, Surface } from 'react-native-paper';
+import { List, IconButton, Surface, useTheme as usePaperTheme } from 'react-native-paper';
 
-const CreditCardItem = ({ card, theme, navigation }: { card: CreditCard, theme: any, navigation: any }) => {
+const CreditCardItem = ({ card, navigation }: { card: CreditCard, theme: any, navigation: any }) => {
   const { t } = useTranslation();
+  const paperTheme = usePaperTheme();
 
   const handleEdit = () => {
     navigation.navigate('CreditCardForm', { card });
@@ -25,8 +26,8 @@ const CreditCardItem = ({ card, theme, navigation }: { card: CreditCard, theme: 
       t('Tem certeza que deseja excluir este cartão?'),
       [
         { text: t('Cancelar'), style: 'cancel' },
-        { 
-          text: t('Excluir'), 
+        {
+          text: t('Excluir'),
           style: 'destructive',
           onPress: () => CreditCardService.delete(card)
         }
@@ -40,11 +41,15 @@ const CreditCardItem = ({ card, theme, navigation }: { card: CreditCard, theme: 
         <Image source={brandLogos[card.brand]} style={styles.brandLogo} />
       );
     }
-    return <List.Icon {...props} icon="credit-card-outline" color={card.color || theme.colors.text} />;
+    return <List.Icon {...props} icon="credit-card-outline" color={card.color || paperTheme.colors.onSurface} />;
   };
 
   return (
-    <Surface style={styles.cardItem} elevation={1}>
+    <Surface style={[styles.cardItem, {
+      backgroundColor: paperTheme.dark ? '#2A2D3E' : '#FFFFFF',
+      borderColor: paperTheme.dark ? 'transparent' : '#E5E7EB',
+      borderWidth: paperTheme.dark ? 0 : 1,
+    }]} elevation={1}>
       <List.Item
         title={card.name}
         description={`${t('Limite')}: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(card.limit)}\n${t('Fecha dia')} ${card.closingDay} • ${t('Vence dia')} ${card.dueDay}`}
@@ -72,7 +77,7 @@ const CreditCardListScreen = ({ cards }: { cards: CreditCard[] }) => {
   const { theme } = useTheme() as any;
 
   return (
-    <View style={{flex: 1}}>
+    <View style={{ flex: 1 }}>
 
       <FlatList
         data={cards}

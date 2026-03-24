@@ -1,6 +1,6 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity } from 'react-native';
-import { Surface, List } from 'react-native-paper';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Surface, Text, Icon, useTheme } from 'react-native-paper';
 
 export interface MenuCardProps {
   nome: string;
@@ -10,19 +10,65 @@ export interface MenuCardProps {
 }
 
 const MenuCard: React.FC<MenuCardProps> = ({ nome, descricao, icone, onPress }) => {
+  const theme = useTheme();
+  
+  // Mapeamento de cores para diferentes tipos de ícones
+  const getIconColor = (iconName: string) => {
+    const iconColors: Record<string, string> = {
+      'wallet': '#FFB156',      // Laranja/Amarelo para carteira
+      'tag': '#56D6A3',         // Verde para categorias
+      'credit-card-outline': '#7C73E6', // Roxo para cartões
+      'chart-bar': '#4F46E5',   // Índigo para gráficos
+      'flag': '#FF7285',        // Rosa para metas
+      'cog': '#818CF8',         // Azul para configurações
+    };
+    
+    return iconColors[iconName] || theme.colors.primary;
+  };
+
+  const iconColor = getIconColor(icone);
+
   const cardContent = (
-    <Surface style={styles.card} elevation={2}>
-      <List.Item
-        title={nome}
-        description={descricao}
-        left={props => <List.Icon {...props} icon={icone} />}
-      />
+    <Surface style={[
+      styles.card,
+      styles.cardElevated,
+      {
+        backgroundColor: theme.dark ? '#2A2D3E' : '#FFFFFF',
+        borderColor: theme.dark ? 'transparent' : '#E5E7EB',
+        borderWidth: theme.dark ? 0 : 1,
+      }
+    ]}>
+      <View style={styles.cardContent}>
+        <View style={[
+          styles.iconContainer,
+          { backgroundColor: `${iconColor}20` } // Cor com 20% de opacidade
+        ]}>
+          <Icon source={icone} size={24} color={iconColor} />
+        </View>
+        <View style={styles.textContainer}>
+          <Text style={[
+            styles.title,
+            { color: theme.dark ? '#FFFFFF' : '#1F2937' }
+          ]}>
+            {nome}
+          </Text>
+          <Text style={[
+            styles.description,
+            { color: theme.dark ? '#E5E7EB' : '#4B5563' }
+          ]}>
+            {descricao}
+          </Text>
+        </View>
+        {onPress && (
+          <Icon source="chevron-right" size={20} color={theme.dark ? '#9CA3AF' : '#6B7280'} />
+        )}
+      </View>
     </Surface>
   );
 
   if (onPress) {
     return (
-      <TouchableOpacity onPress={onPress}>
+      <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
         {cardContent}
       </TouchableOpacity>
     );
@@ -35,7 +81,38 @@ const styles = StyleSheet.create({
   card: {
     marginVertical: 8,
     marginHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: 12,
+    padding: 16,
+  },
+  cardElevated: {
+    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  cardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  textContainer: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  description: {
+    fontSize: 14,
+    opacity: 0.8,
   },
 });
 

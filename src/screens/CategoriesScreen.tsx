@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
-import { Appbar, Portal, Modal, TextInput, Button, Card, IconButton, FAB, useTheme, Text } from 'react-native-paper';
+import { View, StyleSheet, Alert, ScrollView } from 'react-native';
+import { Portal, Modal, TextInput, Button, Surface, FAB, useTheme, Text, Icon } from 'react-native-paper';
 import { useAuth } from '../contexts/AuthContext';
 import { CategoryService } from '../service/CategoryService';
 import CategoryList from '../components/CategoryList';
@@ -12,11 +12,10 @@ export default function CategoriesScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any>(null);
 
-
   const [emptyParams] = useState<Partial<Category>>({
     name: "",
     type: "expense",
-    color: "#6200ee",
+    color: "#7C73E6", // Cor padrão roxa que combina com o tema
     icon: "tag",
   })
   const [params, setParams] = useState<Partial<Category>>(emptyParams)
@@ -31,7 +30,7 @@ export default function CategoriesScreen() {
       await CategoryService.create({
         name: params.name,
         type: params.type || 'expense',
-        color: params.color || '#6200ee',
+        color: params.color || '#7C73E6',
         icon: params.icon || 'tag',
         userId: user.id,
       });
@@ -68,7 +67,7 @@ export default function CategoriesScreen() {
       await CategoryService.update(editingCategory.id, {
         name: params.name,
         type: params.type || 'expense',
-        color: params.color || '#6200ee',
+        color: params.color || '#7C73E6',
         icon: params.icon || 'tag',
       });
 
@@ -97,7 +96,10 @@ export default function CategoriesScreen() {
 
       {/* Floating Action Button para adicionar nova categoria */}
       <FAB
-        style={styles.fab}
+        style={[
+          styles.fab,
+          { backgroundColor: theme.dark ? '#7C73E6' : '#4F46E5' }
+        ]}
         icon="plus"
         color="white"
         onPress={() => setModalVisible(true)}
@@ -109,57 +111,95 @@ export default function CategoriesScreen() {
           visible={modalVisible}
           onDismiss={resetForm}
           style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
-          contentContainerStyle={[styles.modalContainer, { backgroundColor: theme.colors.background }]}
-
+          contentContainerStyle={styles.modalOverlay}
         >
-          <View>
-            <Text variant="titleLarge" style={{ marginBottom: 10 }}>Cadastrar categoria</Text>
-            <TextInput
-              label="Nome da Categoria (ex: Alimentação)"
-              value={params.name || ''}
-              onChangeText={(text) => setParams({ ...params, name: text })}
-              style={styles.input}
-              mode="outlined"
-              autoFocus
-            />
-            <TextInput
-              label="Tipo (income/expense)"
-              value={params.type || ''}
-              onChangeText={(text) => setParams({ ...params, type: text as 'income' | 'expense' })}
-              style={styles.input}
-              mode="outlined"
-            />
-            <TextInput
-              label="Ícone (nome do ícone, ex: 'food', 'shopping', 'home')"
-              value={params.icon || ''}
-              onChangeText={(text) => setParams({ ...params, icon: text })}
-              style={styles.input}
-              mode="outlined"
-            />
-            <TextInput
-              label="Cor (hexadecimal)"
-              value={params.color || ''}
-              onChangeText={(text) => setParams({ ...params, color: text })}
-              style={styles.input}
-              mode="outlined"
-            />
+          <Surface style={[
+            styles.modalContainer,
+            styles.cardElevated,
+            {
+              backgroundColor: theme.dark ? '#2A2D3E' : '#FFFFFF',
+              borderColor: theme.dark ? 'transparent' : '#E5E7EB',
+              borderWidth: theme.dark ? 0 : 1,
+            }
+          ]}>
+            <ScrollView>
+              <View style={styles.modalHeader}>
+                <Icon 
+                  source={editingCategory ? "pencil" : "plus-circle"} 
+                  size={24} 
+                  color={theme.dark ? '#7C73E6' : '#4F46E5'} 
+                />
+                <Text variant="titleLarge" style={[
+                  styles.modalTitle,
+                  { color: theme.dark ? '#FFFFFF' : '#1F2937' }
+                ]}>
+                  {editingCategory ? 'Editar Categoria' : 'Nova Categoria'}
+                </Text>
+              </View>
+              
+              <TextInput
+                label="Nome da Categoria (ex: Alimentação)"
+                value={params.name || ''}
+                onChangeText={(text) => setParams({ ...params, name: text })}
+                style={styles.input}
+                mode="outlined"
+                autoFocus
+                outlineColor={theme.dark ? '#4B5563' : '#D1D5DB'}
+                activeOutlineColor={theme.dark ? '#7C73E6' : '#4F46E5'}
+              />
+              <TextInput
+                label="Tipo (income/expense)"
+                value={params.type || ''}
+                onChangeText={(text) => setParams({ ...params, type: text as 'income' | 'expense' })}
+                style={styles.input}
+                mode="outlined"
+                outlineColor={theme.dark ? '#4B5563' : '#D1D5DB'}
+                activeOutlineColor={theme.dark ? '#7C73E6' : '#4F46E5'}
+              />
+              <TextInput
+                label="Ícone (nome do ícone, ex: 'food', 'shopping', 'home')"
+                value={params.icon || ''}
+                onChangeText={(text) => setParams({ ...params, icon: text })}
+                style={styles.input}
+                mode="outlined"
+                outlineColor={theme.dark ? '#4B5563' : '#D1D5DB'}
+                activeOutlineColor={theme.dark ? '#7C73E6' : '#4F46E5'}
+              />
+              <TextInput
+                label="Cor (hexadecimal)"
+                value={params.color || ''}
+                onChangeText={(text) => setParams({ ...params, color: text })}
+                style={styles.input}
+                mode="outlined"
+                outlineColor={theme.dark ? '#4B5563' : '#D1D5DB'}
+                activeOutlineColor={theme.dark ? '#7C73E6' : '#4F46E5'}
+              />
 
-            <Card.Actions>
-              <Button onPress={() => {
-                setModalVisible(false)
-                resetForm();
-              }}>
-                Cancelar
-              </Button>
-              <Button mode="contained" onPress={editingCategory ? handleUpdate : handleAdd}>
-                Salvar
-              </Button>
-            </Card.Actions>
-          </View>
+              <View style={styles.modalActions}>
+                <Button 
+                  mode="outlined" 
+                  onPress={() => {
+                    setModalVisible(false)
+                    resetForm();
+                  }}
+                  style={styles.cancelButton}
+                  textColor={theme.dark ? '#9CA3AF' : '#6B7280'}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  mode="contained" 
+                  onPress={editingCategory ? handleUpdate : handleAdd}
+                  style={styles.saveButton}
+                  buttonColor={theme.dark ? '#7C73E6' : '#4F46E5'}
+                >
+                  Salvar
+                </Button>
+              </View>
+            </ScrollView>
+          </Surface>
         </Modal>
       </Portal>
-
-
     </View>
   );
 }
@@ -176,17 +216,47 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#6200ee',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  input: {
-    marginBottom: 12
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
   },
   modalContainer: {
-    padding: 20,
-    margin: 20,
-    borderRadius: 20,
-    maxHeight: '90%',
+    borderRadius: 16,
+    padding: 24,
+    maxHeight: '80%',
+  },
+  cardElevated: {
+    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    marginLeft: 12,
+    fontWeight: '600',
+  },
+  input: {
+    marginBottom: 16,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 24,
+    gap: 12,
+  },
+  cancelButton: {
+    borderColor: '#D1D5DB',
+  },
+  saveButton: {
+    minWidth: 100,
   },
 });

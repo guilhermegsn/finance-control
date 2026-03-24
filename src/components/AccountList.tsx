@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, FlatList, StyleSheet, Image } from 'react-native';
-import { List, IconButton, Text, Surface } from 'react-native-paper';
+import { List, IconButton, Text, Surface, useTheme } from 'react-native-paper';
 import { withObservables } from '@nozbe/watermelondb/react';
 import Account from '../models/Accounts';
 import { AccountService } from '../service/AccountService';
@@ -8,6 +8,8 @@ import BankService from '../service/BankService';
 
 // Componente de Item Individual
 const AccountItem = ({ account, onEdit }: { account: Account; onEdit?: (account: Account) => void }) => {
+
+  const theme = useTheme()
   const handleDelete = () => {
     AccountService.delete(account.id);
   };
@@ -29,7 +31,7 @@ const AccountItem = ({ account, onEdit }: { account: Account; onEdit?: (account:
         />
       );
     }
-    
+
     // Se houver código do banco, tentar buscar logo
     if (account.bankCode && account.bankCode.trim() !== '') {
       const bank = BankService.getBankByCode(account.bankCode);
@@ -42,13 +44,17 @@ const AccountItem = ({ account, onEdit }: { account: Account; onEdit?: (account:
         );
       }
     }
-    
+
     // Caso contrário, usar ícone padrão
     return <List.Icon {...props} icon="wallet" color={account.color} />;
   };
 
   return (
-    <Surface style={styles.card} elevation={1}>
+    <Surface style={[styles.card,{
+      backgroundColor: theme.dark ? '#2A2D3E' : '#FFFFFF',
+      borderColor: theme.dark ? 'transparent' : '#E5E7EB',
+      borderWidth: theme.dark ? 0 : 1,
+    }]} elevation={1}>
       <List.Item
         title={account.name}
         left={renderLeftIcon}
@@ -72,6 +78,7 @@ const EnhancedAccountItem = withObservables(['account'], ({ account }) => ({
 
 // Componente da Lista
 const AccountList = ({ accounts, onEdit }: { accounts: Account[]; onEdit?: (account: Account) => void }) => {
+  const theme = useTheme()
   if (accounts.length === 0) {
     return (
       <View style={styles.empty}>
