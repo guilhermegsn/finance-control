@@ -320,7 +320,7 @@ export const TransactionService = {
   },
 
   // Excluir transações recorrentes (apenas esta ou esta e as próximas)
-  deleteRecurring: async (transactionId: string, mode: 'only_this' | 'all_future') => {
+  deleteRecurring: async (transactionId: string, recurringId: string, transactionDate: Date, mode: 'only_this' | 'all_future') => {
     await database.write(async () => {
       const transaction = await database.get<Transaction>('transactions').find(transactionId);
       
@@ -329,9 +329,6 @@ export const TransactionService = {
         await transaction.markAsDeleted();
       } else {
         // Exclui esta e todas as próximas (all_future)
-        // @ts-ignore
-        const recurringId = transaction._raw.recurring_id;
-        const transactionDate = new Date(transaction.date);
         
         if (!recurringId) {
           // Se não tem recurring_id, exclui apenas esta

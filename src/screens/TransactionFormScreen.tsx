@@ -2,7 +2,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, TouchableOpacity, ScrollView, Alert } from 'react-native';
-import { Button, TextInput, Divider, Switch, HelperText, Text, Icon, Portal, Dialog } from 'react-native-paper';
+import { Button, TextInput, Switch, HelperText, Text, Icon, Portal, Dialog } from 'react-native-paper';
 import { Select } from '../components/Select';
 import { TransactionService } from '../service/TransactionService';
 import { useAuth } from '../contexts/AuthContext';
@@ -47,8 +47,8 @@ export default function TransactionFormScreen() {
         isRecurring: false,
         recurringEndDate: null,
         isConsolidated: transaction.isConsolidated,
-        accountId: '', // Será preenchido separadamente
-        categoryId: '', // Será preenchido separadamente
+        accountId: transaction.accountId,
+        categoryId: transaction.categoryId,
       };
     } else {
       const today = new Date();
@@ -183,10 +183,43 @@ export default function TransactionFormScreen() {
         isConsolidated: transaction.isConsolidated,
         isRecurring: transaction.isRecurring,
       };
-      navigation.navigate('RecurringDialog', {
-        transaction: safeTransaction,
-        action: 'delete',
-      });
+      Alert.alert(
+        t('Esta é uma transação recorrente. O que deseja excluir?'),
+        '',
+        [
+          {
+            text: t('Cancelar'),
+            style: 'cancel',
+          },
+          {
+            text: t('Esta e todas as futuras'),
+            onPress: async () => {
+              try {
+                await TransactionService.deleteRecurring(transaction.id, transaction.recurringId, transaction.date, 'all_future');
+                onSave?.();
+                navigation.goBack();
+              } catch (error) {
+                console.error('Erro ao excluir transações recorrentes:', error);
+              }
+            },
+          },
+          {
+            text: t('Apenas esta ocorrência'),
+            onPress: async () => {
+              try {
+                await TransactionService.delete(transaction.id);
+                onSave?.();
+                navigation.goBack();
+              } catch (error) {
+                console.error('Erro ao excluir transação:', error);
+              }
+            },
+          },
+
+
+        ],
+        { cancelable: true }
+      );
     } else {
       try {
         await TransactionService.delete(transaction.id);
