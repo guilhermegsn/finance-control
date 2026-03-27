@@ -1,19 +1,48 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// 1. Definição das Cores
+export const colors = {
+  light: {
+    background: '#F5F7FA',
+    card: '#FFFFFF',
+    text: '#1C1C1E',
+    textSecondary: '#666666',
+    success: '#56D6A3',
+    danger: '#FF7285',
+    warning: '#FFB938',
+    border: '#E1E1E1',
+    primary: '#4B7BEC',
+  },
+  dark: {
+    background: '#121420',
+    card: '#2A2D3E',
+    text: '#FFFFFF',
+    textSecondary: '#A0A0A0',
+    success: '#56D6A3',
+    danger: '#FF7285',
+    warning: '#FFD074',
+    border: '#3D4155',
+    primary: '#709CFF',
+  }
+};
 
 interface ThemeContextData {
   isDarkMode: boolean;
   toggleDarkMode: () => void;
   isThemeLoading: boolean;
+  theme: typeof colors.light; // Tipagem baseada no objeto light
 }
 
 const ThemeContext = createContext<ThemeContextData>({} as ThemeContextData);
-
 const THEME_STORAGE_KEY = '@finance-control:dark-mode';
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isThemeLoading, setIsThemeLoading] = useState(true);
+
+  // useMemo garante que o objeto de cores só mude quando isDarkMode mudar
+  const theme = useMemo(() => (isDarkMode ? colors.dark : colors.light), [isDarkMode]);
 
   useEffect(() => {
     loadTheme();
@@ -43,7 +72,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <ThemeContext.Provider value={{ isDarkMode, toggleDarkMode, isThemeLoading }}>
+    <ThemeContext.Provider value={{ isDarkMode, toggleDarkMode, isThemeLoading, theme }}>
       {children}
     </ThemeContext.Provider>
   );

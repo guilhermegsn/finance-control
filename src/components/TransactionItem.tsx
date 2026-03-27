@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 import { Icon, Text } from 'react-native-paper';
 import { withObservables } from '@nozbe/watermelondb/react';
 import Transaction from '../models/Transactions';
 import { TransactionService } from '../service/TransactionService';
+import { useTheme } from '../contexts/ThemeContext';
+
 
 interface TransactionItemProps {
   transaction: Transaction;
@@ -11,6 +13,9 @@ interface TransactionItemProps {
 }
 
 function TransactionItemComponent({ transaction, onLongPress }: TransactionItemProps) {
+
+  const { theme } = useTheme()
+
   const handleToggleConsolidated = async () => {
     try {
       await TransactionService.toggleConsolidated(transaction);
@@ -28,22 +33,35 @@ function TransactionItemComponent({ transaction, onLongPress }: TransactionItemP
             <Icon
               source={transaction.isConsolidated ? "check-circle" : "check-circle-outline"}
               size={15}
-              
-              color={transaction.isConsolidated && transaction.type === 'income' ?  "#2E9E57" :
-                transaction.isConsolidated && transaction.type === 'expense' ? "#CC4A4A"
-                : "#999"}
+
+              color={transaction.isConsolidated && transaction.type === 'income' ? theme.success :
+                transaction.isConsolidated && transaction.type === 'expense' ? theme.danger
+                  : "#999"}
             />
           </TouchableOpacity>
         )}
-        {/* @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos */}
-        <Text variant='labelMedium' style={{ width: 50, marginLeft: transaction._raw?.credit_card_id ? 32 : 15 }}>
+
+        <Text variant='labelMedium'
+          style={{
+            /* @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos */
+            width: 50, marginLeft: transaction._raw?.credit_card_id ? 32 : 15,
+            color: transaction.isConsolidated ? theme.text : 'gray'
+          }}>
           {transaction.purchaseDate
             ? new Date(transaction.purchaseDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
             : new Date(transaction.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
         </Text>
-        <Text variant='labelMedium' style={{ flex: 1 }}>{transaction.description}</Text>
+
+        <Text variant='labelMedium'
+          style={{ flex: 1, color: transaction.isConsolidated ? theme.text : 'gray' }}>
+          {transaction.description}
+        </Text>
+
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text variant='labelMedium'>R$ {transaction.amount.toFixed(2)}</Text>
+          <Text variant='labelMedium'
+            style={{ color: transaction.isConsolidated ? theme.text : 'gray' }}>
+            R$ {transaction.amount.toFixed(2)}
+          </Text>
         </View>
       </View>
     </TouchableOpacity>

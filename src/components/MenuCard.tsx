@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Surface, Text, Icon, useTheme } from 'react-native-paper';
+import { Surface, Text, Icon } from 'react-native-paper';
+import { useTheme } from '../contexts/ThemeContext';
 
 export interface MenuCardProps {
   nome: string;
@@ -10,8 +11,8 @@ export interface MenuCardProps {
 }
 
 const MenuCard: React.FC<MenuCardProps> = ({ nome, descricao, icone, onPress }) => {
-  const theme = useTheme();
-  
+
+  const { theme, isDarkMode } = useTheme()
   // Mapeamento de cores para diferentes tipos de ícones
   const getIconColor = (iconName: string) => {
     const iconColors: Record<string, string> = {
@@ -22,8 +23,8 @@ const MenuCard: React.FC<MenuCardProps> = ({ nome, descricao, icone, onPress }) 
       'flag': '#FF7285',        // Rosa para metas
       'cog': '#818CF8',         // Azul para configurações
     };
-    
-    return iconColors[iconName] || theme.colors.primary;
+
+    return iconColors[iconName] || theme.primary;
   };
 
   const iconColor = getIconColor(icone);
@@ -33,9 +34,9 @@ const MenuCard: React.FC<MenuCardProps> = ({ nome, descricao, icone, onPress }) 
       styles.card,
       styles.cardElevated,
       {
-        backgroundColor: theme.dark ? '#2A2D3E' : '#FFFFFF',
-        borderColor: theme.dark ? 'transparent' : '#E5E7EB',
-        borderWidth: theme.dark ? 0 : 1,
+        backgroundColor: theme.card,
+        borderColor: isDarkMode ? 'transparent' : '#E5E7EB',
+        borderWidth: isDarkMode ? 0 : 1,
       }
     ]}>
       <View style={styles.cardContent}>
@@ -46,21 +47,15 @@ const MenuCard: React.FC<MenuCardProps> = ({ nome, descricao, icone, onPress }) 
           <Icon source={icone} size={24} color={iconColor} />
         </View>
         <View style={styles.textContainer}>
-          <Text style={[
-            styles.title,
-            { color: theme.dark ? '#FFFFFF' : '#1F2937' }
-          ]}>
+          <Text style={styles.title}>
             {nome}
           </Text>
-          <Text style={[
-            styles.description,
-            { color: theme.dark ? '#E5E7EB' : '#4B5563' }
-          ]}>
+          <Text style={styles.description}>
             {descricao}
           </Text>
         </View>
         {onPress && (
-          <Icon source="chevron-right" size={20} color={theme.dark ? '#9CA3AF' : '#6B7280'} />
+          <Icon source="chevron-right" size={20} />
         )}
       </View>
     </Surface>
