@@ -47,8 +47,8 @@ export default function TransactionFormScreen() {
         isRecurring: false,
         recurringEndDate: null,
         isConsolidated: transaction.isConsolidated,
-        accountId: transaction.accountId,
-        categoryId: transaction.categoryId,
+        accountId: transaction.accountId || '',
+        categoryId: transaction.categoryId || '',
       };
     } else {
       const today = new Date();
@@ -195,7 +195,9 @@ export default function TransactionFormScreen() {
             text: t('Esta e todas as futuras'),
             onPress: async () => {
               try {
-                await TransactionService.deleteRecurring(transaction.id, transaction.recurringId, transaction.date, 'all_future');
+                // Usar type assertion para acessar recurringId que pode não estar na interface TypeScript
+                const recurringId = (transaction as any).recurringId || '';
+                await TransactionService.deleteRecurring(transaction.id, recurringId, transaction.date, 'all_future');
                 onSave?.();
                 navigation.goBack();
               } catch (error) {

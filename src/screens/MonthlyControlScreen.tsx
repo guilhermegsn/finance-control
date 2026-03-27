@@ -111,6 +111,9 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
       date: transaction.date,
       isConsolidated: transaction.isConsolidated,
       isRecurring: transaction.isRecurring,
+      accountId: transaction.account?.id || (transaction as any)._raw?.account_id,
+      categoryId: transaction.category?.id || (transaction as any)._raw?.category_id,
+      recurringId: transaction.recurringId || (transaction as any)._raw?.recurring_id,
     } : undefined;
 
     navigation.navigate('TransactionForm', {
