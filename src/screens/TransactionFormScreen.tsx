@@ -111,27 +111,17 @@ export default function TransactionFormScreen() {
       recurringEndDate: formData.isRecurring ? formData.recurringEndDate || undefined : undefined,
     };
 
+    console.log('handleSave - transactionData:', transactionData);
+    console.log('Transação original:', transaction);
+
     try {
       if (transaction) {
         // Verificar se é uma transação recorrente
         if (transaction.isRecurring) {
-          // Navegar para dialog de recorrência ou tratar de outra forma
-          // Extrair apenas dados simples para evitar referências circulares
-          const safeTransaction = {
-            id: transaction.id,
-            description: transaction.description,
-            amount: transaction.amount,
-            type: transaction.type,
-            date: transaction.date,
-            isConsolidated: transaction.isConsolidated,
-            isRecurring: transaction.isRecurring,
-          };
-          // Verificar se é uma transação recorrente
-          if (transaction.isRecurring) {
-            // Em vez de navegar, salvamos os dados temporariamente e abrimos o popup
-            setPendingUpdateData(transactionData);
-            setRecurringDialogVisible(true);
-          }
+          console.log('Transação recorrente detectada, abrindo diálogo');
+          // Em vez de navegar, salvamos os dados temporariamente e abrimos o popup
+          setPendingUpdateData(transactionData);
+          setRecurringDialogVisible(true);
         } else {
           const updateData = {
             accountId: transactionData.accountId,
@@ -142,11 +132,13 @@ export default function TransactionFormScreen() {
             date: transactionData.date,
             isConsolidated: transactionData.isConsolidated,
           };
+          console.log('Atualizando transação não recorrente:', updateData);
           await TransactionService.update(transaction.id, updateData);
           onSave?.();
           navigation.goBack();
         }
       } else {
+        console.log('Criando nova transação');
         await TransactionService.create(transactionData);
         onSave?.();
         navigation.goBack();
@@ -174,15 +166,6 @@ export default function TransactionFormScreen() {
 
     if (transaction.isRecurring) {
       // Extrair apenas dados simples para evitar referências circulares
-      const safeTransaction = {
-        id: transaction.id,
-        description: transaction.description,
-        amount: transaction.amount,
-        type: transaction.type,
-        date: transaction.date,
-        isConsolidated: transaction.isConsolidated,
-        isRecurring: transaction.isRecurring,
-      };
       Alert.alert(
         t('Esta é uma transação recorrente. O que deseja excluir?'),
         '',

@@ -4,6 +4,7 @@ import { DataTable, Icon, Text } from 'react-native-paper';
 import TransactionItem from './TransactionItem';
 import BankService from '../service/BankService';
 import Transaction from '../models/Transactions';
+import { useTheme } from '../contexts/ThemeContext';
 
 export type SyntheticTransaction = {
   id: string;
@@ -54,8 +55,9 @@ export default function AccountsTable({
   onEditTransaction,
   onConsolidateInvoice,
   totalBalance,
-  currentDate,
 }: AccountsTableProps) {
+
+  const { theme } = useTheme()
 
   const renderAccountLogo = (group: AccountTransactionGroup) => {
     const account = accounts.find(acc => acc.id === group.accountId);
@@ -125,16 +127,16 @@ export default function AccountsTable({
                   <>
                     <DataTable.Row>
                       <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 10 }}>
-                        <Icon source="arrow-up-bold-circle" size={16} color="#2E9E57" />
+                        <Icon source="arrow-up-bold-circle" size={16} color={theme.success} />
                       </DataTable.Cell>
-                      <DataTable.Cell style={{paddingLeft: 20}}>
-                        <Text style={{ color: '#2E9E57', fontWeight: '600' }}>Entradas</Text>
+                      <DataTable.Cell style={{ paddingLeft: 20 }}>
+                        <Text style={{ color: theme.success, fontWeight: '600' }}>Entradas</Text>
                       </DataTable.Cell>
                       <DataTable.Cell numeric>
-                        <Text style={{ color: '#2E9E57', fontWeight: '600' }}>R$ {group.income.total.toFixed(2)}</Text>
+                        <Text style={{ color: theme.success, fontWeight: '600' }}>R$ {group.income.total.toFixed(2)}</Text>
                       </DataTable.Cell>
                     </DataTable.Row>
-                   
+
                     {/* Saldo Anterior */}
                     {group.previousBalance !== 0 && (
                       <DataTable.Row>
@@ -164,13 +166,13 @@ export default function AccountsTable({
                   <>
                     <DataTable.Row>
                       <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 10 }}>
-                        <Icon source="arrow-down-bold-circle" size={16} color="#CC4A4A" />
+                        <Icon source="arrow-down-bold-circle" size={16} color={theme.danger} />
                       </DataTable.Cell>
                       <DataTable.Cell style={{ paddingLeft: 20 }}>
-                        <Text style={{ color: '#CC4A4A', fontWeight: '600' }}>Saídas</Text>
+                        <Text style={{ color: theme.danger, fontWeight: '600' }}>Saídas</Text>
                       </DataTable.Cell>
                       <DataTable.Cell numeric>
-                        <Text style={{ color: '#CC4A4A', fontWeight: '600' }}>R$ {group.expense.total.toFixed(2)}</Text>
+                        <Text style={{ color: theme.danger, fontWeight: '600' }}>R$ {group.expense.total.toFixed(2)}</Text>
                       </DataTable.Cell>
                     </DataTable.Row>
                     {group.expense.transactions.map((item) => {
@@ -221,7 +223,12 @@ export default function AccountsTable({
           <Text style={{ fontWeight: 'bold' }}>TOTAL GERAL</Text>
         </DataTable.Cell>
         <DataTable.Cell numeric>
-          <Text style={{ fontWeight: 'bold' }}>R$ {totalBalance.toFixed(2)}</Text>
+          <Text
+            style={{
+              fontWeight: 'bold', color: totalBalance < 0 ? theme.danger : theme.text
+            }}>
+            R$ {totalBalance.toFixed(2)}
+          </Text>
         </DataTable.Cell>
       </DataTable.Row>
     </DataTable>

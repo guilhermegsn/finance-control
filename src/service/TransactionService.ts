@@ -237,13 +237,18 @@ export const TransactionService = {
       description?: string;
       amount?: number;
       type?: 'income' | 'expense';
+      date?: Date;
       observation?: string;
     }
   ) => {
+    console.log('updateRecurring chamado:', { transactionId, mode, data });
+    
     await database.write(async () => {
       const transaction = await database.get<Transaction>('transactions').find(transactionId);
+      //console.log('Transação encontrada:', transaction.id, 'data original:', transaction.date, 'recurringId:', transaction._raw?.recurring_id);
       
       if (mode === 'only_this') {
+        console.log('Modo: only_this, atualizando apenas esta transação');
         // Atualiza apenas esta transação e remove do grupo recorrente
         await transaction.update((tx) => {
           if (data.accountId !== undefined) {
@@ -257,6 +262,12 @@ export const TransactionService = {
           if (data.description !== undefined) tx.description = data.description;
           if (data.amount !== undefined) tx.amount = data.amount;
           if (data.type !== undefined) tx.type = data.type;
+          if (data.date !== undefined) {
+            console.log('Atualizando data para:', data.date);
+            tx.date = data.date;
+            // @ts-ignore - WatermelonDB usa esta sintaxe para campos date
+            tx._raw.date = data.date.getTime();
+          }
           if (data.observation !== undefined) tx.observation = data.observation;
           // Remove do grupo recorrente
           tx.isRecurring = false;
@@ -264,12 +275,14 @@ export const TransactionService = {
           tx._raw.recurring_id = null;
         });
       } else {
-        // Atualiza esta e todas as próximas (all_future)
-        // @ts-ignore
-        const recurringId = transaction._raw.recurring_id;
+        console.log('Modo: all_future, atualizando esta e todas as próximas');
+        // @ts-ignore - WatermelonDB usa esta sintaxe para campos personalizados
+        const recurringId = (transaction._raw as any).recurring_id;
         const transactionDate = new Date(transaction.date);
+        console.log('recurringId:', recurringId, 'transactionDate:', transactionDate);
         
         if (!recurringId) {
+          console.log('Sem recurring_id, atualizando apenas esta transação');
           // Se não tem recurring_id, atualiza apenas esta
           await transaction.update((tx) => {
             if (data.accountId !== undefined) {
@@ -283,6 +296,12 @@ export const TransactionService = {
             if (data.description !== undefined) tx.description = data.description;
             if (data.amount !== undefined) tx.amount = data.amount;
             if (data.type !== undefined) tx.type = data.type;
+            if (data.date !== undefined) {
+              console.log('Atualizando data para:', data.date);
+              tx.date = data.date;
+              // @ts-ignore - WatermelonDB usa esta sintaxe para campos date
+              tx._raw.date = data.date.getTime();
+            }
             if (data.observation !== undefined) tx.observation = data.observation;
           });
           return;
@@ -295,6 +314,8 @@ export const TransactionService = {
             Q.where('date', Q.gte(transactionDate.getTime()))
           )
           .fetch();
+        
+        console.log(`Encontradas ${futureTransactions.length} transações futuras para atualizar`);
         
         // Preparar atualizações em batch
         const updates = futureTransactions.map(tx => 
@@ -310,13 +331,52 @@ export const TransactionService = {
             if (data.description !== undefined) record.description = data.description;
             if (data.amount !== undefined) record.amount = data.amount;
             if (data.type !== undefined) record.type = data.type;
+            if (data.date !== undefined) {
+              // Calcular o deslocamento de meses entre a data original e a nova data
+              const originalDate = new Date(transaction.date);
+              const newDate = data.date;
+              const monthDiff = (newDate.getFullYear() - originalDate.getFullYear()) * 12 + 
+                               (newDate.getMonth() - originalDate.getMonth());
+              const newDay = newDate.getDate();
+              const newMonth = newDate.getMonth();
+              const newYear = newDate.getFullYear();
+              
+              console.log(`Cálculo: originalDate=${originalDate.toISOString()}, newDate=${newDate.toISOString()}, monthDiff=${monthDiff}, newDay=${newDay}`);
+              
+              // Ajustar a data da transação futura pelo mesmo deslocamento de meses E pelo novo dia
+              const originalRecordDate = new Date(record.date);
+              console.log(`Data original da transação futura: ${originalRecordDate.toISOString()}`);
+              
+              // Calcular o mês e ano ajustados para a transação futura
+              const adjustedMonth = originalRecordDate.getMonth() + monthDiff;
+              const adjustedYear = originalRecordDate.getFullYear();
+              
+              // Criar nova data com ano/mês ajustados e novo dia
+              let adjustedDate = new Date(adjustedYear, adjustedMonth, newDay);
+              
+              // Tratar casos onde o dia não existe no mês ajustado (ex: 31 de fevereiro)
+              if (adjustedDate.getDate() !== newDay) {
+                console.log(`Ajustando data: dia ${newDay} não existe no mês ${adjustedMonth + 1}, usando último dia do mês`);
+                adjustedDate = new Date(adjustedYear, adjustedMonth + 1, 0); // Último dia do mês
+              }
+              
+              console.log(`Data ajustada: ${adjustedDate.toISOString()}`);
+              
+              // Atualizar a data e garantir que _raw.date também seja atualizado
+              record.date = adjustedDate;
+              // @ts-ignore - WatermelonDB usa esta sintaxe para campos date
+              record._raw.date = adjustedDate.getTime();
+            }
             if (data.observation !== undefined) record.observation = data.observation;
           })
         );
         
         await database.batch(...updates);
+        console.log('Batch de atualizações concluído');
       }
     });
+    
+    console.log('updateRecurring concluído');
   },
 
   // Excluir transações recorrentes (apenas esta ou esta e as próximas)

@@ -150,7 +150,7 @@ function CreditCardSectionComponent({
               </DataTable.Cell>
 
               <DataTable.Cell numeric>
-                <Text style={{ fontWeight: 'bold', fontSize: 14, color: '#CC4A4A' }}>
+                <Text style={{ fontWeight: 'bold', fontSize: 14 }}>
                   R$ {group.invoiceTotal.toFixed(2)}
                 </Text>
               </DataTable.Cell>
