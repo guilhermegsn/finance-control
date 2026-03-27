@@ -8,7 +8,6 @@ import { brandLogos } from '../utils/brandLogos';
 import {
   calculateInvoiceTotalByPurchaseDate,
   filterTransactionsByInvoiceMonth,
-  getInvoiceMonthDescription
 } from '../utils/creditCardInvoiceHelper';
 import { useTranslation } from 'react-i18next';
 
@@ -46,33 +45,33 @@ function CreditCardSectionComponent({
     t._raw?.credit_card_id && t._raw.credit_card_id !== null
   );
 
-    // Agrupar transações por cartão e calcular totais da fatura usando REGRA 1 (purchaseDate + closingDay)
-    const creditCardGroups: CreditCardInvoiceGroup[] = creditCards.map(card => {
-      const cardTransactions = creditCardTransactions.filter(t =>
-        // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
-        t._raw?.credit_card_id === card.id
-      );
+  // Agrupar transações por cartão e calcular totais da fatura usando REGRA 1 (purchaseDate + closingDay)
+  const creditCardGroups: CreditCardInvoiceGroup[] = creditCards.map(card => {
+    const cardTransactions = creditCardTransactions.filter(t =>
+      // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
+      t._raw?.credit_card_id === card.id
+    );
 
-      // Filtrar apenas transações não consolidadas para a fatura atual
-      const pendingCardTransactions = cardTransactions.filter(t => !t.isConsolidated);
-      
-      // REGRA 1: Filtrar transações pela data de compra (purchaseDate) e dia de fechamento
-      const invoiceTransactions = filterTransactionsByInvoiceMonth(pendingCardTransactions, card, currentDate);
-      // REGRA 1: Calcular total pela data de compra (purchaseDate)
-      const invoiceTotal = calculateInvoiceTotalByPurchaseDate(pendingCardTransactions, card, currentDate);
+    // Filtrar apenas transações não consolidadas para a fatura atual
+    const pendingCardTransactions = cardTransactions.filter(t => !t.isConsolidated);
 
-      return {
-        cardId: card.id,
-        cardName: card.name,
-        cardBrand: card.brand,
-        cardColor: card.color,
-        closingDay: card.closingDay,
-        dueDay: card.dueDay,
-        limit: card.limit,
-        invoiceTotal,
-        invoiceTransactions,
-      };
-    });
+    // REGRA 1: Filtrar transações pela data de compra (purchaseDate) e dia de fechamento
+    const invoiceTransactions = filterTransactionsByInvoiceMonth(pendingCardTransactions, card, currentDate);
+    // REGRA 1: Calcular total pela data de compra (purchaseDate)
+    const invoiceTotal = calculateInvoiceTotalByPurchaseDate(pendingCardTransactions, card, currentDate);
+
+    return {
+      cardId: card.id,
+      cardName: card.name,
+      cardBrand: card.brand,
+      cardColor: card.color,
+      closingDay: card.closingDay,
+      dueDay: card.dueDay,
+      limit: card.limit,
+      invoiceTotal,
+      invoiceTransactions,
+    };
+  });
 
   const toggleCardExpansion = (cardId: string) => {
     const newExpanded = new Set(expandedCards);
@@ -135,6 +134,9 @@ function CreditCardSectionComponent({
           <View key={group.cardId}>
             {/* Cabeçalho do Cartão */}
             <DataTable.Row onPress={() => toggleCardExpansion(group.cardId)}>
+              <DataTable.Cell style={{ flex: 0.2}}>
+                <Icon source={isExpanded ? "chevron-up" : "chevron-down"} size={16} />
+              </DataTable.Cell>
               <DataTable.Cell>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   {renderCardLogo(group.cardBrand)}
@@ -146,9 +148,7 @@ function CreditCardSectionComponent({
                   </View>
                 </View>
               </DataTable.Cell>
-              <DataTable.Cell numeric>
-                <Icon source={isExpanded ? "chevron-up" : "chevron-down"} size={16} />
-              </DataTable.Cell>
+
               <DataTable.Cell numeric>
                 <Text style={{ fontWeight: 'bold', fontSize: 14, color: '#CC4A4A' }}>
                   R$ {group.invoiceTotal.toFixed(2)}
@@ -159,28 +159,11 @@ function CreditCardSectionComponent({
             {/* Conteúdo Expandido */}
             {isExpanded && (
               <>
-                {/* Informações do cartão */}
-                <DataTable.Row>
-                  <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 10 }}>
-                    <Icon source="information" size={16} />
-                  </DataTable.Cell>
-                  <DataTable.Cell style={{ paddingLeft: 10 }}>
-                    <Text style={{ opacity: 0.6, fontStyle: 'italic' }}>
-                      {getInvoiceMonthDescription(currentDate)}
-                    </Text>
-                  </DataTable.Cell>
-                  <DataTable.Cell numeric>
-                    <Text style={{ opacity: 0.6, fontStyle: 'italic' }}>
-                      {t("Limite:", { ns: "common" })} R$ {group.limit.toFixed(2)}
-                    </Text>
-                  </DataTable.Cell>
-                </DataTable.Row>
-
                 {/* Transações da fatura */}
                 {group.invoiceTransactions.length > 0 ? (
                   group.invoiceTransactions.map((transaction) => (
                     <DataTable.Row key={transaction.id} onLongPress={() => onEditTransaction?.(transaction)}>
-                      <DataTable.Cell style={{ paddingLeft: 10 }}>
+                      <DataTable.Cell>
                         <TransactionItem
                           transaction={transaction}
                           onLongPress={() => onEditTransaction?.(transaction)}

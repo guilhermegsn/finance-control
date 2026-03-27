@@ -56,7 +56,7 @@ export default function AccountsTable({
   totalBalance,
   currentDate,
 }: AccountsTableProps) {
-  
+
   const renderAccountLogo = (group: AccountTransactionGroup) => {
     const account = accounts.find(acc => acc.id === group.accountId);
 
@@ -101,15 +101,16 @@ export default function AccountsTable({
           <View key={group.accountId}>
             {/* Cabeçalho da Conta */}
             <DataTable.Row onPress={() => onToggleAccount(group.accountId)}>
+              <DataTable.Cell style={{ flex: 0.2 }}>
+                <Icon source={isExpanded ? "chevron-up" : "chevron-down"} size={16} />
+              </DataTable.Cell>
               <DataTable.Cell>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   {renderAccountLogo(group)}
                   <Text style={{ fontWeight: 'bold' }}>{group.accountName}</Text>
                 </View>
               </DataTable.Cell>
-              <DataTable.Cell numeric>
-                <Icon source={isExpanded ? "chevron-up" : "chevron-down"} size={16} />
-              </DataTable.Cell>
+
               <DataTable.Cell numeric>
                 <Text style={{ fontWeight: 'bold', fontSize: 14 }}>R$ {group.totalBalance.toFixed(2)}</Text>
               </DataTable.Cell>
@@ -118,20 +119,6 @@ export default function AccountsTable({
             {/* Conteúdo Expandido */}
             {isExpanded && (
               <>
-                {/* Saldo Anterior */}
-                {group.previousBalance !== 0 && (
-                  <DataTable.Row>
-                    <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 10 }}>
-                      <Icon source="history" size={16} />
-                    </DataTable.Cell>
-                    <DataTable.Cell style={{ paddingLeft: 10 }}>
-                      <Text style={{ opacity: 0.6, fontStyle: 'italic' }}>Saldo Inicial do Mês</Text>
-                    </DataTable.Cell>
-                    <DataTable.Cell numeric>
-                      <Text style={{ opacity: 0.6, fontStyle: 'italic' }}>R$ {group.previousBalance.toFixed(2)}</Text>
-                    </DataTable.Cell>
-                  </DataTable.Row>
-                )}
 
                 {/* Entradas */}
                 {group.income.transactions.length > 0 && (
@@ -140,13 +127,28 @@ export default function AccountsTable({
                       <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 10 }}>
                         <Icon source="arrow-up-bold-circle" size={16} color="#2E9E57" />
                       </DataTable.Cell>
-                      <DataTable.Cell style={{ paddingLeft: 20 }}>
+                      <DataTable.Cell style={{paddingLeft: 20}}>
                         <Text style={{ color: '#2E9E57', fontWeight: '600' }}>Entradas</Text>
                       </DataTable.Cell>
                       <DataTable.Cell numeric>
                         <Text style={{ color: '#2E9E57', fontWeight: '600' }}>R$ {group.income.total.toFixed(2)}</Text>
                       </DataTable.Cell>
                     </DataTable.Row>
+                   
+                    {/* Saldo Anterior */}
+                    {group.previousBalance !== 0 && (
+                      <DataTable.Row>
+                        <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 10 }}>
+                          <Icon source="history" size={16} />
+                        </DataTable.Cell>
+                        <DataTable.Cell>
+                          <Text style={{ opacity: 0.6, fontStyle: 'italic' }}>Saldo Inicial do Mês</Text>
+                        </DataTable.Cell>
+                        <DataTable.Cell numeric>
+                          <Text style={{ opacity: 0.6, fontStyle: 'italic' }}>R$ {group.previousBalance.toFixed(2)}</Text>
+                        </DataTable.Cell>
+                      </DataTable.Row>
+                    )}
                     {group.income.transactions.map((item) => (
                       <DataTable.Row key={item.id} onLongPress={() => onEditTransaction(item)}>
                         <DataTable.Cell style={{ paddingLeft: 10 }}>

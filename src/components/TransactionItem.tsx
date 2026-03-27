@@ -22,21 +22,28 @@ function TransactionItemComponent({ transaction, onLongPress }: TransactionItemP
   return (
     <TouchableOpacity onLongPress={onLongPress} style={{ flexDirection: 'row', alignItems: 'center' }}>
       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-        <Text style={{ width: 70, paddingLeft: 10 }}>
-          {transaction.purchaseDate 
-            ? new Date(transaction.purchaseDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-            : new Date(transaction.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-        </Text>
-        <Text style={{ paddingLeft: 40, flex: 1 }}>{transaction.description}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={{ marginRight: 8 }}>R$ {transaction.amount.toFixed(2)}</Text>
+        {/* @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos */}
+        {!transaction._raw?.credit_card_id && (
           <TouchableOpacity onPress={handleToggleConsolidated}>
             <Icon
               source={transaction.isConsolidated ? "check-circle" : "check-circle-outline"}
-              size={20}
-              color={transaction.isConsolidated ? "#2E9E57" : "#999"}
+              size={15}
+              
+              color={transaction.isConsolidated && transaction.type === 'income' ?  "#2E9E57" :
+                transaction.isConsolidated && transaction.type === 'expense' ? "#CC4A4A"
+                : "#999"}
             />
           </TouchableOpacity>
+        )}
+        {/* @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos */}
+        <Text variant='labelMedium' style={{ width: 50, marginLeft: transaction._raw?.credit_card_id ? 32 : 15 }}>
+          {transaction.purchaseDate
+            ? new Date(transaction.purchaseDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+            : new Date(transaction.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+        </Text>
+        <Text variant='labelMedium' style={{ flex: 1 }}>{transaction.description}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text variant='labelMedium'>R$ {transaction.amount.toFixed(2)}</Text>
         </View>
       </View>
     </TouchableOpacity>
