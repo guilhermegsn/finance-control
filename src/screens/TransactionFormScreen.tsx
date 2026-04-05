@@ -1,5 +1,5 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { Button, TextInput, Switch, HelperText, Text, Icon, Portal, Dialog } from 'react-native-paper';
@@ -32,8 +32,6 @@ export default function TransactionFormScreen() {
   const [recurringDialogVisible, setRecurringDialogVisible] = useState(false);
   const [pendingUpdateData, setPendingUpdateData] = useState<any>(null);
   const [activePicker, setActivePicker] = useState<'date' | 'recurringEndDate' | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
   const { transaction, initialType, accounts = [], categories = [], onSave } = route.params || {};
 
   const [formData, setFormData] = useState<FormData>(() => {
@@ -62,12 +60,34 @@ export default function TransactionFormScreen() {
         type: initialType || null,
         isRecurring: false,
         recurringEndDate: null,
-        isConsolidated: newDate <= today,
+        isConsolidated: true,
         accountId: accounts.length > 0 ? accounts[0].id : '',
         categoryId: categories.length > 0 ? categories[0].id : '',
       };
     }
   });
+
+  // Desabilitando toggle de 'consolidado' ao escolher uma data futura.
+
+  useEffect(() => {
+    if (!transaction && formData.date) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const transactionDate = new Date(formData.date);
+      transactionDate.setHours(0, 0, 0, 0);
+
+      const shouldBeConsolidated = transactionDate <= today;
+
+      if (formData.isConsolidated !== shouldBeConsolidated) {
+        setFormData(prevData => ({
+          ...prevData,
+          isConsolidated: shouldBeConsolidated
+        }));
+      }
+    }
+  }, [transaction, formData.date, formData.isConsolidated])
+
 
 
 
