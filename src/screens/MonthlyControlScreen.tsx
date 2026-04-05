@@ -182,6 +182,27 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
     return pastConsolidated + currentMonthConsolidated;
   }, [allTransactions, filteredTransactions, currentDate]);
 
+  // Calcular saldo projetado (todas as transações, incluindo não consolidadas)
+  const projectedBalance = useMemo(() => {
+    // Saldo total de transações passadas (consolidadas e não consolidadas)
+    const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    let pastTotal = 0;
+    allTransactions.forEach(t => {
+      if (new Date(t.date).getTime() < firstDayOfMonth.getTime()) {
+        pastTotal += t.type === 'income' ? t.amount : -t.amount;
+      }
+    });
+
+    // Saldo total do mês atual (todas as transações, incluindo cartão de crédito)
+    let currentMonthTotal = 0;
+    const allFilteredTransactions = filterAllTransactionsByMonth(allTransactions, currentDate);
+    allFilteredTransactions.forEach(t => {
+      currentMonthTotal += t.type === 'income' ? t.amount : -t.amount;
+    });
+
+    return pastTotal + currentMonthTotal;
+  }, [allTransactions, currentDate]);
+
   useEffect(() => {
     const calculatePreviousBalances = async () => {
       const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -345,6 +366,7 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
         <View style={styles.headerCenter}>
           <Text style={styles.monthText}>{`${dayjs(currentDate).format('MMMM/YYYY')}`}</Text>
           <View style={styles.headerSummary}>
+          
             {/* Card de Balanço */}
             <View style={[
               styles.summaryCard,
@@ -382,17 +404,17 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
             ]}>
               <View style={styles.cardHeader}>
                 <Icon
-                  source="chart-line-variant"
+                  source="crystal-ball"
                   size={16}
-                  color={totals.balance >= 0 ? '#56D6A3' : '#FF7285'}
+                  color={projectedBalance >= 0 ? '#56D6A3' : '#FF7285'}
                 />
 
               </View>
               <Text style={[
                 styles.cardValue,
-                { color: totals.balance >= 0 ? '#56D6A3' : '#FF7285' }
+                { color: projectedBalance >= 0 ? '#56D6A3' : '#FF7285' }
               ]}>
-                R$ {totals.balance.toFixed(2)}
+                R$ {projectedBalance.toFixed(2)}
               </Text>
             </View>
 
@@ -416,7 +438,7 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
           onToggleAccount={toggleAccountExpansion}
           onEditTransaction={openTransactionForm}
           onConsolidateInvoice={handleConsolidateInvoice}
-          totalBalance={totals.balance}
+          totalBalance={projectedBalance}
           currentDate={currentDate}
         />
 
@@ -504,6 +526,15 @@ const styles = StyleSheet.create({
 });
 
 const filterTransactionsByMonth = (transactions: Transaction[], date: Date) => {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  return transactions.filter(transaction => {
+    const transactionDate = new Date(transaction.date);
+    return transactionDate.getFullYear() === year && transactionDate.getMonth() === month;
+  });
+};
+
+const filterAllTransactionsByMonth = (transactions: Transaction[], date: Date) => {
   const year = date.getFullYear();
   const month = date.getMonth();
   return transactions.filter(transaction => {
