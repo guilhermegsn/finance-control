@@ -73,8 +73,14 @@ const DashboardSection: React.FC<DashboardSectionProps> = ({
 
 
   const pieData = [
-    { value: balanceData.current, color: '#16b50b' },
-    { value: Math.max(0, balanceData.projected - balanceData.current), color: '#07773b' }
+    { 
+      value: Math.abs(balanceData.current) || 0.1, 
+      color: balanceData.current >= 0 ? theme.success : theme.danger 
+    },
+    { 
+      value: Math.max(0, balanceData.projected - balanceData.current), 
+      color: balanceData.projected >= balanceData.current ? (balanceData.current >= 0 ? '#07773b' : '#8B0000') : theme.danger 
+    }
   ];
 
   const barData = categorySpending.map(item => ({
@@ -125,7 +131,12 @@ const DashboardSection: React.FC<DashboardSectionProps> = ({
           textColor={theme.text}
           centerLabelComponent={() => (
             <View style={{ alignItems: 'center' }}>
-              <Text style={{ color: theme.text, fontWeight: 'bold' }}>R$ {balanceData.current.toFixed(2)}</Text>
+              <Text style={{ 
+                color: balanceData.current >= 0 ? theme.success : theme.danger, 
+                fontWeight: 'bold' 
+              }}>
+                R$ {balanceData.current.toFixed(2)}
+              </Text>
               <Text style={{ color: theme.textSecondary, fontSize: 13 }}>Saldo</Text>
             </View>
           )}

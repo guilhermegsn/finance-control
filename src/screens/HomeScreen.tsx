@@ -35,7 +35,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ transactions }) => {
           flexDirection: 'row',
           alignItems: 'center',
           padding: 10,
-          marginTop: 10
+          marginTop: 17
         }}
       >
       
@@ -75,9 +75,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ transactions }) => {
           />
         }
       >
-
-
-
 
         {/* Dashboard Section */}
         <DashboardSection />
