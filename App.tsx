@@ -7,10 +7,20 @@ import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import { CategoryService } from './src/service/CategoryService';
 import useAutoSync from './src/service/useAutoSync';
 import './src/i18n';
+import { useFonts, Poppins_900Black } from '@expo-google-fonts/poppins';
 
 // 1. Componente de Login (Simples e Direto)
 const LoginScreen = () => {
   const { signInWithGoogle } = useAuth();
+
+  const [fontsLoaded] = useFonts({
+    Poppins_900Black,
+  });
+
+  // 3. Segure a tela até a fonte carregar (evita que o texto pisque com outra fonte)
+  if (!fontsLoaded) {
+    return null; // Você também pode retornar a SplashScreen nativa do Expo aqui
+  }
 
   return (
     <View style={styles.loginContainer}>

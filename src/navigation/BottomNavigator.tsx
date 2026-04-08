@@ -16,6 +16,7 @@ export default function BottomNavigator() {
         options={{
           tabBarLabel: 'Home',
           title: 'Finance-Control',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="home-filled" size={size} color={color} />
           ),

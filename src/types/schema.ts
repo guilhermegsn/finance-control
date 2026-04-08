@@ -83,3 +83,10 @@ export interface CreditInstallment {
   updated_at: string;
   deleted_at: string | null;
 }
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  photoUrl?: string;
+}
