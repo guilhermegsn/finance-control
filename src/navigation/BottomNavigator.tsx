@@ -48,6 +48,7 @@ export default function BottomNavigator() {
         name='Config'
         component={MenuScreen}
         options={{
+          headerShown: false,
           tabBarLabel: 'Menu',
           title: 'Menu',
           tabBarIcon: ({ color, size }) => (

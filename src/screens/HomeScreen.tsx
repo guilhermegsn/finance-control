@@ -7,6 +7,8 @@ import { withObservables } from '@nozbe/watermelondb/react';
 import { database } from '../database';
 import { Q } from '@nozbe/watermelondb';
 import Transaction from '../models/Transactions';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import GlassHeader from '../components/GlassHeader';
 
 interface HomeScreenProps {
   transactions: Transaction[];
@@ -28,79 +30,84 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ transactions }) => {
   const recentTransactions = transactions.slice(0, 10);
 
   return (
-
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          padding: 10,
-          marginTop: 17
-        }}
-      >
-      
-        <Image
-          source={require('../../assets/logos/butterflow.png')}
-          style={{
-            width: screenWidth * 0.10,
-            height: screenWidth * 0.10,
-            resizeMode: 'contain'
-          }}
-        />
 
-        <Text
+      <GlassHeader title="" />
+
+     
+
+        <View
           style={{
-            fontSize: 20,
-            fontWeight: '900', // Peso máximo (Extra Bold/Black)
-            color: theme.text, // Branco puro para máximo contraste no Dark Theme
-            letterSpacing: 1.2, // Dá um respiro moderno entre as letras
-            marginLeft: 5, // Descola o texto da imagem
-            fontFamily: 'Poppins_900Black',
+            flexDirection: 'row',
+            alignItems: 'center',
+            padding: 10,
+            marginTop: -30
           }}
         >
-          Butter
-          {/* Destaque na palavra Flow com a cor principal do seu tema */}
-          <Text style={{ color: theme.success, fontFamily: 'Poppins_900Black', letterSpacing: 1.2 }}>
-            Flow
-          </Text>
-        </Text>
-      </View>
-      <ScrollView
-        style={[styles.container, { backgroundColor: theme.background }]}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[theme.primary]}
+
+          <Image
+            source={require('../../assets/logos/butterflow.png')}
+            style={{
+              width: screenWidth * 0.10,
+              height: screenWidth * 0.10,
+              resizeMode: 'contain'
+            }}
           />
-        }
-      >
 
-        {/* Dashboard Section */}
-        <DashboardSection />
-
-        {/* Transações Recentes */}
-        <View style={[styles.section, { backgroundColor: theme.card }]}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>
-            Transações Recentes
+          <Text
+            style={{
+              fontSize: 20,
+              fontWeight: '900', // Peso máximo (Extra Bold/Black)
+              color: theme.text, // Branco puro para máximo contraste no Dark Theme
+              letterSpacing: 1.2, // Dá um respiro moderno entre as letras
+              marginLeft: 5, // Descola o texto da imagem
+              fontFamily: 'Poppins_900Black',
+            }}
+          >
+            Butter
+            {/* Destaque na palavra Flow com a cor principal do seu tema */}
+            <Text style={{ color: theme.success, fontFamily: 'Poppins_900Black', letterSpacing: 1.2 }}>
+              Flow
+            </Text>
           </Text>
-
-          {recentTransactions.length > 0 ? (
-            recentTransactions.map((transaction) => (
-              <TransactionItem
-                key={transaction.id}
-                transaction={transaction}
-              />
-            ))
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                Nenhuma transação recente
-              </Text>
-            </View>
-          )}
         </View>
-      </ScrollView>
+        <ScrollView
+          style={[styles.container, { backgroundColor: theme.background }]}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[theme.primary]}
+            />
+          }
+        >
+
+          {/* Dashboard Section */}
+          <DashboardSection />
+
+          {/* Transações Recentes */}
+          <View style={[styles.section, { backgroundColor: theme.card }]}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>
+              Transações Recentes
+            </Text>
+
+            {recentTransactions.length > 0 ? (
+              recentTransactions.map((transaction) => (
+                <TransactionItem
+                  key={transaction.id}
+                  transaction={transaction}
+                />
+              ))
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                  Nenhuma transação recente
+                </Text>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      
     </View>
   );
 };

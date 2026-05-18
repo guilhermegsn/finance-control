@@ -23,6 +23,7 @@ import { isTransactionDueInMonth } from '../utils/creditCardInvoiceHelper';
 import { MixedTransaction, SyntheticTransaction, AccountTransactionGroup } from '../components/AccountsTable';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from '../contexts/ThemeContext';
+import GlassHeader from "../components/GlassHeader";
 
 interface MonthlyControlScreenProps {
   transactions: Transaction[]; // Transações sem cartão (filtradas)

@@ -5,6 +5,7 @@ import MenuCard, { MenuCardProps } from '../components/MenuCard';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
 import { Surface, Text, Icon, useTheme as usePaperTheme } from 'react-native-paper';
+import GlassHeader from '../components/GlassHeader';
 
 
 export default function MenuScreen() {
@@ -46,70 +47,73 @@ export default function MenuScreen() {
   ];
 
   return (
-    <ScrollView style={styles.container}>
-      {menuItems.map((item, index) => (
-        <MenuCard
-          key={index}
-          nome={item.nome}
-          descricao={item.descricao}
-          icone={item.icone}
-          onPress={item.onPress}
-        />
-      ))}
-
-      {/* Seção de Configurações */}
-      <Surface style={[
-        styles.configSection,
-        styles.cardElevated,
-        {
-          backgroundColor: paperTheme.dark ? '#2A2D3E' : '#FFFFFF',
-          borderColor: paperTheme.dark ? 'transparent' : '#E5E7EB',
-          borderWidth: paperTheme.dark ? 0 : 1,
-        }
-      ]}>
-        <View style={styles.configHeader}>
-          <Icon source="cog" size={24} color="#818CF8" />
-          <Text style={[
-            styles.configTitle,
-            { color: paperTheme.dark ? '#FFFFFF' : '#1F2937' }
-          ]}>
-            {t('Configurações')}
-          </Text>
-        </View>
-
-        <View style={styles.configItem}>
-          <View style={styles.configItemContent}>
-            <View style={[
-              styles.configIconContainer,
-              { backgroundColor: '#818CF820' }
-            ]}>
-              <Icon source="brightness-6" size={20} color="#818CF8" />
-            </View>
-            <View style={styles.configTextContainer}>
-              <Text style={[
-                styles.configLabel,
-                { color: paperTheme.dark ? '#FFFFFF' : '#1F2937' }
-              ]}>
-                {t('Modo Escuro')}
-              </Text>
-              <Text style={[
-                styles.configDescription,
-                { color: paperTheme.dark ? '#E5E7EB' : '#4B5563' }
-              ]}>
-                {t('Ativar tema escuro no app')}
-              </Text>
-            </View>
-          </View>
-          <Switch
-            value={isDarkMode}
-            onValueChange={toggleDarkMode}
-            trackColor={{ false: '#D1D5DB', true: '#818CF8' }}
-            thumbColor={isDarkMode ? '#FFFFFF' : '#FFFFFF'}
-            ios_backgroundColor="#D1D5DB"
+    <View style={{ flex: 1 }}>
+      <GlassHeader title='Menu'/>
+      <ScrollView style={styles.container}>
+        {menuItems.map((item, index) => (
+          <MenuCard
+            key={index}
+            nome={item.nome}
+            descricao={item.descricao}
+            icone={item.icone}
+            onPress={item.onPress}
           />
-        </View>
-      </Surface>
-    </ScrollView>
+        ))}
+
+        {/* Seção de Configurações */}
+        <Surface style={[
+          styles.configSection,
+          styles.cardElevated,
+          {
+            backgroundColor: paperTheme.dark ? '#2A2D3E' : '#FFFFFF',
+            borderColor: paperTheme.dark ? 'transparent' : '#E5E7EB',
+            borderWidth: paperTheme.dark ? 0 : 1,
+          }
+        ]}>
+          <View style={styles.configHeader}>
+            <Icon source="cog" size={24} color="#818CF8" />
+            <Text style={[
+              styles.configTitle,
+              { color: paperTheme.dark ? '#FFFFFF' : '#1F2937' }
+            ]}>
+              {t('Configurações')}
+            </Text>
+          </View>
+
+          <View style={styles.configItem}>
+            <View style={styles.configItemContent}>
+              <View style={[
+                styles.configIconContainer,
+                { backgroundColor: '#818CF820' }
+              ]}>
+                <Icon source="brightness-6" size={20} color="#818CF8" />
+              </View>
+              <View style={styles.configTextContainer}>
+                <Text style={[
+                  styles.configLabel,
+                  { color: paperTheme.dark ? '#FFFFFF' : '#1F2937' }
+                ]}>
+                  {t('Modo Escuro')}
+                </Text>
+                <Text style={[
+                  styles.configDescription,
+                  { color: paperTheme.dark ? '#E5E7EB' : '#4B5563' }
+                ]}>
+                  {t('Ativar tema escuro no app')}
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={isDarkMode}
+              onValueChange={toggleDarkMode}
+              trackColor={{ false: '#D1D5DB', true: '#818CF8' }}
+              thumbColor={isDarkMode ? '#FFFFFF' : '#FFFFFF'}
+              ios_backgroundColor="#D1D5DB"
+            />
+          </View>
+        </Surface>
+      </ScrollView>
+    </View>
   );
 }
 
