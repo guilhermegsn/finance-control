@@ -1,175 +1,300 @@
-import { View, ScrollView, StyleSheet, Switch } from 'react-native';
 import React from 'react';
-import { useTranslation } from 'react-i18next';
-import MenuCard, { MenuCardProps } from '../components/MenuCard';
+import { View, ScrollView, StyleSheet, Switch, TouchableOpacity, Text } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
-import { Surface, Text, Icon, useTheme as usePaperTheme } from 'react-native-paper';
+import { useAuth } from '../contexts/AuthContext';
+import { Icon } from 'react-native-paper';
+import { LinearGradient } from 'expo-linear-gradient';
 import GlassHeader from '../components/GlassHeader';
+import { useTranslation } from 'react-i18next';
 
+const ICON_COLORS: Record<string, string> = {
+  wallet: '#F59E0B',
+  tag: '#10B981',
+  'credit-card-outline': '#8B5CF6',
+  'chart-bar': '#3B82F6',
+  flag: '#F43F5E',
+  'brightness-6': '#6366F1',
+  logout: '#EF4444',
+};
 
 export default function MenuScreen() {
-
-  const navigation = useNavigation()
+  const navigation = useNavigation();
   const { isDarkMode, toggleDarkMode } = useTheme();
-  const paperTheme = usePaperTheme();
+  const { user, signOut } = useAuth();
   const { t } = useTranslation();
 
-  const menuItems: MenuCardProps[] = [
-    {
-      nome: t('Contas'),
-      descricao: t('Gerencie suas contas bancárias'),
-      icone: 'wallet',
-      onPress: () => navigation.navigate('Accounts')
-    },
-    {
-      nome: t('Categorias'),
-      descricao: t('Organize suas categorias de gastos'),
-      icone: 'tag',
-      onPress: () => navigation.navigate('Categories')
-    },
-    {
-      nome: t('Cartões de Crédito'),
-      descricao: t('Gerenciar seus cartões'),
-      icone: 'credit-card-outline',
-      onPress: () => navigation.navigate('CreditCardList')
-    },
-    {
-      nome: t('Relatórios'),
-      descricao: t('Visualize gráficos e estatísticas'),
-      icone: 'chart-bar'
-    },
-    {
-      nome: t('Metas'),
-      descricao: t('Defina e acompanhe suas metas financeiras'),
-      icone: 'flag'
-    },
+  const c = {
+    bg: isDarkMode ? '#0D1117' : '#EEF2F7',
+    card: isDarkMode ? '#161C27' : '#FFFFFF',
+    border: isDarkMode ? '#2D3748' : '#E2E8F0',
+    textPrimary: isDarkMode ? '#E2E8F0' : '#1A202C',
+    textSecondary: isDarkMode ? '#718096' : '#64748B',
+    sectionLabel: isDarkMode ? '#4A5568' : '#94A3B8',
+  };
+
+  const email = user?.email ?? '';
+  const rawName: string =
+    user?.user_metadata?.full_name ??
+    user?.user_metadata?.name ??
+    email.split('@')[0] ??
+    '';
+  const initials = rawName
+    .trim()
+    .split(' ')
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('');
+
+  const manageItems = [
+    { label: t('Contas'), icon: 'wallet', onPress: () => navigation.navigate('Accounts' as never) },
+    { label: t('Categorias'), icon: 'tag', onPress: () => navigation.navigate('Categories' as never) },
+    { label: t('Cartões de Crédito'), icon: 'credit-card-outline', onPress: () => navigation.navigate('CreditCardList' as never) },
+  ];
+
+  const insightItems = [
+    { label: t('Relatórios'), icon: 'chart-bar' },
+    { label: t('Metas'), icon: 'flag' },
   ];
 
   return (
-    <View style={{ flex: 1 }}>
-      <GlassHeader title='Menu'/>
-      <ScrollView style={styles.container}>
-        {menuItems.map((item, index) => (
-          <MenuCard
-            key={index}
-            nome={item.nome}
-            descricao={item.descricao}
-            icone={item.icone}
-            onPress={item.onPress}
-          />
-        ))}
+    <View style={[styles.root, { backgroundColor: c.bg }]}>
+      <GlassHeader />
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
-        {/* Seção de Configurações */}
-        <Surface style={[
-          styles.configSection,
-          styles.cardElevated,
-          {
-            backgroundColor: paperTheme.dark ? '#2A2D3E' : '#FFFFFF',
-            borderColor: paperTheme.dark ? 'transparent' : '#E5E7EB',
-            borderWidth: paperTheme.dark ? 0 : 1,
-          }
-        ]}>
-          <View style={styles.configHeader}>
-            <Icon source="cog" size={24} color="#818CF8" />
-            <Text style={[
-              styles.configTitle,
-              { color: paperTheme.dark ? '#FFFFFF' : '#1F2937' }
-            ]}>
-              {t('Configurações')}
-            </Text>
+        {/* Profile Card */}
+        <LinearGradient
+          colors={isDarkMode
+            ? ['#1E2D5A', '#111830', '#0D1117']
+            : ['#6366F1', '#7C3AED', '#A855F7']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.profileCard}
+        >
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{initials || '?'}</Text>
           </View>
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileName}>{rawName}</Text>
+            <Text style={styles.profileEmail}>{email}</Text>
+          </View>
+          <View style={styles.proBadge}>
+            <Text style={styles.proBadgeText}>PRO</Text>
+          </View>
+        </LinearGradient>
 
-          <View style={styles.configItem}>
-            <View style={styles.configItemContent}>
-              <View style={[
-                styles.configIconContainer,
-                { backgroundColor: '#818CF820' }
-              ]}>
-                <Icon source="brightness-6" size={20} color="#818CF8" />
-              </View>
-              <View style={styles.configTextContainer}>
-                <Text style={[
-                  styles.configLabel,
-                  { color: paperTheme.dark ? '#FFFFFF' : '#1F2937' }
-                ]}>
-                  {t('Modo Escuro')}
-                </Text>
-                <Text style={[
-                  styles.configDescription,
-                  { color: paperTheme.dark ? '#E5E7EB' : '#4B5563' }
-                ]}>
-                  {t('Ativar tema escuro no app')}
-                </Text>
-              </View>
+        {/* Gerenciar */}
+        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>
+          {t('GERENCIAR')}
+        </Text>
+        <View style={[styles.sectionCard, { backgroundColor: c.card, borderColor: c.border }]}>
+          {manageItems.map((item, i) => (
+            <View key={item.label}>
+              <TouchableOpacity style={styles.row} onPress={item.onPress} activeOpacity={0.7}>
+                <View style={[styles.iconPill, { backgroundColor: `${ICON_COLORS[item.icon]}1A` }]}>
+                  <Icon source={item.icon} size={20} color={ICON_COLORS[item.icon]} />
+                </View>
+                <Text style={[styles.rowLabel, { color: c.textPrimary }]}>{item.label}</Text>
+                <Icon source="chevron-right" size={18} color={c.sectionLabel} />
+              </TouchableOpacity>
+              {i < manageItems.length - 1 && (
+                <View style={[styles.divider, { backgroundColor: c.border }]} />
+              )}
             </View>
+          ))}
+        </View>
+
+        {/* Análise */}
+        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>
+          {t('ANÁLISE')}
+        </Text>
+        <View style={[styles.sectionCard, { backgroundColor: c.card, borderColor: c.border }]}>
+          {insightItems.map((item, i) => (
+            <View key={item.label}>
+              <View style={[styles.row, { opacity: 0.55 }]}>
+                <View style={[styles.iconPill, { backgroundColor: `${ICON_COLORS[item.icon]}1A` }]}>
+                  <Icon source={item.icon} size={20} color={ICON_COLORS[item.icon]} />
+                </View>
+                <Text style={[styles.rowLabel, { color: c.textPrimary }]}>{item.label}</Text>
+                <View style={styles.comingSoonBadge}>
+                  <Text style={styles.comingSoonText}>Em breve</Text>
+                </View>
+              </View>
+              {i < insightItems.length - 1 && (
+                <View style={[styles.divider, { backgroundColor: c.border }]} />
+              )}
+            </View>
+          ))}
+        </View>
+
+        {/* Preferências */}
+        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>
+          {t('PREFERÊNCIAS')}
+        </Text>
+        <View style={[styles.sectionCard, { backgroundColor: c.card, borderColor: c.border }]}>
+          <View style={styles.row}>
+            <View style={[styles.iconPill, { backgroundColor: '#6366F11A' }]}>
+              <Icon source="brightness-6" size={20} color="#6366F1" />
+            </View>
+            <Text style={[styles.rowLabel, { color: c.textPrimary }]}>{t('Modo Escuro')}</Text>
             <Switch
               value={isDarkMode}
               onValueChange={toggleDarkMode}
-              trackColor={{ false: '#D1D5DB', true: '#818CF8' }}
-              thumbColor={isDarkMode ? '#FFFFFF' : '#FFFFFF'}
-              ios_backgroundColor="#D1D5DB"
+              trackColor={{ false: '#CBD5E1', true: '#6366F1' }}
+              thumbColor="#FFFFFF"
+              ios_backgroundColor="#CBD5E1"
             />
           </View>
-        </Surface>
+        </View>
+
+        {/* Sair */}
+        <TouchableOpacity
+          style={[styles.signOutBtn, { backgroundColor: c.card, borderColor: c.border }]}
+          onPress={signOut}
+          activeOpacity={0.7}
+        >
+          <Icon source="logout" size={20} color="#EF4444" />
+          <Text style={styles.signOutText}>{t('Sair')}</Text>
+        </TouchableOpacity>
+
+        <Text style={[styles.footer, { color: c.sectionLabel }]}>ButterFlow v1.0.0</Text>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
   },
-  configSection: {
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
+  scroll: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 48,
   },
-  cardElevated: {
-    elevation: 2,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  configHeader: {
+
+  // Profile card
+  profileCard: {
+    borderRadius: 20,
+    padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 32,
   },
-  configTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginLeft: 12,
-  },
-  configItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 14,
   },
-  configItemContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  avatarText: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  profileInfo: {
     flex: 1,
   },
-  configIconContainer: {
-    width: 40,
-    height: 40,
+  profileName: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 3,
+  },
+  profileEmail: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 13,
+  },
+  proBadge: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  proBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+
+  // Section
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    marginBottom: 8,
+    marginLeft: 4,
+  },
+  sectionCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: 24,
+  },
+
+  // Row
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  iconPill: {
+    width: 38,
+    height: 38,
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
-  configTextContainer: {
+  rowLabel: {
     flex: 1,
-  },
-  configLabel: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
   },
-  configDescription: {
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 68,
+  },
+
+  // Badges
+  comingSoonBadge: {
+    backgroundColor: '#3B82F614',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  comingSoonText: {
+    color: '#3B82F6',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  // Sign out
+  signOutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 15,
+    marginBottom: 28,
+  },
+  signOutText: {
+    color: '#EF4444',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+
+  // Footer
+  footer: {
+    textAlign: 'center',
     fontSize: 12,
-    marginTop: 2,
-    opacity: 0.8,
+    letterSpacing: 0.3,
   },
 });
