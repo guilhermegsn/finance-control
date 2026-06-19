@@ -434,124 +434,127 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={goToPreviousMonth}>
-          <Icon source="chevron-left" size={24} />
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.monthText}>{`${dayjs(currentDate).format('MMMM/YYYY')}`}</Text>
-          <View style={styles.headerSummary}>
-          
-            {/* Card de Balanço */}
-            <View style={[
-              styles.summaryCard,
-              {
-                backgroundColor: isDarkMode ? '#2A2D3E' : '#FFFFFF',
-                borderColor: isDarkMode ? 'transparent' : '#E5E7EB',
-                shadowColor: isDarkMode ? '#000' : '#9CA3AF',
-                marginLeft: 8,
-              }
-            ]}>
-              <View style={styles.cardHeader}>
-                <Icon
-                  source="wallet"
-                  size={16}
-                  color={currentBalance >= 0 ? '#56D6A3' : '#FF7285'}
-                />
-              </View>
-              <Text style={[
-                styles.cardValue,
-                { color: currentBalance >= 0 ? '#56D6A3' : '#FF7285' }
+    <View style={{ flex: 1 }}>
+      <GlassHeader />
+      <SafeAreaView style={styles.container}>
+        {/* HEADER */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={goToPreviousMonth}>
+            <Icon source="chevron-left" size={24} />
+          </TouchableOpacity>
+          <View style={styles.headerCenter}>
+            <Text style={styles.monthText}>{`${dayjs(currentDate).format('MMMM/YYYY')}`}</Text>
+            <View style={styles.headerSummary}>
+
+              {/* Card de Balanço */}
+              <View style={[
+                styles.summaryCard,
+                {
+                  backgroundColor: isDarkMode ? '#2A2D3E' : '#FFFFFF',
+                  borderColor: isDarkMode ? 'transparent' : '#E5E7EB',
+                  shadowColor: isDarkMode ? '#000' : '#9CA3AF',
+                  marginLeft: 8,
+                }
               ]}>
-                R$ {currentBalance.toFixed(2)}
-              </Text>
-            </View>
-
-
-            <View style={[
-              styles.summaryCard,
-              {
-
-                backgroundColor: isDarkMode ? '#2A2D3E' : '#FFFFFF',
-                borderColor: isDarkMode ? 'transparent' : '#E5E7EB',
-                shadowColor: isDarkMode ? '#000' : '#9CA3AF',
-              }
-            ]}>
-              <View style={styles.cardHeader}>
-                <Icon
-                  source="crystal-ball"
-                  size={16}
-                  color={projectedBalance >= 0 ? '#56D6A3' : '#FF7285'}
-                />
-
+                <View style={styles.cardHeader}>
+                  <Icon
+                    source="wallet"
+                    size={16}
+                    color={currentBalance >= 0 ? '#56D6A3' : '#FF7285'}
+                  />
+                </View>
+                <Text style={[
+                  styles.cardValue,
+                  { color: currentBalance >= 0 ? '#56D6A3' : '#FF7285' }
+                ]}>
+                  R$ {currentBalance.toFixed(2)}
+                </Text>
               </View>
-              <Text style={[
-                styles.cardValue,
-                { color: projectedBalance >= 0 ? '#56D6A3' : '#FF7285' }
+
+
+              <View style={[
+                styles.summaryCard,
+                {
+
+                  backgroundColor: isDarkMode ? '#2A2D3E' : '#FFFFFF',
+                  borderColor: isDarkMode ? 'transparent' : '#E5E7EB',
+                  shadowColor: isDarkMode ? '#000' : '#9CA3AF',
+                }
               ]}>
-                R$ {projectedBalance.toFixed(2)}
-              </Text>
+                <View style={styles.cardHeader}>
+                  <Icon
+                    source="crystal-ball"
+                    size={16}
+                    color={projectedBalance >= 0 ? '#56D6A3' : '#FF7285'}
+                  />
+
+                </View>
+                <Text style={[
+                  styles.cardValue,
+                  { color: projectedBalance >= 0 ? '#56D6A3' : '#FF7285' }
+                ]}>
+                  R$ {projectedBalance.toFixed(2)}
+                </Text>
+              </View>
+
+
+
             </View>
-
-
-
           </View>
+          <TouchableOpacity onPress={goToNextMonth}>
+            <Icon source="chevron-right" size={24} />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={goToNextMonth}>
-          <Icon source="chevron-right" size={24} />
+
+        <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false}>
+
+          {/* Lista de Contas */}
+          <Text style={styles.sectionTitle}>{t('Contas')}</Text>
+          <AccountsTable
+            accountTransactionGroups={accountTransactionGroups}
+            accounts={accounts}
+            expandedAccounts={expandedAccounts}
+            onToggleAccount={toggleAccountExpansion}
+            onEditTransaction={openTransactionForm}
+            onConsolidateInvoice={handleConsolidateInvoice}
+            totalBalance={projectedBalance}
+            currentDate={currentDate}
+          />
+
+
+          <CreditCardSectionComponent
+            creditCards={creditCards}
+            allTransactions={allTransactions}
+            currentDate={currentDate}
+            onEditTransaction={openTransactionForm}
+          />
+
+          <SummaryFooter currentDate={currentDate} isFutureMonth={isFutureMonth} />
+          <View style={{ height: 100 }} />
+        </ScrollView>
+
+        {/* FAB */}
+        <TouchableOpacity onPress={() => setTypeModalVisible(true)} style={styles.fab}>
+          <Icon source="plus" size={24} color="#fff" />
         </TouchableOpacity>
-      </View>
 
-      <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false}>
+        {/* Modal de seleção de tipo */}
+        <TransactionTypeModal
+          visible={typeModalVisible}
+          onClose={() => setTypeModalVisible(false)}
+          onSelectIncome={() => handleSelectTransactionType('income')}
+          onSelectExpense={() => handleSelectTransactionType('expense')}
+          onSelectCredit={() => handleSelectTransactionType('credit')}
 
-        {/* Lista de Contas */}
-        <Text style={styles.sectionTitle}>{t('Contas')}</Text>
-        <AccountsTable
-          accountTransactionGroups={accountTransactionGroups}
-          accounts={accounts}
-          expandedAccounts={expandedAccounts}
-          onToggleAccount={toggleAccountExpansion}
-          onEditTransaction={openTransactionForm}
-          onConsolidateInvoice={handleConsolidateInvoice}
-          totalBalance={projectedBalance}
-          currentDate={currentDate}
+          onSelectTransfer={handleSelectTransfer}
         />
-
-
-        <CreditCardSectionComponent
-          creditCards={creditCards}
-          allTransactions={allTransactions}
-          currentDate={currentDate}
-          onEditTransaction={openTransactionForm}
-        />
-
-        <SummaryFooter currentDate={currentDate} isFutureMonth={isFutureMonth} />
-        <View style={{ height: 100 }} />
-      </ScrollView>
-
-      {/* FAB */}
-      <TouchableOpacity onPress={() => setTypeModalVisible(true)} style={styles.fab}>
-        <Icon source="plus" size={24} color="#fff" />
-      </TouchableOpacity>
-
-      {/* Modal de seleção de tipo */}
-      <TransactionTypeModal
-        visible={typeModalVisible}
-        onClose={() => setTypeModalVisible(false)}
-        onSelectIncome={() => handleSelectTransactionType('income')}
-        onSelectExpense={() => handleSelectTransactionType('expense')}
-        onSelectCredit={() => handleSelectTransactionType('credit')}
-
-        onSelectTransfer={handleSelectTransfer}
-      />
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 10 },
+  container: { flex: 1, paddingHorizontal: 10, marginTop: -80 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 16 },
   headerCenter: { alignItems: "center" },
   headerSummary: { flexDirection: "row", marginTop: 8 },
