@@ -433,83 +433,65 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
     }
   };
 
+  const c = {
+    bg: isDarkMode ? '#0D1117' : '#EEF2F7',
+    card: isDarkMode ? '#161C27' : '#FFFFFF',
+    border: isDarkMode ? '#2D3748' : '#E2E8F0',
+    textPrimary: isDarkMode ? '#E2E8F0' : '#1A202C',
+    textSecondary: isDarkMode ? '#718096' : '#64748B',
+    sectionLabel: isDarkMode ? '#4A5568' : '#94A3B8',
+    navBtn: isDarkMode ? '#1C2333' : '#FFFFFF',
+  };
+
   return (
-    <View style={{ flex: 1 }}>
+    <View style={[styles.root, { backgroundColor: c.bg }]}>
       <GlassHeader />
       <SafeAreaView style={styles.container}>
-        {/* HEADER */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={goToPreviousMonth}>
-            <Icon source="chevron-left" size={24} />
+
+        {/* Month Navigator */}
+        <View style={styles.monthNav}>
+          <TouchableOpacity style={[styles.navBtn, { backgroundColor: c.navBtn, borderColor: c.border }]} onPress={goToPreviousMonth}>
+            <Icon source="chevron-left" size={20} color={c.textSecondary} />
           </TouchableOpacity>
-          <View style={styles.headerCenter}>
-            <Text style={styles.monthText}>{`${dayjs(currentDate).format('MMMM/YYYY')}`}</Text>
-            <View style={styles.headerSummary}>
+          <Text style={[styles.monthText, { color: c.textPrimary }]}>
+            {dayjs(currentDate).format('MMMM YYYY')}
+          </Text>
+          <TouchableOpacity style={[styles.navBtn, { backgroundColor: c.navBtn, borderColor: c.border }]} onPress={goToNextMonth}>
+            <Icon source="chevron-right" size={20} color={c.textSecondary} />
+          </TouchableOpacity>
+        </View>
 
-              {/* Card de Balanço */}
-              <View style={[
-                styles.summaryCard,
-                {
-                  backgroundColor: isDarkMode ? '#2A2D3E' : '#FFFFFF',
-                  borderColor: isDarkMode ? 'transparent' : '#E5E7EB',
-                  shadowColor: isDarkMode ? '#000' : '#9CA3AF',
-                  marginLeft: 8,
-                }
-              ]}>
-                <View style={styles.cardHeader}>
-                  <Icon
-                    source="wallet"
-                    size={16}
-                    color={currentBalance >= 0 ? '#56D6A3' : '#FF7285'}
-                  />
-                </View>
-                <Text style={[
-                  styles.cardValue,
-                  { color: currentBalance >= 0 ? '#56D6A3' : '#FF7285' }
-                ]}>
-                  R$ {currentBalance.toFixed(2)}
-                </Text>
+        {/* Balance Cards */}
+        <View style={styles.balanceRow}>
+          <View style={[styles.balanceCard, { backgroundColor: c.card, borderColor: c.border }]}>
+            <View style={styles.balanceCardTop}>
+              <View style={[styles.balanceIconPill, { backgroundColor: '#10B98118' }]}>
+                <Icon source="wallet" size={14} color="#10B981" />
               </View>
-
-
-              <View style={[
-                styles.summaryCard,
-                {
-
-                  backgroundColor: isDarkMode ? '#2A2D3E' : '#FFFFFF',
-                  borderColor: isDarkMode ? 'transparent' : '#E5E7EB',
-                  shadowColor: isDarkMode ? '#000' : '#9CA3AF',
-                }
-              ]}>
-                <View style={styles.cardHeader}>
-                  <Icon
-                    source="crystal-ball"
-                    size={16}
-                    color={projectedBalance >= 0 ? '#56D6A3' : '#FF7285'}
-                  />
-
-                </View>
-                <Text style={[
-                  styles.cardValue,
-                  { color: projectedBalance >= 0 ? '#56D6A3' : '#FF7285' }
-                ]}>
-                  R$ {projectedBalance.toFixed(2)}
-                </Text>
-              </View>
-
-
-
+              <Text style={[styles.balanceLabel, { color: c.textSecondary }]}>{t('Saldo Atual')}</Text>
             </View>
+            <Text style={[styles.balanceValue, { color: currentBalance >= 0 ? '#10B981' : '#F43F5E' }]}>
+              R$ {currentBalance.toFixed(2)}
+            </Text>
           </View>
-          <TouchableOpacity onPress={goToNextMonth}>
-            <Icon source="chevron-right" size={24} />
-          </TouchableOpacity>
+
+          <View style={[styles.balanceCard, { backgroundColor: c.card, borderColor: c.border }]}>
+            <View style={styles.balanceCardTop}>
+              <View style={[styles.balanceIconPill, { backgroundColor: '#6366F118' }]}>
+                <Icon source="crystal-ball" size={14} color="#6366F1" />
+              </View>
+              <Text style={[styles.balanceLabel, { color: c.textSecondary }]}>{t('Projetado')}</Text>
+            </View>
+            <Text style={[styles.balanceValue, { color: projectedBalance >= 0 ? '#10B981' : '#F43F5E' }]}>
+              R$ {projectedBalance.toFixed(2)}
+            </Text>
+          </View>
         </View>
 
         <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false}>
 
           {/* Lista de Contas */}
-          <Text style={styles.sectionTitle}>{t('Contas')}</Text>
+          <Text style={[styles.sectionTitle, { color: c.sectionLabel }]}>{t('CONTAS')}</Text>
           <AccountsTable
             accountTransactionGroups={accountTransactionGroups}
             accounts={accounts}
@@ -554,54 +536,92 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 10, marginTop: -80 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 16 },
-  headerCenter: { alignItems: "center" },
-  headerSummary: { flexDirection: "row", marginTop: 8 },
-  monthText: { fontSize: 18, fontWeight: "bold", textTransform: "capitalize" },
+  root: { flex: 1 },
+  container: { flex: 1, paddingHorizontal: 16, marginTop: -80 },
   scrollArea: { flex: 1 },
-  sectionTitle: { fontSize: 16, fontWeight: "600", marginTop: 20, marginBottom: 8 },
-  summaryCard: {
+
+  // Month navigator
+  monthNav: {
     flexDirection: 'row',
-    paddingHorizontal: 30,
-    paddingVertical: 4,
-    justifyContent: 'center',
-    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+  },
+  navBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     borderWidth: 1,
-    elevation: 2,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    minWidth: 100,
-    marginRight: 5
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 4,
+  monthText: {
+    fontSize: 17,
+    fontWeight: '700',
+    textTransform: 'capitalize',
+    letterSpacing: 0.3,
   },
-  cardLabel: {
+
+  // Balance cards
+  balanceRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 20,
+  },
+  balanceCard: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+  },
+  balanceCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 6,
+  },
+  balanceIconPill: {
+    width: 26,
+    height: 26,
+    borderRadius: 7,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  balanceLabel: {
     fontSize: 12,
-    fontWeight: "600",
-    marginLeft: 4,
+    fontWeight: '500',
   },
-  cardValue: {
-    fontSize: 12,
-    fontWeight: "700",
-    marginLeft: 5
+  balanceValue: {
+    fontSize: 15,
+    fontWeight: '700',
   },
+
+  // Section
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    marginTop: 4,
+    marginBottom: 8,
+    marginLeft: 2,
+  },
+
   fab: {
     position: 'absolute',
     bottom: 20,
     right: 20,
-    backgroundColor: "#007bff",
-    borderRadius: 50,
+    backgroundColor: '#6366F1',
+    borderRadius: 28,
     width: 56,
     height: 56,
-    justifyContent: "center",
-    alignItems: "center",
-    elevation: 5,
-    zIndex: 10
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    zIndex: 10,
   },
 });
 
