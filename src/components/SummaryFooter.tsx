@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
-import { Surface, Text, Icon } from 'react-native-paper';
+import { View, StyleSheet } from 'react-native';
+import { Text, Icon } from 'react-native-paper';
 import { withObservables } from '@nozbe/watermelondb/react';
 import { Q } from '@nozbe/watermelondb';
 import { database } from '../database';
@@ -8,7 +8,6 @@ import Transaction from '../models/Transactions';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTranslation } from 'react-i18next';
 
-// Props que o componente puro recebe (incluindo as injetadas pelo WatermelonDB)
 interface SummaryFooterProps {
   currentDate: Date;
   isFutureMonth: boolean;
@@ -18,14 +17,10 @@ interface SummaryFooterProps {
 }
 
 const SummaryFooterComponent = ({ isFutureMonth, transactions, pastTransactions, ccTransactions }: SummaryFooterProps) => {
-
   const { t } = useTranslation();
   const { isDarkMode } = useTheme();
 
   const totals = useMemo(() => {
-    // 1. Passado:
-    //    - pastConsolidatedBalance: só consolidadas → base do Saldo Atual
-    //    - pastAllBalance: tudo (consolidado + agendado) → base da Previsão
     let pastConsolidatedBalance = 0;
     let pastAllBalance = 0;
     pastTransactions.forEach(t => {
@@ -34,7 +29,6 @@ const SummaryFooterComponent = ({ isFutureMonth, transactions, pastTransactions,
       if (t.isConsolidated) pastConsolidatedBalance += delta;
     });
 
-    // 2. Mês atual (transações não-CC)
     let income = 0;
     let expense = 0;
     let consolidatedIncome = 0;
@@ -51,10 +45,6 @@ const SummaryFooterComponent = ({ isFutureMonth, transactions, pastTransactions,
       }
     });
 
-    // 3. Compras CC do mês: pendentes (não-consolidadas) = fatura ainda não paga
-    //    Quando paga: CC purchases ficam consolidadas → ccPendingExpense = 0
-    //                 e o pagamento já está em expense (credit_card_id = null)
-    //    Quando não paga: ccPendingExpense captura o valor da fatura
     let ccPendingExpense = 0;
     ccTransactions.forEach(t => {
       if (!t.isConsolidated) ccPendingExpense += t.amount;
@@ -70,251 +60,135 @@ const SummaryFooterComponent = ({ isFutureMonth, transactions, pastTransactions,
     };
   }, [transactions, pastTransactions, ccTransactions]);
 
-  // Cores baseadas no tema
-  const getCardBackgroundColor = () => {
-    return isDarkMode ? '#2A2D3E' : '#FFFFFF';
+  const c = {
+    card: isDarkMode ? '#161C27' : '#FFFFFF',
+    border: isDarkMode ? '#2D3748' : '#E2E8F0',
+    textSecondary: isDarkMode ? '#718096' : '#64748B',
+    sectionLabel: isDarkMode ? '#4A5568' : '#94A3B8',
   };
 
-  const getHeaderGradientColors = () => {
-    return isDarkMode
-      ? ['#4F46E5', '#7C3AED']
-      : ['#818CF8', '#C084FC'];
-  };
-
-  const getTextColor = () => {
-    return isDarkMode ? '#FFFFFF' : '#1F2937';
-  };
-
-  const getSubtitleColor = () => {
-    return isDarkMode ? '#E5E7EB' : '#4B5563';
-  };
-
-  const getBorderColor = () => {
-    return isDarkMode ? 'transparent' : '#E5E7EB';
-  };
-
-  const getShadowColor = () => {
-    return isDarkMode ? '#000' : '#9CA3AF';
-  };
+  const cards = [
+    {
+      icon: 'arrow-up-circle',
+      iconColor: '#10B981',
+      label: t('Entradas'),
+      value: totals.consolidatedIncome,
+      valueColor: '#10B981',
+      pending: totals.income - totals.consolidatedIncome,
+    },
+    {
+      icon: 'arrow-down-circle',
+      iconColor: '#F43F5E',
+      label: t('Saídas'),
+      value: totals.consolidatedExpense,
+      valueColor: '#F43F5E',
+      pending: totals.expense - totals.consolidatedExpense,
+    },
+    {
+      icon: 'wallet',
+      iconColor: '#10B981',
+      label: t('Saldo Atual'),
+      value: totals.currentBalance,
+      valueColor: totals.currentBalance >= 0 ? '#10B981' : '#F43F5E',
+      pending: null,
+    },
+    {
+      icon: 'crystal-ball',
+      iconColor: '#6366F1',
+      label: t('Projetado'),
+      value: totals.projectedBalance,
+      valueColor: totals.projectedBalance >= 0 ? '#10B981' : '#F43F5E',
+      pending: null,
+    },
+  ];
 
   return (
-    <View>
-      <View style={{ padding: 12, marginTop: 30 }}>
-        <Text variant='headlineSmall'>
-          {t("Resumo mensal")}
-        </Text>
-        <Text style={[
-          styles.headerSubtitle,
-          { color: getSubtitleColor() }
-        ]}>
-          {totals.projectedBalance >= 0
-            ? t("Você está no caminho certo! 🚀")
-            : t("Vamos melhorar isso juntos! 💪")}
-        </Text>
+    <View style={styles.container}>
+      <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>
+        {t('RESUMO MENSAL')}
+      </Text>
+      <Text style={[styles.subtitle, { color: c.textSecondary }]}>
+        {totals.projectedBalance >= 0
+          ? t('Você está no caminho certo! 🚀')
+          : t('Vamos melhorar isso juntos! 💪')}
+      </Text>
+
+      <View style={styles.grid}>
+        {cards.map((card) => (
+          <View key={card.label} style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+            <View style={styles.cardTop}>
+              <View style={[styles.iconPill, { backgroundColor: `${card.iconColor}18` }]}>
+                <Icon source={card.icon} size={14} color={card.iconColor} />
+              </View>
+              <Text style={[styles.cardLabel, { color: c.textSecondary }]}>{card.label}</Text>
+            </View>
+            <Text style={[styles.cardValue, { color: card.valueColor }]}>
+              R$ {card.value.toFixed(2)}
+            </Text>
+            {card.pending != null && card.pending > 0.001 && (
+              <Text style={[styles.pendingText, { color: c.sectionLabel }]}>
+                + R$ {card.pending.toFixed(2)} {t('pendente')}
+              </Text>
+            )}
+          </View>
+        ))}
       </View>
-
-      <View style={styles.gridContainer}>
-        {/* Card de Entradas */}
-        <Surface
-          style={[
-            styles.card,
-            styles.cardElevated,
-            {
-              backgroundColor: getCardBackgroundColor(),
-              borderColor: getBorderColor(),
-              borderWidth: isDarkMode ? 0 : 1,
-              shadowColor: getShadowColor(),
-            }
-          ]}
-        >
-          <View style={styles.cardHeader}>
-            <Icon source="arrow-up-circle" size={24} color="#56D6A3" />
-            <Text style={[
-              styles.cardLabel,
-              { color: getTextColor() }
-            ]}>
-              {t("Entradas")}
-            </Text>
-          </View>
-          <Text style={[styles.cardValue, styles.incomeValue]}>
-            R$ {totals.consolidatedIncome.toFixed(2)}
-          </Text>
-          {totals.income - totals.consolidatedIncome > 0.001 && (
-            <Text style={{ color: 'gray', fontSize: 12, marginTop: 2 }}>
-              + R$ {(totals.income - totals.consolidatedIncome).toFixed(2)}
-            </Text>
-          )}
-        </Surface>
-
-        {/* Card de Saídas */}
-        <Surface
-          style={[
-            styles.card,
-            styles.cardElevated,
-            {
-              backgroundColor: getCardBackgroundColor(),
-              borderColor: getBorderColor(),
-              borderWidth: isDarkMode ? 0 : 1,
-              shadowColor: getShadowColor(),
-            }
-          ]}
-        >
-          <View style={styles.cardHeader}>
-            <Icon source="arrow-down-circle" size={24} color="#FF7285" />
-            <Text style={[
-              styles.cardLabel,
-              { color: getTextColor() }
-            ]}>
-              {t("Saídas")}
-            </Text>
-          </View>
-          <Text style={[styles.cardValue, styles.expenseValue]}>
-            R$ {totals.consolidatedExpense.toFixed(2)}
-          </Text>
-          {totals.expense - totals.consolidatedExpense > 0.001 && (
-            <Text style={{ color: 'gray', fontSize: 12, marginTop: 2 }}>
-              + R$ {(totals.expense - totals.consolidatedExpense).toFixed(2)}
-            </Text>
-          )}
-        </Surface>
-
-        {/* Saldo Atual */}
-        <Surface
-          style={[
-            styles.card,
-            styles.cardElevated,
-            {
-              backgroundColor: getCardBackgroundColor(),
-              borderColor: getBorderColor(),
-              borderWidth: isDarkMode ? 0 : 1,
-              shadowColor: getShadowColor(),
-            }
-          ]}
-        >
-          <View style={styles.cardHeader}>
-            <Icon source="wallet" size={24} color="#FFB156" />
-            <Text style={[
-              styles.cardLabel,
-              { color: getTextColor() }
-            ]}>
-              {t("Saldo Atual")}
-            </Text>
-          </View>
-          <Text style={[
-            styles.cardValue,
-            { color: totals.currentBalance >= 0 ? '#56D6A3' : '#FF7285' }
-          ]}>
-            R$ {totals.currentBalance.toFixed(2)}
-          </Text>
-        </Surface>
-
-        {/* Previsão */}
-        <Surface
-          style={[
-            styles.card,
-            styles.cardElevated,
-            {
-              backgroundColor: getCardBackgroundColor(),
-              borderColor: getBorderColor(),
-              borderWidth: isDarkMode ? 0 : 1,
-              shadowColor: getShadowColor(),
-            }
-          ]}
-        >
-          <View style={styles.forecastHeader}>
-            <Icon source="crystal-ball" size={20} color="#7C73E6" />
-            <Text style={[
-              styles.forecastTitle,
-              { color: getTextColor() }
-            ]}>
-              {t("Previsão")}
-            </Text>
-          </View>
-          <Text style={[
-            styles.forecastValue,
-            { color: totals.projectedBalance >= 0 ? '#56D6A3' : '#FF7285' }
-          ]}>
-            R$ {totals.projectedBalance.toFixed(2)}
-          </Text>
-        </Surface>
-      </View>
-
-
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  headerGradient: {
-    padding: 10,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+  container: {
+    marginTop: 24,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 4,
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    marginBottom: 6,
+    marginLeft: 2,
   },
-  headerSubtitle: {
-    fontSize: 14,
-    opacity: 0.9,
+  subtitle: {
+    fontSize: 13,
+    marginBottom: 14,
+    marginLeft: 2,
   },
-  gridContainer: {
+  grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 12,
-    gap: 12,
-    justifyContent: 'space-between'
+    gap: 10,
   },
   card: {
-    width: (Dimensions.get('window').width - 57) / 2,
-    padding: 16,
-    borderRadius: 12,
+    flex: 1,
+    minWidth: '45%',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
   },
-  cardElevated: {
-    elevation: 2,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  cardHeader: {
+  cardTop: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
+    gap: 6,
+  },
+  iconPill: {
+    width: 26,
+    height: 26,
+    borderRadius: 7,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cardLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 8,
+    fontSize: 12,
+    fontWeight: '500',
   },
   cardValue: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '700',
   },
-  incomeValue: {
-    color: '#56D6A3',
-  },
-  expenseValue: {
-    color: '#FF7285',
-  },
-  forecastContainer: {
-    padding: 16,
-    borderRadius: 12,
-  },
-  forecastHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  forecastTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  forecastValue: {
-    fontSize: 20,
-    fontWeight: '700'
+  pendingText: {
+    fontSize: 11,
+    marginTop: 4,
   },
 });
 
@@ -337,7 +211,6 @@ const enhanceSummaryFooter = withObservables(['currentDate'], ({ currentDate }: 
       )
       .observeWithColumns(['is_consolidated', 'amount', 'type']),
 
-    // Compras CC do mês: necessário para incluir fatura pendente na projeção
     ccTransactions: database.get<Transaction>('transactions')
       .query(
         Q.where('date', Q.between(firstDay.getTime(), lastDay.getTime())),
