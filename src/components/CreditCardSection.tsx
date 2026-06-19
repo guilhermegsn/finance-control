@@ -52,13 +52,12 @@ function CreditCardSectionComponent({
       t._raw?.credit_card_id === card.id
     );
 
-    // Filtrar apenas transações não consolidadas para a fatura atual
-    const pendingCardTransactions = cardTransactions.filter(t => !t.isConsolidated);
-
     // REGRA 1: Filtrar transações pela data de compra (purchaseDate) e dia de fechamento
-    const invoiceTransactions = filterTransactionsByInvoiceMonth(pendingCardTransactions, card, currentDate);
-    // REGRA 1: Calcular total pela data de compra (purchaseDate)
-    const invoiceTotal = calculateInvoiceTotalByPurchaseDate(pendingCardTransactions, card, currentDate);
+    // Inclui consolidadas para manter histórico visível após pagamento
+    const invoiceTransactions = filterTransactionsByInvoiceMonth(cardTransactions, card, currentDate);
+    // Total apenas das pendentes (não consolidadas) para mostrar o que ainda será pago
+    const pendingInvoiceTransactions = invoiceTransactions.filter(t => !t.isConsolidated);
+    const invoiceTotal = calculateInvoiceTotalByPurchaseDate(pendingInvoiceTransactions, card, currentDate);
 
     return {
       cardId: card.id,

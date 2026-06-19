@@ -13,6 +13,7 @@ export type SyntheticTransaction = {
   type: 'expense';
   date: Date;
   isVirtualInvoice: true;
+  isPaid: boolean;
   creditCardId: string;
   accountId: string;
   transactionIds: string[];
@@ -28,10 +29,12 @@ export interface AccountTransactionGroup {
   totalBalance: number;
   income: {
     total: number;
+    consolidatedTotal: number;
     transactions: Transaction[];
   };
   expense: {
     total: number;
+    consolidatedTotal: number;
     transactions: MixedTransaction[];
   };
 }
@@ -133,7 +136,16 @@ export default function AccountsTable({
                         <Text style={{ color: theme.success, fontWeight: '600' }}>Entradas</Text>
                       </DataTable.Cell>
                       <DataTable.Cell numeric>
-                        <Text style={{ color: theme.success, fontWeight: '600' }}>R$ {group.income.total.toFixed(2)}</Text>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={{ color: theme.success, fontWeight: '600' }}>
+                            R$ {group.income.consolidatedTotal.toFixed(2)}
+                          </Text>
+                          {group.income.total - group.income.consolidatedTotal > 0.001 && (
+                            <Text style={{ color: 'gray', fontSize: 11 }}>
+                              + R$ {(group.income.total - group.income.consolidatedTotal).toFixed(2)}
+                            </Text>
+                          )}
+                        </View>
                       </DataTable.Cell>
                     </DataTable.Row>
 
@@ -144,10 +156,10 @@ export default function AccountsTable({
                           <Icon source="history" size={16} />
                         </DataTable.Cell>
                         <DataTable.Cell>
-                          <Text style={{ opacity: 0.6, fontStyle: 'italic' }}>Saldo Inicial do Mês</Text>
+                          <Text variant="labelMedium" style={{ marginLeft: 20 }}>Saldo Inicial do Mês</Text>
                         </DataTable.Cell>
                         <DataTable.Cell numeric>
-                          <Text style={{ opacity: 0.6, fontStyle: 'italic' }}>R$ {group.previousBalance.toFixed(2)}</Text>
+                          <Text  variant="labelMedium">R$ {group.previousBalance.toFixed(2)}</Text>
                         </DataTable.Cell>
                       </DataTable.Row>
                     )}
@@ -172,30 +184,41 @@ export default function AccountsTable({
                         <Text style={{ color: theme.danger, fontWeight: '600' }}>Saídas</Text>
                       </DataTable.Cell>
                       <DataTable.Cell numeric>
-                        <Text style={{ color: theme.danger, fontWeight: '600' }}>R$ {group.expense.total.toFixed(2)}</Text>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={{ color: theme.danger, fontWeight: '600' }}>
+                            R$ {group.expense.consolidatedTotal.toFixed(2)}
+                          </Text>
+                          {group.expense.total - group.expense.consolidatedTotal > 0.001 && (
+                            <Text style={{ color: 'gray', fontSize: 11 }}>
+                              + R$ {(group.expense.total - group.expense.consolidatedTotal).toFixed(2)}
+                            </Text>
+                          )}
+                        </View>
                       </DataTable.Cell>
                     </DataTable.Row>
                     {group.expense.transactions.map((item) => {
                       if ('isVirtualInvoice' in item) {
+                        const paid = (item as SyntheticTransaction).isPaid;
+                        const textColor = paid ? theme.text : 'gray';
                         return (
                           <DataTable.Row key={item.id}>
                             <DataTable.Cell style={{ paddingLeft: 10 }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                                <TouchableOpacity onPress={() => onConsolidateInvoice && onConsolidateInvoice(item as SyntheticTransaction)}>
+                                  <Icon
+                                    source={paid ? 'check-circle' : 'check-circle-outline'}
+                                    size={15}
+                                    color={paid ? theme.danger : '#999'}
+                                  />
+                                </TouchableOpacity>
+                                <Text variant="labelMedium" style={{ width: 50, marginLeft: 15, color: textColor }}>
+                                  {item.date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                </Text>
                                 <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-                                  <Text style={{ width: 70, paddingLeft: 10 }}>
-                                    {item.date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                                  </Text>
-                                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingLeft: 40 }}>
-                                    <Icon source="credit-card-outline" size={16} color="#666" />
-                                    <Text style={{ marginLeft: 6 }}>{item.description}</Text>
-                                  </View>
-                                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <Text style={{ marginRight: 8 }}>R$ {item.amount.toFixed(2)}</Text>
-                                    <TouchableOpacity onPress={() => onConsolidateInvoice && onConsolidateInvoice(item as SyntheticTransaction)}>
-                                      <Icon source="check-circle-outline" size={20} color="#999" />
-                                    </TouchableOpacity>
-                                  </View>
+                                  <Icon source="credit-card-outline" size={16} color="#666" />
+                                  <Text variant="labelMedium" style={{ marginLeft: 6, color: textColor }}>{item.description}</Text>
                                 </View>
+                                <Text variant="labelMedium" style={{ color: textColor }}>R$ {item.amount.toFixed(2)}</Text>
                               </View>
                             </DataTable.Cell>
                           </DataTable.Row>

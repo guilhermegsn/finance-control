@@ -163,16 +163,17 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
 
   // Calcular saldo atual (apenas transações consolidadas)
   const currentBalance = useMemo(() => {
-    // Saldo de transações passadas consolidadas
     const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
     let pastConsolidated = 0;
     allTransactions.forEach(t => {
+      // Compras de CC são contadas via transação de pagamento da fatura (credit_card_id = null)
+      if ((t as any)._raw?.credit_card_id != null) return;
       if (new Date(t.date).getTime() < firstDayOfMonth.getTime() && t.isConsolidated) {
         pastConsolidated += t.type === 'income' ? t.amount : -t.amount;
       }
     });
 
-    // Saldo do mês atual consolidado
+    // filteredTransactions já exclui CC (query com credit_card_id = null)
     let currentMonthConsolidated = 0;
     filteredTransactions.forEach(t => {
       if (t.isConsolidated) {
@@ -183,25 +184,37 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
     return pastConsolidated + currentMonthConsolidated;
   }, [allTransactions, filteredTransactions, currentDate]);
 
-  // Calcular saldo projetado (todas as transações, incluindo não consolidadas)
+  // Calcular saldo projetado (todo o passado não-CC + mês atual não-CC + fatura CC pendente)
   const projectedBalance = useMemo(() => {
-    // Saldo total de transações passadas (consolidadas e não consolidadas)
     const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    let pastTotal = 0;
+
+    // Passado: tudo não-CC (consolidado + agendado) — mesmo não consolidado é esperado
+    let pastAllBalance = 0;
     allTransactions.forEach(t => {
+      if ((t as any)._raw?.credit_card_id != null) return;
       if (new Date(t.date).getTime() < firstDayOfMonth.getTime()) {
-        pastTotal += t.type === 'income' ? t.amount : -t.amount;
+        pastAllBalance += t.type === 'income' ? t.amount : -t.amount;
       }
     });
 
-    // Saldo total do mês atual (todas as transações, incluindo cartão de crédito)
+    // Mês atual: transações não-CC (inclui pagamento da fatura quando pago)
     let currentMonthTotal = 0;
     const allFilteredTransactions = filterAllTransactionsByMonth(allTransactions, currentDate);
     allFilteredTransactions.forEach(t => {
+      if ((t as any)._raw?.credit_card_id != null) return;
       currentMonthTotal += t.type === 'income' ? t.amount : -t.amount;
     });
 
-    return pastTotal + currentMonthTotal;
+    // Fatura CC pendente: compras CC do mês não-consolidadas
+    // Quando paga: purchases ficam consolidadas → ccPendingExpense = 0
+    //              e o pagamento já está em currentMonthTotal
+    let ccPendingExpense = 0;
+    allFilteredTransactions.forEach(t => {
+      if ((t as any)._raw?.credit_card_id == null) return;
+      if (!t.isConsolidated) ccPendingExpense += t.amount;
+    });
+
+    return pastAllBalance + currentMonthTotal - ccPendingExpense;
   }, [allTransactions, currentDate]);
 
   useEffect(() => {
@@ -246,50 +259,88 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
       });
 
       const incomeTransactions = accountTransactions.filter(t => t.type === 'income');
-      const expenseTransactions: MixedTransaction[] = accountTransactions.filter(t => t.type === 'expense');
+      const realExpenseTransactions = accountTransactions.filter(t => t.type === 'expense');
 
-      // Calcular Faturas de Cartão de Crédito vinculadas a essa conta
+      // Total real de despesas para cálculo do saldo (inclui pagamento da fatura quando pago)
+      const realExpenseCalcTotal = realExpenseTransactions.reduce((sum, t) => sum + t.amount, 0);
+
+      // Lista de exibição: começa com despesas reais e é ajustada por cartão
+      const displayExpenseTransactions: MixedTransaction[] = [...realExpenseTransactions];
+
       const accountCreditCards = creditCards.filter(card => card.accountId === account.id);
 
       accountCreditCards.forEach(card => {
-        const cardTransactions = allCreditCardTransactions.filter(t => {
+        const cardTransactions = allCreditCardTransactions.filter(t =>
           // @ts-ignore
-          return t._raw?.credit_card_id === card.id;
-        });
+          t._raw?.credit_card_id === card.id
+        );
 
-        // REGRA DE OURO: Para o Fluxo de Caixa, usar isTransactionDueInMonth que considera
-        // APENAS a data de vencimento (date) para determinar se a transação aparece na fatura virtual
-        const pendingInvoiceTransactions = cardTransactions.filter(t => {
-          return isTransactionDueInMonth(t, currentDate) && !t.isConsolidated;
-        });
+        // REGRA DE OURO: usar isTransactionDueInMonth (data de vencimento) para o fluxo de caixa
+        const invoiceDueTxs = cardTransactions.filter(t => isTransactionDueInMonth(t, currentDate));
+        if (invoiceDueTxs.length === 0) return;
 
-        const cardTotal = pendingInvoiceTransactions.reduce((sum, t) => sum + t.amount, 0);
+        const pendingTxs = invoiceDueTxs.filter(t => !t.isConsolidated);
+        const paidTxs = invoiceDueTxs.filter(t => t.isConsolidated);
+        const isPaid = pendingTxs.length === 0 && paidTxs.length > 0;
 
-        if (cardTotal > 0) {
-          let dueDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), card.dueDay);
-          // Se o dueDay não for válido (ex: 31 em fevereiro), o JS ajusta sozinho, mas para garantir
-          if (dueDate.getDate() !== card.dueDay) {
-            dueDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-          }
+        let dueDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), card.dueDay);
+        if (dueDate.getDate() !== card.dueDay) {
+          dueDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+        }
 
-          const syntheticInvoice: SyntheticTransaction = {
-            id: 'fatura_virtual_' + card.id + '_' + currentDate.getMonth(),
+        if (isPaid) {
+          const paidTotal = paidTxs.reduce((sum, t) => sum + t.amount, 0);
+
+          // Ocultar da lista de exibição a transação de pagamento (representada pelo invoice pago)
+          const paymentIdx = displayExpenseTransactions.findIndex(t =>
+            !('isVirtualInvoice' in t) &&
+            (t as Transaction).description === `Pagamento Fatura ${card.name}`
+          );
+          if (paymentIdx >= 0) displayExpenseTransactions.splice(paymentIdx, 1);
+
+          displayExpenseTransactions.push({
+            id: `fatura_virtual_${card.id}_${currentDate.getMonth()}`,
             description: `Fatura ${card.name}`,
-            amount: cardTotal,
+            amount: paidTotal,
             type: 'expense',
             date: dueDate,
             isVirtualInvoice: true,
+            isPaid: true,
             creditCardId: card.id,
             accountId: account.id,
-            transactionIds: pendingInvoiceTransactions.map(t => t.id)
-          };
-          expenseTransactions.push(syntheticInvoice);
+            transactionIds: paidTxs.map(t => t.id),
+          } as SyntheticTransaction);
+        } else {
+          const cardTotal = pendingTxs.reduce((sum, t) => sum + t.amount, 0);
+          if (cardTotal > 0) {
+            displayExpenseTransactions.push({
+              id: `fatura_virtual_${card.id}_${currentDate.getMonth()}`,
+              description: `Fatura ${card.name}`,
+              amount: cardTotal,
+              type: 'expense',
+              date: dueDate,
+              isVirtualInvoice: true,
+              isPaid: false,
+              creditCardId: card.id,
+              accountId: account.id,
+              transactionIds: pendingTxs.map(t => t.id),
+            } as SyntheticTransaction);
+          }
         }
       });
 
       const incomeTotal = incomeTransactions.reduce((sum, t) => sum + t.amount, 0);
-      const expenseTotal = expenseTransactions.reduce((sum, t) => sum + t.amount, 0);
-      const totalBalance = previousBalance + incomeTotal - expenseTotal;
+      const incomeConsolidatedTotal = incomeTransactions
+        .filter(t => t.isConsolidated)
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      const expenseTotal = displayExpenseTransactions.reduce((sum, t) => sum + t.amount, 0);
+      const expenseConsolidatedTotal = displayExpenseTransactions.reduce((sum, t) => {
+        if ('isVirtualInvoice' in t) return (t as SyntheticTransaction).isPaid ? sum + t.amount : sum;
+        return (t as Transaction).isConsolidated ? sum + t.amount : sum;
+      }, 0);
+
+      const totalBalance = previousBalance + incomeTotal - realExpenseCalcTotal;
 
       groups.push({
         accountId: account.id,
@@ -299,11 +350,13 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
         totalBalance,
         income: {
           total: incomeTotal,
+          consolidatedTotal: incomeConsolidatedTotal,
           transactions: incomeTransactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
         },
         expense: {
           total: expenseTotal,
-          transactions: expenseTransactions.sort((a, b) => {
+          consolidatedTotal: expenseConsolidatedTotal,
+          transactions: displayExpenseTransactions.sort((a: MixedTransaction, b: MixedTransaction) => {
             const dateA = new Date(a.date).getTime();
             const dateB = new Date(b.date).getTime();
             return dateA - dateB;
@@ -328,33 +381,56 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
   const handleConsolidateInvoice = async (invoice: SyntheticTransaction) => {
     if (!user?.id) return;
 
-    Alert.alert(
-      t('Pagar Fatura'),
-      t(`Deseja confirmar o pagamento de ${invoice.description} no valor de R$ ${invoice.amount.toFixed(2)}?`),
-      [
-        { text: t('Cancelar'), style: 'cancel' },
-        {
-          text: t('Confirmar'),
-          onPress: async () => {
-            try {
-              await TransactionService.payCreditCardInvoice(
-                invoice.accountId,
-                `Pagamento ${invoice.description}`,
-                invoice.amount,
-                invoice.date,
-                user.id,
-                invoice.transactionIds
-              );
-              // Como estamos usando observables, a tela será atualizada automaticamente
-              // e a fatura virtual desaparecerá (pois isConsolidated será true para as compras)
-            } catch (error) {
-              console.error('Erro ao pagar fatura:', error);
-              Alert.alert(t('Erro'), t('Ocorreu um erro ao pagar a fatura.'));
+    if (invoice.isPaid) {
+      Alert.alert(
+        t('Desfazer Pagamento'),
+        t(`Deseja desfazer o pagamento de R$ ${invoice.amount.toFixed(2)} de "${invoice.description}"?`),
+        [
+          { text: t('Cancelar'), style: 'cancel' },
+          {
+            text: t('Confirmar'),
+            onPress: async () => {
+              try {
+                await TransactionService.unpayCreditCardInvoice(
+                  invoice.accountId,
+                  `Pagamento ${invoice.description}`,
+                  invoice.transactionIds,
+                );
+              } catch (error) {
+                console.error('Erro ao desfazer pagamento:', error);
+                Alert.alert(t('Erro'), t('Ocorreu um erro ao desfazer o pagamento.'));
+              }
             }
           }
-        }
-      ]
-    );
+        ]
+      );
+    } else {
+      Alert.alert(
+        t('Pagar Fatura'),
+        t(`Deseja confirmar o pagamento de ${invoice.description} no valor de R$ ${invoice.amount.toFixed(2)}?`),
+        [
+          { text: t('Cancelar'), style: 'cancel' },
+          {
+            text: t('Confirmar'),
+            onPress: async () => {
+              try {
+                await TransactionService.payCreditCardInvoice(
+                  invoice.accountId,
+                  `Pagamento ${invoice.description}`,
+                  invoice.amount,
+                  invoice.date,
+                  user.id,
+                  invoice.transactionIds
+                );
+              } catch (error) {
+                console.error('Erro ao pagar fatura:', error);
+                Alert.alert(t('Erro'), t('Ocorreu um erro ao pagar a fatura.'));
+              }
+            }
+          }
+        ]
+      );
+    }
   };
 
   return (

@@ -469,11 +469,13 @@ export const TransactionService = {
 
   // Calcular saldo de uma conta antes de uma data específica
   getBalanceBeforeDate: async (accountId: string, date: Date): Promise<number> => {
-    // Buscar todas as transações da conta com data anterior à data fornecida
+    // Apenas consolidadas e sem CC: representam o saldo real acumulado até a data
     const transactions = await database.get<Transaction>('transactions')
       .query(
         Q.where('account_id', accountId),
-        Q.where('date', Q.lt(date.getTime())), // date é armazenado como timestamp (number)
+        Q.where('credit_card_id', null),
+        Q.where('is_consolidated', true),
+        Q.where('date', Q.lt(date.getTime())),
         Q.sortBy('date', Q.asc)
       )
       .fetch();
@@ -537,6 +539,38 @@ export const TransactionService = {
 
       // Executar todas as operações em um único batch
       await database.batch(invoicePaymentRecord, ...recordsToUpdate);
+    });
+  },
+
+  // Desfazer pagamento de fatura de cartão de crédito
+  unpayCreditCardInvoice: async (
+    accountId: string,
+    paymentDescription: string, // ex: 'Pagamento Fatura Nubank'
+    creditCardTransactionIds: string[],
+  ) => {
+    await database.write(async () => {
+      // 1. Encontrar e marcar para exclusão a transação de pagamento da fatura
+      const paymentTransactions = await database.get<Transaction>('transactions').query(
+        Q.where('account_id', accountId),
+        Q.where('description', paymentDescription),
+      ).fetch();
+
+      const deletions = paymentTransactions.map(t => t.prepareMarkAsDeleted());
+
+      // 2. Desconsolidar as compras de CC que compunham a fatura
+      const unconsolidations = [];
+      for (const id of creditCardTransactionIds) {
+        try {
+          const tx = await database.get<Transaction>('transactions').find(id);
+          unconsolidations.push(tx.prepareUpdate((record) => {
+            record.isConsolidated = false;
+          }));
+        } catch (error) {
+          console.error(`Erro ao buscar transação CC ${id}:`, error);
+        }
+      }
+
+      await database.batch(...deletions, ...unconsolidations);
     });
   },
 
