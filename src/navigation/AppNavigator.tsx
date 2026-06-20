@@ -48,9 +48,7 @@ export default function AppNavigator() {
         <Stack.Screen
           name="TransactionForm"
           component={TransactionFormScreen}
-          options={{
-            title: t('Transação'),
-          }}
+          options={{ headerShown: false }}
         />
 
         <Stack.Screen
@@ -81,9 +79,7 @@ export default function AppNavigator() {
         <Stack.Screen
           name="CreditCardPurchase"
           component={CreditCardPurchaseScreen}
-          options={{
-            title: t('Cartão de crédito'),
-          }}
+          options={{ headerShown: false }}
         />
       </Stack.Navigator>
     </NavigationContainer>

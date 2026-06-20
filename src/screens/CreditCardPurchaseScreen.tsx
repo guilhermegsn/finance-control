@@ -1,11 +1,12 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View, ScrollView, Alert, TouchableOpacity } from 'react-native';
-import { Button, TextInput, Text, Icon, HelperText, Divider } from 'react-native-paper';
+import { View, ScrollView, Alert, TouchableOpacity, StyleSheet, Text } from 'react-native';
+import { TextInput, Icon } from 'react-native-paper';
 import { Select } from '../components/Select';
 import { TransactionService } from '../service/TransactionService';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Category from '../models/Caterogy';
 import CreditCard from '../models/CreditCard';
@@ -13,6 +14,8 @@ import Transaction from '../models/Transactions';
 import { withObservables } from '@nozbe/watermelondb/react';
 import CreditCardService from '../service/CreditCardService';
 import { Q } from '@nozbe/watermelondb';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface CreditCardPurchaseFormData {
   amount: string;
@@ -31,23 +34,36 @@ interface CreditCardPurchaseScreenProps {
 function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps) {
   const { user } = useAuth();
   const { t } = useTranslation();
+  const { isDarkMode } = useTheme();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const [activePicker, setActivePicker] = useState<boolean>(false);
-  const [calculating, setCalculating] = useState<boolean>(false);
-  const [previewInfo, setPreviewInfo] = useState<{
-    installmentAmount: number;
-    totalAmount: number;
-    show: boolean;
-  }>({
-    installmentAmount: 0,
-    totalAmount: 0,
-    show: false,
-  });
+  const insets = useSafeAreaInsets();
+  const [activePicker, setActivePicker] = useState(false);
+  const [calculating, setCalculating] = useState(false);
+  const [previewInfo, setPreviewInfo] = useState({ installmentAmount: 0, totalAmount: 0, show: false });
 
   const { transactionId, categories = [], onSave } = route.params || {};
   const [isEditing, setIsEditing] = useState(false);
   const [currentTransaction, setCurrentTransaction] = useState<Transaction | null>(null);
+
+  const c = {
+    bg: isDarkMode ? '#0D1117' : '#EEF2F7',
+    card: isDarkMode ? '#161C27' : '#FFFFFF',
+    border: isDarkMode ? '#2D3748' : '#E2E8F0',
+    textPrimary: isDarkMode ? '#E2E8F0' : '#1A202C',
+    textSecondary: isDarkMode ? '#718096' : '#64748B',
+    sectionLabel: isDarkMode ? '#4A5568' : '#94A3B8',
+  };
+
+  const inputTheme = {
+    colors: {
+      background: c.card,
+      onSurfaceVariant: c.textSecondary,
+      primary: '#6366F1',
+      outline: c.border,
+      onSurface: c.textPrimary,
+    },
+  };
 
   const [formData, setFormData] = useState<CreditCardPurchaseFormData>(() => {
     const today = new Date();
@@ -63,206 +79,126 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
     };
   });
 
-  // Carregar dados da transação se estiver em modo edição
   useEffect(() => {
-    const loadTransactionData = async () => {
-      if (transactionId) {
-        try {
-          const transaction = await TransactionService.findById(transactionId);
-          if (transaction) {
-            setCurrentTransaction(transaction);
-            setIsEditing(true);
-
-            // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
-            const creditCardId = transaction._raw?.credit_card_id;
-            // @ts-ignore
-            const categoryId = transaction._raw?.category_id;
-            const purchaseDate = transaction.purchaseDate || transaction.date;
-
-            setFormData({
-              amount: transaction.amount.toString(),
-              description: transaction.description.replace(/ \(\d+\/\d+\)$/, ''), // Remove (1/12) do final
-              date: new Date(purchaseDate),
-              creditCardId: creditCardId || '',
-              categoryId: categoryId || '',
-              installments: 1, // Será calculado depois
-              interestRate: '0',
-            });
-          }
-        } catch (error) {
-          console.error('Erro ao carregar transação para edição:', error);
+    const load = async () => {
+      if (!transactionId) return;
+      try {
+        const tx = await TransactionService.findById(transactionId);
+        if (tx) {
+          setCurrentTransaction(tx);
+          setIsEditing(true);
+          // @ts-ignore
+          const creditCardId = tx._raw?.credit_card_id;
+          // @ts-ignore
+          const categoryId = tx._raw?.category_id;
+          const purchaseDate = tx.purchaseDate || tx.date;
+          setFormData({
+            amount: tx.amount.toString(),
+            description: tx.description.replace(/ \(\d+\/\d+\)$/, ''),
+            date: new Date(purchaseDate),
+            creditCardId: creditCardId || '',
+            categoryId: categoryId || '',
+            installments: 1,
+            interestRate: '0',
+          });
         }
+      } catch (error) {
+        console.error('Erro ao carregar transação:', error);
       }
     };
-
-    loadTransactionData();
+    load();
   }, [transactionId]);
 
-  // Atualizar categoryId quando as categorias chegarem
   useEffect(() => {
     if (categories.length > 0 && !formData.categoryId) {
-      const expenseCategories = categories.filter((cat: Category) => cat.type === 'expense');
-      if (expenseCategories.length > 0) {
-        setFormData(prev => ({
-          ...prev,
-          categoryId: expenseCategories[0].id
-        }));
+      const expenseCats = categories.filter((cat: Category) => cat.type === 'expense');
+      if (expenseCats.length > 0) {
+        setFormData(prev => ({ ...prev, categoryId: expenseCats[0].id }));
       }
     }
   }, [categories]);
 
-  const handleDateChange = (event: any, selectedDate?: Date) => {
-    if (selectedDate) {
-      setFormData(prev => ({ ...prev, date: selectedDate }));
-    }
-    setActivePicker(false);
-  };
-
-  // Calcular preview quando os campos relevantes mudarem
   useEffect(() => {
     const amount = parseFloat(formData.amount.replace(',', '.'));
     const installments = formData.installments;
     const interestRate = parseFloat(formData.interestRate.replace(',', '.')) || 0;
 
-    if (amount > 0 && installments > 0 && interestRate >= 0) {
-      if (installments > 1 && interestRate > 0) {
-        // Tabela Price: PMT = PV * i / (1 - (1 + i)^-n)
-        const i = interestRate / 100; // taxa decimal
-        const n = installments;
-        const pv = amount;
-        const pmt = pv * i / (1 - Math.pow(1 + i, -n));
-        const total = pmt * n;
-        setPreviewInfo({
-          installmentAmount: parseFloat(pmt.toFixed(2)),
-          totalAmount: parseFloat(total.toFixed(2)),
-          show: true,
-        });
-      } else if (installments > 1) {
-        // Sem juros
-        const installmentAmount = amount / installments;
-        setPreviewInfo({
-          installmentAmount: parseFloat(installmentAmount.toFixed(2)),
-          totalAmount: amount,
-          show: true,
-        });
+    if (amount > 0 && installments > 1) {
+      if (interestRate > 0) {
+        const i = interestRate / 100;
+        const pmt = amount * i / (1 - Math.pow(1 + i, -installments));
+        const total = pmt * installments;
+        setPreviewInfo({ installmentAmount: parseFloat(pmt.toFixed(2)), totalAmount: parseFloat(total.toFixed(2)), show: true });
       } else {
-        setPreviewInfo({
-          installmentAmount: amount,
-          totalAmount: amount,
-          show: false,
-        });
+        const installmentAmount = amount / installments;
+        setPreviewInfo({ installmentAmount: parseFloat(installmentAmount.toFixed(2)), totalAmount: amount, show: true });
       }
     } else {
-      setPreviewInfo({
-        installmentAmount: 0,
-        totalAmount: 0,
-        show: false,
-      });
+      setPreviewInfo({ installmentAmount: 0, totalAmount: 0, show: false });
     }
   }, [formData.amount, formData.installments, formData.interestRate]);
 
   const isInvalidForm = () => {
     const amount = parseFloat(formData.amount.replace(',', '.'));
-    return (
-      isNaN(amount) ||
-      amount <= 0 ||
-      !formData.description.trim() ||
-      !formData.creditCardId ||
-      !formData.categoryId ||
-      formData.installments < 1
-    );
+    return isNaN(amount) || amount <= 0 || !formData.description.trim() || !formData.creditCardId || !formData.categoryId || formData.installments < 1;
   };
 
   const handleDelete = async () => {
     if (!user || !currentTransaction) return;
-
-    // Verificar se é uma transação parcelada
-    // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
+    // @ts-ignore
     const relatedTransactionId = currentTransaction._raw?.related_transaction_id;
     const isInstallment = !!relatedTransactionId;
 
     if (isInstallment) {
-      // Mostrar alerta para escolher o tipo de exclusão
       Alert.alert(
         t('Excluir Compra Parcelada'),
         t('Esta compra faz parte de um parcelamento. Como deseja excluir?'),
         [
-          {
-            text: t('Cancelar'),
-            style: 'cancel'
-          },
+          { text: t('Cancelar'), style: 'cancel' },
           {
             text: t('Excluir apenas esta parcela'),
             onPress: async () => {
               try {
-                await TransactionService.deleteCreditCardPurchase(
-                  currentTransaction.id,
-                  'only_this'
-                );
-                Alert.alert(t('Sucesso'), t('Parcela excluída com sucesso!'));
+                await TransactionService.deleteCreditCardPurchase(currentTransaction.id, 'only_this');
                 onSave?.();
                 navigation.goBack();
               } catch (error: any) {
-                console.error('Erro ao excluir parcela:', error);
-                Alert.alert(
-                  t('Erro'),
-                  error.message || t('Ocorreu um erro ao excluir a parcela.')
-                );
+                Alert.alert(t('Erro'), error.message || t('Ocorreu um erro ao excluir a parcela.'));
               }
-            }
+            },
           },
           {
             text: t('Excluir todas as parcelas pendentes'),
             onPress: async () => {
               try {
-                await TransactionService.deleteCreditCardPurchase(
-                  currentTransaction.id,
-                  'all_pending'
-                );
-                Alert.alert(t('Sucesso'), t('Todas as parcelas pendentes excluídas com sucesso!'));
+                await TransactionService.deleteCreditCardPurchase(currentTransaction.id, 'all_pending');
                 onSave?.();
                 navigation.goBack();
               } catch (error: any) {
-                console.error('Erro ao excluir parcelas:', error);
-                Alert.alert(
-                  t('Erro'),
-                  error.message || t('Ocorreu um erro ao excluir as parcelas.')
-                );
+                Alert.alert(t('Erro'), error.message || t('Ocorreu um erro ao excluir as parcelas.'));
               }
-            }
-          }
+            },
+          },
         ]
       );
     } else {
-      // Transação não parcelada, pedir confirmação simples
       Alert.alert(
         t('Confirmar Exclusão'),
         t('Tem certeza que deseja excluir esta compra?'),
         [
-          {
-            text: t('Cancelar'),
-            style: 'cancel'
-          },
+          { text: t('Cancelar'), style: 'cancel' },
           {
             text: t('Excluir'),
             onPress: async () => {
               try {
-                await TransactionService.deleteCreditCardPurchase(
-                  currentTransaction.id,
-                  'only_this'
-                );
-                Alert.alert(t('Sucesso'), t('Compra excluída com sucesso!'));
+                await TransactionService.deleteCreditCardPurchase(currentTransaction.id, 'only_this');
                 onSave?.();
                 navigation.goBack();
               } catch (error: any) {
-                console.error('Erro ao excluir compra:', error);
-                Alert.alert(
-                  t('Erro'),
-                  error.message || t('Ocorreu um erro ao excluir a compra.')
-                );
+                Alert.alert(t('Erro'), error.message || t('Ocorreu um erro ao excluir a compra.'));
               }
-            }
-          }
+            },
+          },
         ]
       );
     }
@@ -270,376 +206,410 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
 
   const handleSave = async () => {
     if (!user) return;
-
     const amount = parseFloat(formData.amount.replace(',', '.'));
-    if (isNaN(amount) || amount <= 0) {
-      Alert.alert(t('Erro'), t('Valor inválido'));
-      return;
-    }
-
+    if (isNaN(amount) || amount <= 0) { Alert.alert(t('Erro'), t('Valor inválido')); return; }
     const interestRate = parseFloat(formData.interestRate.replace(',', '.')) || 0;
-    if (interestRate < 0) {
-      Alert.alert(t('Erro'), t('Taxa de juros não pode ser negativa'));
-      return;
-    }
+    if (interestRate < 0) { Alert.alert(t('Erro'), t('Taxa de juros não pode ser negativa')); return; }
 
     setCalculating(true);
     try {
       if (isEditing && currentTransaction) {
-        // Verificar se é uma transação parcelada
-        // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
-        const relatedTransactionId = currentTransaction._raw?.related_transaction_id;
-        const isInstallment = !!relatedTransactionId;
-
-        if (isInstallment) {
-          // Mostrar alerta para escolher o tipo de edição
+        // @ts-ignore
+        const relatedId = currentTransaction._raw?.related_transaction_id;
+        if (relatedId) {
           Alert.alert(
             t('Editar Compra Parcelada'),
             t('Esta compra faz parte de um parcelamento. Como deseja editar?'),
             [
-              {
-                text: t('Cancelar'),
-                style: 'cancel',
-                onPress: () => {
-                  setCalculating(false);
-                }
-              },
+              { text: t('Cancelar'), style: 'cancel', onPress: () => setCalculating(false) },
               {
                 text: t('Editar apenas esta parcela'),
                 onPress: async () => {
                   try {
-                    await TransactionService.updateCreditCardPurchase(
-                      currentTransaction.id,
-                      'only_this',
-                      {
-                        amount,
-                        description: formData.description,
-                        date: formData.date,
-                        creditCardId: formData.creditCardId,
-                        categoryId: formData.categoryId,
-                        installments: formData.installments,
-                        interestRate,
-                        userId: user.id,
-                      }
-                    );
-                    Alert.alert(t('Sucesso'), t('Parcela atualizada com sucesso!'));
-                    onSave?.();
-                    navigation.goBack();
-                  } catch (error: any) {
-                    console.error('Erro ao atualizar parcela:', error);
-                    Alert.alert(
-                      t('Erro'),
-                      error.message || t('Ocorreu um erro ao atualizar a parcela.')
-                    );
-                    setCalculating(false);
-                  }
-                }
+                    await TransactionService.updateCreditCardPurchase(currentTransaction.id, 'only_this', { amount, description: formData.description, date: formData.date, creditCardId: formData.creditCardId, categoryId: formData.categoryId, installments: formData.installments, interestRate, userId: user.id });
+                    onSave?.(); navigation.goBack();
+                  } catch (error: any) { Alert.alert(t('Erro'), error.message); setCalculating(false); }
+                },
               },
               {
                 text: t('Editar todas as parcelas pendentes'),
                 onPress: async () => {
                   try {
-                    await TransactionService.updateCreditCardPurchase(
-                      currentTransaction.id,
-                      'all_pending',
-                      {
-                        amount,
-                        description: formData.description,
-                        date: formData.date,
-                        creditCardId: formData.creditCardId,
-                        categoryId: formData.categoryId,
-                        installments: formData.installments,
-                        interestRate,
-                        userId: user.id,
-                      }
-                    );
-                    Alert.alert(t('Sucesso'), t('Todas as parcelas pendentes atualizadas com sucesso!'));
-                    onSave?.();
-                    navigation.goBack();
-                  } catch (error: any) {
-                    console.error('Erro ao atualizar parcelas:', error);
-                    Alert.alert(
-                      t('Erro'),
-                      error.message || t('Ocorreu um erro ao atualizar as parcelas.')
-                    );
-                    setCalculating(false);
-                  }
-                }
-              }
+                    await TransactionService.updateCreditCardPurchase(currentTransaction.id, 'all_pending', { amount, description: formData.description, date: formData.date, creditCardId: formData.creditCardId, categoryId: formData.categoryId, installments: formData.installments, interestRate, userId: user.id });
+                    onSave?.(); navigation.goBack();
+                  } catch (error: any) { Alert.alert(t('Erro'), error.message); setCalculating(false); }
+                },
+              },
             ]
           );
           return;
         } else {
-          // Transação não parcelada, atualizar normalmente
-          await TransactionService.updateCreditCardPurchase(
-            currentTransaction.id,
-            'only_this',
-            {
-              amount,
-              description: formData.description,
-              date: formData.date,
-              creditCardId: formData.creditCardId,
-              categoryId: formData.categoryId,
-              installments: formData.installments,
-              interestRate,
-              userId: user.id,
-            }
-          );
-          Alert.alert(t('Sucesso'), t('Compra atualizada com sucesso!'));
-          onSave?.();
-          navigation.goBack();
+          await TransactionService.updateCreditCardPurchase(currentTransaction.id, 'only_this', { amount, description: formData.description, date: formData.date, creditCardId: formData.creditCardId, categoryId: formData.categoryId, installments: formData.installments, interestRate, userId: user.id });
+          onSave?.(); navigation.goBack();
         }
       } else {
-        // Criar nova compra
-        await TransactionService.createCreditCardPurchase({
-          amount,
-          description: formData.description,
-          date: formData.date,
-          creditCardId: formData.creditCardId,
-          categoryId: formData.categoryId,
-          installments: formData.installments,
-          interestRate,
-          userId: user.id,
-        });
-
-        Alert.alert(t('Sucesso'), t('Compra no cartão criada com sucesso!'));
-        onSave?.();
-        navigation.goBack();
+        await TransactionService.createCreditCardPurchase({ amount, description: formData.description, date: formData.date, creditCardId: formData.creditCardId, categoryId: formData.categoryId, installments: formData.installments, interestRate, userId: user.id });
+        onSave?.(); navigation.goBack();
       }
     } catch (error: any) {
-      console.error('Erro ao salvar compra no cartão:', error);
-      Alert.alert(
-        t('Erro'),
-        error.message || t('Ocorreu um erro ao salvar a compra no cartão.')
-      );
+      Alert.alert(t('Erro'), error.message || t('Ocorreu um erro ao salvar a compra no cartão.'));
     } finally {
       setCalculating(false);
     }
   };
 
-  // Opções de parcelamento (1 a 12 parcelas)
   const installmentOptions = Array.from({ length: 12 }, (_, i) => ({
     id: (i + 1).toString(),
-    label: `${i + 1} ${i === 0 ? t('parcela') : t('parcelas')}`,
+    label: `${i + 1}x — ${i === 0 ? t('à vista') : t('parcelado')}`,
     value: (i + 1).toString(),
   }));
 
+  const cardItems = creditCards.map((card: CreditCard) => ({
+    id: card.id,
+    label: card.name,
+    value: card.id,
+    imageUri: null as null,
+  }));
+
+  const categoryItems = categories
+    .filter((cat: Category) => cat.type === 'expense')
+    .map((cat: Category) => {
+      const label = t(`categories:${cat.name}`);
+      return { id: cat.id, label: label.includes('categories:') ? cat.name : label, value: cat.id, icon: cat.icon };
+    });
+
   return (
-    <View style={{ flex: 1 }}>
-      <ScrollView style={{ flex: 1, padding: 20 }}>
-        {activePicker && (
-          <DateTimePicker
-            value={formData.date}
-            mode="date"
-            display="default"
-            onChange={handleDateChange}
-          />
-        )}
-
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold' }}>
-            {isEditing ? t('Editar Compra') : t('Lançar Compra')}
-          </Text>
-        </View>
-
-        {/* Data da Compra */}
-        <View style={{ marginBottom: 20 }}>
-          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Data da Compra')}</Text>
-          <TouchableOpacity
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              paddingVertical: 12,
-              paddingHorizontal: 16,
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: '#ddd',
-              gap: 8,
-              width: '48%'
-            }}
-            onPress={() => setActivePicker(true)}
-          >
-            <Icon source="calendar" size={16} />
-            <Text style={{ fontSize: 14 }}>
-              {formData.date.toLocaleDateString('pt-BR')}
-            </Text>
+    <View style={[styles.root, { backgroundColor: c.bg, paddingTop: insets.top }]}>
+      {/* Header */}
+      <View style={[styles.header, { backgroundColor: c.bg }]}>
+        <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
+          <Icon source="arrow-left" size={22} color={c.textPrimary} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: c.textPrimary }]}>
+          {isEditing ? t('Editar Compra') : t('Lançar Compra')}
+        </Text>
+        {isEditing && currentTransaction && !currentTransaction.isConsolidated ? (
+          <TouchableOpacity style={styles.headerBtn} onPress={handleDelete}>
+            <Icon source="trash-can-outline" size={22} color="#F43F5E" />
           </TouchableOpacity>
-        </View>
+        ) : (
+          <View style={styles.headerBtn} />
+        )}
+      </View>
 
-        {/* Cartão de Crédito */}
-        <View style={{ marginBottom: 20 }}>
-          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Cartão de Crédito')}</Text>
-          <Select
-            items={creditCards.map((card: CreditCard) => ({
-              id: card.id,
-              label: card.name,
-              value: card.id,
-              imageUri: null, // Pode-se adicionar logo do cartão no futuro
-            }))}
-            selectedValue={formData.creditCardId}
-            onSelect={(value) => setFormData(prev => ({ ...prev, creditCardId: value }))}
-            placeholder={t("Selecionar cartão")}
-          />
-        </View>
+      {activePicker && (
+        <DateTimePicker
+          value={formData.date}
+          mode="date"
+          display="default"
+          onChange={(_, date) => { if (date) setFormData(prev => ({ ...prev, date })); setActivePicker(false); }}
+        />
+      )}
 
-        {/* Categoria */}
-        <View style={{ marginBottom: 20 }}>
-          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Categoria')}</Text>
-          <Select
-            items={categories
-              .filter((cat: Category) => cat.type === 'expense')
-              .map((category: Category) => {
-                const translatedLabel = t(`categories:${category.name}`);
-                const label = translatedLabel.includes('categories:') ? category.name : translatedLabel;
-                return {
-                  id: category.id,
-                  label: label,
-                  value: category.id,
-                  icon: category.icon
-                };
-              })}
-            selectedValue={formData.categoryId}
-            onSelect={(value) => setFormData(prev => ({ ...prev, categoryId: value }))}
-            placeholder={categories.length === 0 ? t("Carregando...") : t("Selecione")}
-          />
-          {categories.length === 0 && (
-            <HelperText type="info">
-              {t('Aguarde enquanto as categorias são carregadas...')}
-            </HelperText>
-          )}
-        </View>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
-        {/* Descrição */}
-        <View style={{ marginBottom: 20 }}>
-          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Descrição')}</Text>
-          <TextInput
-            value={formData.description}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
-            placeholder={t("Descrição da compra")}
-          />
-        </View>
+        {/* Descrição + Valor */}
+        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>{t('DETALHES')}</Text>
+        <TextInput
+          mode="outlined"
+          label={t('Descrição')}
+          value={formData.description}
+          onChangeText={text => setFormData(prev => ({ ...prev, description: text }))}
+          placeholder={t('Descrição da compra')}
+          theme={inputTheme}
+          style={[styles.input, { backgroundColor: c.card }]}
+        />
+        <TextInput
+          mode="outlined"
+          label={t('Valor Original')}
+          value={formData.amount}
+          onChangeText={text => setFormData(prev => ({ ...prev, amount: text }))}
+          placeholder="0,00"
+          keyboardType="numeric"
+          left={<TextInput.Affix text="R$ " textStyle={{ color: c.textSecondary }} />}
+          theme={inputTheme}
+          style={[styles.input, { backgroundColor: c.card }]}
+        />
 
-        {/* Valor Original */}
-        <View style={{ marginBottom: 20 }}>
-          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Valor Original')}</Text>
-          <TextInput
-            value={formData.amount}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, amount: text }))}
-            placeholder={t("0,00")}
-            keyboardType="numeric"
-            left={<TextInput.Affix text="R$ " />}
-          />
-        </View>
+        {/* Data */}
+        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>{t('DATA DA COMPRA')}</Text>
+        <TouchableOpacity
+          style={[styles.dateBtn, { backgroundColor: c.card, borderColor: c.border }]}
+          onPress={() => setActivePicker(true)}
+          activeOpacity={0.7}
+        >
+          <Icon source="calendar" size={18} color="#6366F1" />
+          <Text style={[styles.dateBtnText, { color: c.textPrimary }]}>
+            {formData.date.toLocaleDateString('pt-BR')}
+          </Text>
+          <Icon source="chevron-right" size={16} color={c.sectionLabel} />
+        </TouchableOpacity>
 
-        {/* Quantidade de Parcelas */}
-        <View style={{ marginBottom: 20 }}>
-          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Quantidade de Parcelas')}</Text>
-          <Select
-            items={installmentOptions}
-            selectedValue={formData.installments.toString()}
-            onSelect={(value) => setFormData(prev => ({ ...prev, installments: parseInt(value) }))}
-            placeholder={t("Selecione")}
-          />
-        </View>
-
-        {/* Taxa de Juros % a.m. */}
-        <View style={{ marginBottom: 24 }}>
-          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Taxa de Juros % a.m.')}</Text>
-          <TextInput
-            value={formData.interestRate}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, interestRate: text }))}
-            placeholder="0"
-            keyboardType="numeric"
-            right={<TextInput.Affix text="% a.m." />}
-          />
-          <HelperText type="info">
-            {t('Deixe em 0 para compra sem juros')}
-          </HelperText>
-        </View>
-
-        {/* Preview do cálculo */}
-        {previewInfo.show && (
-          <View style={{
-            backgroundColor: '#f8f9fa',
-            padding: 16,
-            borderRadius: 12,
-            borderWidth: 1,
-            borderColor: '#e9ecef',
-            marginBottom: 24,
-          }}>
-            <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>
-              {t('Detalhes do Parcelamento')}
-            </Text>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-              <Text style={{ fontSize: 14 }}>{t('Valor da Parcela')}:</Text>
-              <Text style={{ fontSize: 14, fontWeight: '600' }}>
-                R$ {previewInfo.installmentAmount.toFixed(2).replace('.', ',')}
-              </Text>
+        {/* Cartão & Categoria */}
+        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>{t('CARTÃO & CATEGORIA')}</Text>
+        <View style={[styles.sectionCard, { backgroundColor: c.card, borderColor: c.border }]}>
+          <View style={styles.selectRow}>
+            <Text style={[styles.selectLabel, { color: c.textSecondary }]}>{t('Cartão')}</Text>
+            <View style={styles.selectWrap}>
+              <Select
+                items={cardItems}
+                selectedValue={formData.creditCardId}
+                onSelect={value => setFormData(prev => ({ ...prev, creditCardId: value }))}
+                placeholder={t('Selecionar cartão')}
+                fontColor={c.textPrimary}
+              />
             </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-              <Text style={{ fontSize: 14 }}>{t('Número de Parcelas')}:</Text>
-              <Text style={{ fontSize: 14, fontWeight: '600' }}>
-                {formData.installments}
-              </Text>
-            </View>
-            <Divider style={{ marginVertical: 8 }} />
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 14, fontWeight: '600' }}>{t('Valor Total Final')}:</Text>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: '#CC4A4A' }}>
-                R$ {previewInfo.totalAmount.toFixed(2).replace('.', ',')}
-              </Text>
-            </View>
-            {parseFloat(formData.interestRate.replace(',', '.')) > 0 && (
-              <HelperText type="info" style={{ marginTop: 8 }}>
-                {t('Cálculo baseado na Tabela Price')}
-              </HelperText>
-            )}
           </View>
+          <View style={[styles.divider, { backgroundColor: c.border }]} />
+          <View style={styles.selectRow}>
+            <Text style={[styles.selectLabel, { color: c.textSecondary }]}>{t('Categoria')}</Text>
+            <View style={styles.selectWrap}>
+              <Select
+                items={categoryItems}
+                selectedValue={formData.categoryId}
+                onSelect={value => setFormData(prev => ({ ...prev, categoryId: value }))}
+                placeholder={categories.length === 0 ? t('Carregando...') : t('Selecione')}
+                fontColor={c.textPrimary}
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* Parcelamento */}
+        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>{t('PARCELAMENTO')}</Text>
+        <View style={[styles.sectionCard, { backgroundColor: c.card, borderColor: c.border }]}>
+          <View style={styles.selectRow}>
+            <Text style={[styles.selectLabel, { color: c.textSecondary }]}>{t('Parcelas')}</Text>
+            <View style={styles.selectWrap}>
+              <Select
+                items={installmentOptions}
+                selectedValue={formData.installments.toString()}
+                onSelect={value => setFormData(prev => ({ ...prev, installments: parseInt(value) }))}
+                placeholder={t('Selecione')}
+                fontColor={c.textPrimary}
+              />
+            </View>
+          </View>
+          <View style={[styles.divider, { backgroundColor: c.border }]} />
+          <View style={styles.selectRow}>
+            <Text style={[styles.selectLabel, { color: c.textSecondary }]}>{t('Juros a.m.')}</Text>
+            <View style={styles.selectWrap}>
+              <TextInput
+                mode="flat"
+                value={formData.interestRate}
+                onChangeText={text => setFormData(prev => ({ ...prev, interestRate: text }))}
+                placeholder="0"
+                keyboardType="numeric"
+                right={<TextInput.Affix text="%" textStyle={{ color: c.textSecondary }} />}
+                theme={{ colors: { background: 'transparent', onSurfaceVariant: c.textSecondary, primary: '#6366F1', onSurface: c.textPrimary } }}
+                underlineColor="transparent"
+                activeUnderlineColor="#6366F1"
+                style={{ backgroundColor: 'transparent', height: 44 }}
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* Preview de parcelamento */}
+        {previewInfo.show && (
+          <>
+            <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>{t('RESUMO DO PARCELAMENTO')}</Text>
+            <View style={[styles.previewCard, { backgroundColor: c.card, borderColor: c.border }]}>
+              <View style={styles.previewRow}>
+                <Text style={[styles.previewLabel, { color: c.textSecondary }]}>{t('Valor por parcela')}</Text>
+                <Text style={[styles.previewValue, { color: c.textPrimary }]}>
+                  R$ {previewInfo.installmentAmount.toFixed(2).replace('.', ',')}
+                </Text>
+              </View>
+              <View style={[styles.divider, { backgroundColor: c.border, marginLeft: 0 }]} />
+              <View style={styles.previewRow}>
+                <Text style={[styles.previewLabel, { color: c.textSecondary }]}>{t('Número de parcelas')}</Text>
+                <Text style={[styles.previewValue, { color: c.textPrimary }]}>{formData.installments}x</Text>
+              </View>
+              <View style={[styles.divider, { backgroundColor: c.border, marginLeft: 0 }]} />
+              <View style={styles.previewRow}>
+                <Text style={[styles.previewLabel, { color: c.textSecondary, fontWeight: '700' }]}>{t('Total final')}</Text>
+                <Text style={[styles.previewValue, { color: '#F43F5E', fontWeight: '700' }]}>
+                  R$ {previewInfo.totalAmount.toFixed(2).replace('.', ',')}
+                </Text>
+              </View>
+            </View>
+          </>
         )}
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* Botões de ação fixos no rodapé */}
-      <View style={{ padding: 20 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
-          <Button
-            mode="outlined"
-            onPress={() => navigation.goBack()}
-            style={{ flex: 1 }}
-            disabled={calculating}
+      {/* Footer */}
+      <View style={[styles.footer, { backgroundColor: c.bg, borderTopColor: c.border, paddingBottom: insets.bottom + 12 }]}>
+        <TouchableOpacity
+          style={[styles.cancelBtn, { borderColor: c.border, backgroundColor: c.card }]}
+          onPress={() => navigation.goBack()}
+          disabled={calculating}
+        >
+          <Text style={[styles.cancelBtnText, { color: c.textSecondary }]}>{t('Cancelar')}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={handleSave}
+          disabled={isInvalidForm() || calculating}
+          style={[styles.saveBtn, { opacity: isInvalidForm() || calculating ? 0.45 : 1 }]}
+        >
+          <LinearGradient
+            colors={['#8B5CF6', '#6366F1']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.saveGradient}
           >
-            {t('Cancelar')}
-          </Button>
-
-          {isEditing && !currentTransaction?.isConsolidated &&
-            < Button
-              mode="contained"
-              onPress={handleDelete}
-              style={{ flex: 1 }}
-              disabled={calculating}
-              buttonColor="#FF6B6B"
-            >
-              {t('Excluir')}
-            </Button>
-          }
-
-
-          <Button
-            mode="contained"
-            onPress={handleSave}
-            disabled={isInvalidForm() || calculating}
-            loading={calculating}
-            style={{ flex: 1 }}
-          >
-            {isEditing ? t('Atualizar') : t('Lançar Compra')}
-          </Button>
-        </View>
+            <Icon source="credit-card-outline" size={16} color="#FFFFFF" />
+            <Text style={styles.saveBtnText}>
+              {calculating ? t('Salvando...') : isEditing ? t('Atualizar') : t('Lançar Compra')}
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
-    </View >
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  headerBtn: {
+    width: 38,
+    height: 38,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+
+  scroll: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    marginBottom: 8,
+    marginTop: 20,
+    marginLeft: 2,
+  },
+
+  input: {
+    marginBottom: 10,
+  },
+
+  dateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 10,
+  },
+  dateBtnText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+
+  sectionCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 16,
+  },
+
+  selectRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+  },
+  selectLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    width: 80,
+  },
+  selectWrap: {
+    flex: 1,
+  },
+
+  previewCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  previewRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+  },
+  previewLabel: {
+    fontSize: 14,
+  },
+  previewValue: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  footer: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  cancelBtn: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  cancelBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  saveBtn: {
+    flex: 2,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  saveGradient: {
+    flexDirection: 'row',
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  saveBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+});
+
+// ---
 
 const CreditCardPurchaseScreenWrapper = () => {
   const { user } = useAuth();

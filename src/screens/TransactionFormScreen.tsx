@@ -1,15 +1,18 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View, TouchableOpacity, ScrollView, Alert } from 'react-native';
-import { Button, TextInput, Switch, HelperText, Text, Icon, Portal, Dialog } from 'react-native-paper';
+import { View, TouchableOpacity, ScrollView, Alert, StyleSheet, Text } from 'react-native';
+import { TextInput, Switch, Portal, Dialog, Button, Icon } from 'react-native-paper';
 import { Select } from '../components/Select';
 import { TransactionService } from '../service/TransactionService';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Account from '../models/Accounts';
 import Category from '../models/Caterogy';
 import { getAccountLogoByCode } from '../utils/accountLogos';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface FormData {
   id: string;
@@ -27,12 +30,33 @@ interface FormData {
 export default function TransactionFormScreen() {
   const { user } = useAuth();
   const { t } = useTranslation();
+  const { isDarkMode } = useTheme();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
+  const insets = useSafeAreaInsets();
   const [recurringDialogVisible, setRecurringDialogVisible] = useState(false);
   const [pendingUpdateData, setPendingUpdateData] = useState<any>(null);
   const [activePicker, setActivePicker] = useState<'date' | 'recurringEndDate' | null>(null);
   const { transaction, initialType, accounts = [], categories = [], onSave } = route.params || {};
+
+  const c = {
+    bg: isDarkMode ? '#0D1117' : '#EEF2F7',
+    card: isDarkMode ? '#161C27' : '#FFFFFF',
+    border: isDarkMode ? '#2D3748' : '#E2E8F0',
+    textPrimary: isDarkMode ? '#E2E8F0' : '#1A202C',
+    textSecondary: isDarkMode ? '#718096' : '#64748B',
+    sectionLabel: isDarkMode ? '#4A5568' : '#94A3B8',
+  };
+
+  const inputTheme = {
+    colors: {
+      background: c.card,
+      onSurfaceVariant: c.textSecondary,
+      primary: '#6366F1',
+      outline: c.border,
+      onSurface: c.textPrimary,
+    },
+  };
 
   const [formData, setFormData] = useState<FormData>(() => {
     if (transaction) {
@@ -48,48 +72,34 @@ export default function TransactionFormScreen() {
         accountId: transaction.accountId || '',
         categoryId: transaction.categoryId || '',
       };
-    } else {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const newDate = new Date();
-      return {
-        id: '',
-        description: '',
-        value: '',
-        date: newDate,
-        type: initialType || null,
-        isRecurring: false,
-        recurringEndDate: null,
-        isConsolidated: true,
-        accountId: accounts.length > 0 ? accounts[0].id : '',
-        categoryId: categories.length > 0 ? categories[0].id : '',
-      };
     }
+    const now = new Date();
+    return {
+      id: '',
+      description: '',
+      value: '',
+      date: now,
+      type: initialType || null,
+      isRecurring: false,
+      recurringEndDate: null,
+      isConsolidated: true,
+      accountId: accounts.length > 0 ? accounts[0].id : '',
+      categoryId: categories.length > 0 ? categories[0].id : '',
+    };
   });
-
-  // Desabilitando toggle de 'consolidado' ao escolher uma data futura.
 
   useEffect(() => {
     if (!transaction && formData.date) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-
-      const transactionDate = new Date(formData.date);
-      transactionDate.setHours(0, 0, 0, 0);
-
-      const shouldBeConsolidated = transactionDate <= today;
-
+      const txDate = new Date(formData.date);
+      txDate.setHours(0, 0, 0, 0);
+      const shouldBeConsolidated = txDate <= today;
       if (formData.isConsolidated !== shouldBeConsolidated) {
-        setFormData(prevData => ({
-          ...prevData,
-          isConsolidated: shouldBeConsolidated
-        }));
+        setFormData(prev => ({ ...prev, isConsolidated: shouldBeConsolidated }));
       }
     }
-  }, [transaction, formData.date, formData.isConsolidated])
-
-
-
+  }, [transaction, formData.date, formData.isConsolidated]);
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
     if (selectedDate && activePicker) {
@@ -102,17 +112,14 @@ export default function TransactionFormScreen() {
     setActivePicker(null);
   };
 
-  const isInvalidForm = () => {
-    return !formData.description.trim() || !formData.value.trim() || !formData.type || !formData.date;
-  };
+  const isInvalidForm = () =>
+    !formData.description.trim() || !formData.value.trim() || !formData.type || !formData.date;
 
   const handleSave = async () => {
     if (!user || !formData.type) return;
-
     const amount = parseFloat(formData.value);
     if (isNaN(amount)) return;
 
-    // Usar categoria selecionada ou primeira categoria do tipo correto
     const filteredCategories = categories.filter((cat: Category) => cat.type === formData.type);
     const categoryId = formData.categoryId ||
       (filteredCategories.length > 0 ? filteredCategories[0].id :
@@ -120,9 +127,9 @@ export default function TransactionFormScreen() {
 
     const transactionData = {
       accountId: formData.accountId || (accounts.length > 0 ? accounts[0].id : ''),
-      categoryId: categoryId,
+      categoryId,
       description: formData.description,
-      amount: amount,
+      amount,
       type: formData.type,
       date: formData.date,
       userId: user.id,
@@ -131,19 +138,13 @@ export default function TransactionFormScreen() {
       recurringEndDate: formData.isRecurring ? formData.recurringEndDate || undefined : undefined,
     };
 
-    console.log('handleSave - transactionData:', transactionData);
-    console.log('Transação original:', transaction);
-
     try {
       if (transaction) {
-        // Verificar se é uma transação recorrente
         if (transaction.isRecurring) {
-          console.log('Transação recorrente detectada, abrindo diálogo');
-          // Em vez de navegar, salvamos os dados temporariamente e abrimos o popup
           setPendingUpdateData(transactionData);
           setRecurringDialogVisible(true);
         } else {
-          const updateData = {
+          await TransactionService.update(transaction.id, {
             accountId: transactionData.accountId,
             categoryId: transactionData.categoryId,
             description: transactionData.description,
@@ -151,14 +152,11 @@ export default function TransactionFormScreen() {
             type: transactionData.type,
             date: transactionData.date,
             isConsolidated: transactionData.isConsolidated,
-          };
-          console.log('Atualizando transação não recorrente:', updateData);
-          await TransactionService.update(transaction.id, updateData);
+          });
           onSave?.();
           navigation.goBack();
         }
       } else {
-        console.log('Criando nova transação');
         await TransactionService.create(transactionData);
         onSave?.();
         navigation.goBack();
@@ -170,11 +168,10 @@ export default function TransactionFormScreen() {
 
   const handleRecurringAction = async (mode: 'only_this' | 'all_future') => {
     if (!transaction || !pendingUpdateData) return;
-
     try {
       await TransactionService.updateRecurring(transaction.id, mode, pendingUpdateData);
       setRecurringDialogVisible(false);
-      onSave?.(); // Atualiza a tela anterior se necessário
+      onSave?.();
       navigation.goBack();
     } catch (error) {
       console.error('Erro ao atualizar transação recorrente:', error);
@@ -183,28 +180,22 @@ export default function TransactionFormScreen() {
 
   const handleDelete = async () => {
     if (!transaction) return;
-
     if (transaction.isRecurring) {
-      // Extrair apenas dados simples para evitar referências circulares
       Alert.alert(
         t('Esta é uma transação recorrente. O que deseja excluir?'),
         '',
         [
-          {
-            text: t('Cancelar'),
-            style: 'cancel',
-          },
+          { text: t('Cancelar'), style: 'cancel' },
           {
             text: t('Esta e todas as futuras'),
             onPress: async () => {
               try {
-                // Usar type assertion para acessar recurringId que pode não estar na interface TypeScript
                 const recurringId = (transaction as any).recurringId || '';
                 await TransactionService.deleteRecurring(transaction.id, recurringId, transaction.date, 'all_future');
                 onSave?.();
                 navigation.goBack();
               } catch (error) {
-                console.error('Erro ao excluir transações recorrentes:', error);
+                console.error(error);
               }
             },
           },
@@ -216,12 +207,10 @@ export default function TransactionFormScreen() {
                 onSave?.();
                 navigation.goBack();
               } catch (error) {
-                console.error('Erro ao excluir transação:', error);
+                console.error(error);
               }
             },
           },
-
-
         ],
         { cancelable: true }
       );
@@ -231,291 +220,290 @@ export default function TransactionFormScreen() {
         onSave?.();
         navigation.goBack();
       } catch (error) {
-        console.error('Erro ao excluir transação:', error);
+        console.error(error);
       }
     }
   };
 
+  const confirmDelete = () => {
+    Alert.alert(
+      t('Confirmação'),
+      t('Confirma a exclusão do registro?'),
+      [
+        { text: t('Não'), style: 'cancel' },
+        { text: t('Sim'), onPress: handleDelete },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const accountItems = accounts.map((account: Account) => {
+    let imageSource = account.logoUrl;
+    if (!imageSource && account.bankCode?.trim()) {
+      imageSource = getAccountLogoByCode(account.bankCode);
+    }
+    let imageUri = imageSource;
+    if (imageSource && typeof imageSource !== 'string') {
+      try {
+        const RNImage = require('react-native').Image;
+        const resolved = RNImage.resolveAssetSource(imageSource);
+        if (resolved?.uri) imageUri = resolved.uri;
+      } catch { /* ignore */ }
+    }
+    return { id: account.id, label: account.name, value: account.id, imageUri };
+  });
+
+  const categoryItems = categories
+    .filter((cat: Category) => !formData.type || cat.type === formData.type)
+    .map((cat: Category) => ({
+      id: cat.id,
+      label: t(`categories:${cat.name}`),
+      value: cat.id,
+      icon: cat.icon,
+    }));
 
   return (
-    <View style={{ flex: 1 }}>
-      <ScrollView style={{ flex: 1, padding: 20 }}>
-        {activePicker && (
-          <DateTimePicker
-            value={activePicker === 'date' ? formData.date : (formData.recurringEndDate || new Date())}
-            mode="date"
-            display="default"
-            onChange={handleDateChange}
-          />
+    <View style={[styles.root, { backgroundColor: c.bg, paddingTop: insets.top }]}>
+      {/* Header */}
+      <View style={[styles.header, { backgroundColor: c.bg }]}>
+        <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
+          <Icon source="arrow-left" size={22} color={c.textPrimary} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: c.textPrimary }]}>
+          {transaction ? t('Editar Transação') : t('Nova Transação')}
+        </Text>
+        {transaction ? (
+          <TouchableOpacity style={styles.headerBtn} onPress={confirmDelete}>
+            <Icon source="trash-can-outline" size={22} color="#F43F5E" />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerBtn} />
         )}
+      </View>
 
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold' }}>
-            {transaction ? t('Editar Transação') : t('Nova Transação')}
+      {activePicker && (
+        <DateTimePicker
+          value={activePicker === 'date' ? formData.date : (formData.recurringEndDate || new Date())}
+          mode="date"
+          display="default"
+          onChange={handleDateChange}
+        />
+      )}
+
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Type toggle */}
+        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>{t('TIPO')}</Text>
+        <View style={[styles.typeRow, { backgroundColor: c.card, borderColor: c.border }]}>
+          <TouchableOpacity
+            style={[
+              styles.typeBtn,
+              formData.type === 'income' && styles.typeBtnActiveIncome,
+            ]}
+            onPress={() => setFormData(prev => ({ ...prev, type: 'income' }))}
+            activeOpacity={0.8}
+          >
+            <Icon
+              source="arrow-down-circle"
+              size={16}
+              color={formData.type === 'income' ? '#FFF' : c.textSecondary}
+            />
+            <Text style={[
+              styles.typeBtnText,
+              { color: formData.type === 'income' ? '#FFF' : c.textSecondary },
+            ]}>
+              {t('Entrada')}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.typeBtn,
+              formData.type === 'expense' && styles.typeBtnActiveExpense,
+            ]}
+            onPress={() => setFormData(prev => ({ ...prev, type: 'expense' }))}
+            activeOpacity={0.8}
+          >
+            <Icon
+              source="arrow-up-circle"
+              size={16}
+              color={formData.type === 'expense' ? '#FFF' : c.textSecondary}
+            />
+            <Text style={[
+              styles.typeBtnText,
+              { color: formData.type === 'expense' ? '#FFF' : c.textSecondary },
+            ]}>
+              {t('Saída')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Descrição + Valor */}
+        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>{t('DETALHES')}</Text>
+        <TextInput
+          mode="outlined"
+          label={t('Descrição')}
+          value={formData.description}
+          onChangeText={text => setFormData(prev => ({ ...prev, description: text }))}
+          placeholder={t('Salário, Aluguel, Supermercado')}
+          theme={inputTheme}
+          style={[styles.input, { backgroundColor: c.card }]}
+        />
+        <TextInput
+          mode="outlined"
+          label={t('Valor')}
+          value={formData.value}
+          onChangeText={text => setFormData(prev => ({ ...prev, value: text }))}
+          placeholder="0,00"
+          keyboardType="numeric"
+          left={<TextInput.Affix text="R$ " textStyle={{ color: c.textSecondary }} />}
+          theme={inputTheme}
+          style={[styles.input, { backgroundColor: c.card }]}
+        />
+
+        {/* Data */}
+        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>{t('DATA')}</Text>
+        <TouchableOpacity
+          style={[styles.dateBtn, { backgroundColor: c.card, borderColor: c.border }]}
+          onPress={() => setActivePicker('date')}
+          activeOpacity={0.7}
+        >
+          <Icon source="calendar" size={18} color="#6366F1" />
+          <Text style={[styles.dateBtnText, { color: c.textPrimary }]}>
+            {formData.date.toLocaleDateString('pt-BR')}
           </Text>
+          <Icon source="chevron-right" size={16} color={c.sectionLabel} />
+        </TouchableOpacity>
+
+        {/* Conta & Categoria */}
+        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>{t('CONTA & CATEGORIA')}</Text>
+        <View style={[styles.sectionCard, { backgroundColor: c.card, borderColor: c.border }]}>
+          <View style={styles.selectRow}>
+            <Text style={[styles.selectLabel, { color: c.textSecondary }]}>{t('Conta')}</Text>
+            <View style={styles.selectWrap}>
+              <Select
+                items={accountItems}
+                selectedValue={formData.accountId}
+                onSelect={value => setFormData(prev => ({ ...prev, accountId: value }))}
+                placeholder={t('Selecionar conta')}
+                fontColor={c.textPrimary}
+              />
+            </View>
+          </View>
+          <View style={[styles.divider, { backgroundColor: c.border }]} />
+          <View style={styles.selectRow}>
+            <Text style={[styles.selectLabel, { color: c.textSecondary }]}>{t('Categoria')}</Text>
+            <View style={styles.selectWrap}>
+              <Select
+                items={categoryItems}
+                selectedValue={formData.categoryId}
+                onSelect={value => setFormData(prev => ({ ...prev, categoryId: value }))}
+                placeholder={t('Selecione')}
+                fontColor={c.textPrimary}
+              />
+            </View>
+          </View>
         </View>
 
-        {/* Tipo e Data */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
-          <View style={{ flex: 1, marginHorizontal: 4 }}>
-
-            <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Tipo')}</Text>
-            <Select
-              backgroundColor={formData.type === 'income' ? '#2E9E57' : '#CC4A4A'}
-              fontColor='#ffff'
-              selectedValue={formData.type || ''}
-              onSelect={(value) => setFormData((prev: any) => ({ ...prev, type: value }))}
-              items={[
-                {
-                  id: 'income',
-                  label: t('Entrada'),
-                  value: 'income',
-                  icon: 'arrow-down-circle'
-                },
-                {
-                  id: 'expense',
-                  label: t('account:Saída'),
-                  value: 'expense',
-                  icon: 'arrow-up-circle'
-                }]}
-            />
-
-          </View>
-
-          <View style={{ flex: 1, marginHorizontal: 4 }}>
-            <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Data')}</Text>
-            <TouchableOpacity
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingVertical: 12,
-                paddingHorizontal: 16,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: '#ddd',
-                gap: 8,
-              }}
-              onPress={() => setActivePicker('date')}
-            >
-              <Icon source="calendar" size={16} />
-              <Text style={{ fontSize: 14 }}>
-                {formData.date.toLocaleDateString('pt-BR')}
+        {/* Opções */}
+        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>{t('OPÇÕES')}</Text>
+        <View style={[styles.sectionCard, { backgroundColor: c.card, borderColor: c.border }]}>
+          <View style={styles.toggleRow}>
+            <View style={[styles.toggleIconPill, { backgroundColor: '#10B98118' }]}>
+              <Icon source="check-circle-outline" size={16} color="#10B981" />
+            </View>
+            <View style={styles.toggleTextWrap}>
+              <Text style={[styles.toggleLabel, { color: c.textPrimary }]}>{t('Efetivado / Pago')}</Text>
+              <Text style={[styles.toggleHint, { color: c.textSecondary }]}>
+                {formData.isConsolidated ? t('Transação já efetivada') : t('Transação pendente')}
               </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Conta e Categoria */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
-          <View style={{ flex: 1, marginHorizontal: 4 }}>
-            <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Conta')}</Text>
-            <Select
-              items={accounts.map((account: Account) => {
-                // Resolvendo a imagem da conta
-                let imageSource = account.logoUrl;
-                if (!imageSource && account.bankCode && account.bankCode.trim() !== '') {
-                  // Usar o novo accountLogos para obter a imagem pelo código do banco
-                  imageSource = getAccountLogoByCode(account.bankCode);
-                }
-                // Converter require() para URI se necessário
-                let imageUri = imageSource;
-                if (imageSource && typeof imageSource !== 'string') {
-                  // Se for um objeto require(), tentar extrair a URI
-                  try {
-                    const Image = require('react-native').Image;
-                    const resolvedSource = Image.resolveAssetSource(imageSource);
-                    if (resolvedSource && resolvedSource.uri) {
-                      imageUri = resolvedSource.uri;
-                    }
-                  } catch (error) {
-                    console.warn('Erro ao resolver imagem:', error);
-                  }
-                }
-                return {
-                  id: account.id,
-                  label: account.name,
-                  value: account.id,
-                  imageUri: imageUri
-                };
-              })}
-              selectedValue={formData.accountId}
-              onSelect={(value) => setFormData(prev => ({ ...prev, accountId: value }))}
-              placeholder={t("Selecionar conta")}
-            />
-          </View>
-
-          <View style={{ flex: 1, marginHorizontal: 4 }}>
-            <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Categoria')}</Text>
-            <Select
-              items={categories
-                .filter((cat: Category) => !formData.type || cat.type === formData.type)
-                .map((category: Category) => ({
-                  id: category.id,
-                  label: t(`categories:${category.name}`),
-                  value: category.id,
-                  icon: category.icon
-                }))}
-              selectedValue={formData.categoryId}
-              onSelect={(value) => setFormData(prev => ({ ...prev, categoryId: value }))}
-              placeholder={t("Selecione")}
-            />
-          </View>
-        </View>
-
-        {/* Descrição */}
-        <View style={{ marginBottom: 20 }}>
-          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Descrição')}</Text>
-          <TextInput
-            value={formData.description}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
-            placeholder={t("Salário, Aluguel, Supermercado")}
-          />
-        </View>
-
-        {/* Valor */}
-        <View style={{ marginBottom: 20 }}>
-          <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>{t('Valor')}</Text>
-          <TextInput
-            value={formData.value}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, value: text }))}
-            placeholder={t("0,00")}
-            keyboardType="numeric"
-            left={<TextInput.Affix text="R$ " />}
-          />
-        </View>
-
-        {/* Efetivado/Pago? */}
-        <View style={{ marginBottom: 20 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <Text style={{ fontSize: 14, fontWeight: '600' }}>{t('Efetivado/Pago?')}</Text>
+            </View>
             <Switch
               value={formData.isConsolidated}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, isConsolidated: value }))}
+              onValueChange={value => setFormData(prev => ({ ...prev, isConsolidated: value }))}
+              trackColor={{ false: '#CBD5E1', true: '#10B981' }}
+              thumbColor="#FFFFFF"
             />
           </View>
-          <HelperText type="info">
-            {formData.isConsolidated ? t('Transação já efetivada/paga') : t('Transação pendente')}
-          </HelperText>
-        </View>
 
-        {/* Recorrência */}
-        <View style={{ marginBottom: 24 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <Text style={{ fontSize: 14, fontWeight: '600' }}>{t('Recorrência')}</Text>
+          <View style={[styles.divider, { backgroundColor: c.border }]} />
+
+          <View style={styles.toggleRow}>
+            <View style={[styles.toggleIconPill, { backgroundColor: '#6366F118' }]}>
+              <Icon source="repeat" size={16} color="#6366F1" />
+            </View>
+            <View style={styles.toggleTextWrap}>
+              <Text style={[styles.toggleLabel, { color: c.textPrimary }]}>{t('Recorrência')}</Text>
+              <Text style={[styles.toggleHint, { color: c.textSecondary }]}>
+                {formData.isRecurring ? t('Ativa') : t('Desativada')}
+              </Text>
+            </View>
             <Switch
               value={formData.isRecurring}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, isRecurring: value }))}
+              onValueChange={value => setFormData(prev => ({ ...prev, isRecurring: value }))}
               disabled={!!transaction}
+              trackColor={{ false: '#CBD5E1', true: '#6366F1' }}
+              thumbColor="#FFFFFF"
             />
           </View>
-
-          {formData.isRecurring && (
-            <View style={{ backgroundColor: '#f8f9fa', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#e9ecef' }}>
-              <Text style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>{t('Data Final (opcional)')}</Text>
-              <TouchableOpacity
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  paddingVertical: 12,
-                  paddingHorizontal: 16,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: '#ddd',
-                  backgroundColor: '#f8f9fa',
-                  gap: 8,
-                }}
-                onPress={() => setActivePicker('recurringEndDate')}
-              >
-                <Icon source="calendar" size={16} />
-                <Text style={{ fontSize: 14 }}>
-                  {formData.recurringEndDate
-                    ? formData.recurringEndDate.toLocaleDateString('pt-BR')
-                    : t('Selecionar data final')
-                  }
-                </Text>
-              </TouchableOpacity>
-              <HelperText type="info" style={{ marginTop: 8 }}>
-                {t('Se não definir uma data final, a recorrência será criada para os próximos 2 anos')}
-              </HelperText>
-            </View>
-          )}
         </View>
 
-        <View style={{ height: 100 }} />
+        {/* Data final da recorrência */}
+        {formData.isRecurring && (
+          <>
+            <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>
+              {t('DATA FINAL DA RECORRÊNCIA')}
+            </Text>
+            <TouchableOpacity
+              style={[styles.dateBtn, { backgroundColor: c.card, borderColor: c.border }]}
+              onPress={() => setActivePicker('recurringEndDate')}
+              activeOpacity={0.7}
+            >
+              <Icon source="calendar-end" size={18} color="#6366F1" />
+              <Text style={[styles.dateBtnText, { color: c.textPrimary }]}>
+                {formData.recurringEndDate
+                  ? formData.recurringEndDate.toLocaleDateString('pt-BR')
+                  : t('Sem data final (2 anos)')}
+              </Text>
+              <Icon source="chevron-right" size={16} color={c.sectionLabel} />
+            </TouchableOpacity>
+          </>
+        )}
+
+        <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* Botões de ação fixos no rodapé */}
-      <View style={{
-        padding: 20,
-      }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
-          <Button
-            mode="outlined"
-            onPress={() => {
-              // onCancel?.();
-              navigation.goBack();
-            }}
-            style={{ flex: 1 }}
+      {/* Footer */}
+      <View style={[styles.footer, { backgroundColor: c.bg, borderTopColor: c.border, paddingBottom: insets.bottom + 12 }]}>
+        <TouchableOpacity
+          style={[styles.cancelBtn, { borderColor: c.border, backgroundColor: c.card }]}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={[styles.cancelBtnText, { color: c.textSecondary }]}>{t('Cancelar')}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={handleSave}
+          disabled={isInvalidForm()}
+          style={[styles.saveBtn, { opacity: isInvalidForm() ? 0.45 : 1 }]}
+        >
+          <LinearGradient
+            colors={['#4F46E5', '#7C3AED']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.saveGradient}
           >
-            {t('Cancelar')}
-          </Button>
-
-
-          {transaction &&
-            <Button
-              mode="contained"
-              onPress={() => {
-                Alert.alert(
-                  t('Confirmação'),
-                  t('Confirma a exclusão do registro?'),
-                  [
-                    {
-                      text: t('Não'),
-                      style: 'cancel',
-                      onPress: () => {
-                        null
-                      },
-                    },
-                    {
-                      text: t('Sim'),
-                      onPress: () => {
-                        handleDelete()
-                      },
-                    },
-                  ],
-                  { cancelable: true }
-                );
-              }}
-              buttonColor="#FF6B6B"
-              style={{ flex: 1 }}
-            >
-              {t('Excluir')}
-            </Button>
-          }
-
-
-          <Button
-            mode="contained"
-            onPress={handleSave}
-            disabled={isInvalidForm()}
-            style={{ flex: 1 }}
-          >
-            {transaction ? t('Atualizar') : t('Salvar')}
-          </Button>
-
-        </View>
+            <Text style={styles.saveBtnText}>
+              {transaction ? t('Atualizar') : t('Salvar')}
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
 
       <Portal>
-        <Dialog
-          visible={recurringDialogVisible}
-          onDismiss={() => setRecurringDialogVisible(false)}
-        >
+        <Dialog visible={recurringDialogVisible} onDismiss={() => setRecurringDialogVisible(false)}>
           <Dialog.Title>{t('Editar Transação Recorrente')}</Dialog.Title>
           <Dialog.Content>
-            <Text>{t('Deseja alterar apenas esta transação ou também as próximas?')}</Text>
+            <Button>{t('Deseja alterar apenas esta transação ou também as próximas?')}</Button>
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setRecurringDialogVisible(false)}>{t('Cancelar')}</Button>
@@ -531,3 +519,173 @@ export default function TransactionFormScreen() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  headerBtn: {
+    width: 38,
+    height: 38,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+
+  scroll: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    marginBottom: 8,
+    marginTop: 20,
+    marginLeft: 2,
+  },
+
+  // Type toggle
+  typeRow: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  typeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 13,
+    gap: 7,
+  },
+  typeBtnActiveIncome: {
+    backgroundColor: '#10B981',
+  },
+  typeBtnActiveExpense: {
+    backgroundColor: '#F43F5E',
+  },
+  typeBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  // TextInput
+  input: {
+    marginBottom: 10,
+  },
+
+  // Date button
+  dateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 10,
+  },
+  dateBtnText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+
+  // Section card
+  sectionCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 16,
+  },
+
+  // Select row inside card
+  selectRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+  },
+  selectLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    width: 80,
+  },
+  selectWrap: {
+    flex: 1,
+  },
+
+  // Toggle row
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  toggleIconPill: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  toggleTextWrap: { flex: 1 },
+  toggleLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  toggleHint: {
+    fontSize: 12,
+  },
+
+  // Footer
+  footer: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  cancelBtn: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  cancelBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  saveBtn: {
+    flex: 2,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  saveGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  saveBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+});
