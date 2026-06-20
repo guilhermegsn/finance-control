@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 
 interface HomeScreenProps {
   allTransactions: Transaction[];
+  pastTransactions: Transaction[];
   currentMonthTransactions: Transaction[];
   ccCurrentMonth: Transaction[];
   accounts: any[];
@@ -26,6 +27,7 @@ interface HomeScreenProps {
 
 const HomeScreen: React.FC<HomeScreenProps> = ({
   allTransactions,
+  pastTransactions,
   currentMonthTransactions,
   ccCurrentMonth,
   accounts,
@@ -47,6 +49,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   };
 
   const { currentBalance, projectedBalance, monthIncome, monthExpense } = useMemo(() => {
+    // Saldo Atual: todas as transações consolidadas não-CC (todo o histórico)
     let currentBalance = 0;
     allTransactions.forEach(t => {
       if (t.isConsolidated) {
@@ -54,12 +57,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       }
     });
 
-    let projected = 0;
-    allTransactions.forEach(t => {
-      projected += t.type === 'income' ? t.amount : -t.amount;
-    });
-    ccCurrentMonth.forEach(t => {
-      if (!t.isConsolidated) projected -= t.amount;
+    // Projetado do mês: base histórica + tudo do mês atual - CC pendente
+    let pastAllBalance = 0;
+    pastTransactions.forEach(t => {
+      pastAllBalance += t.type === 'income' ? t.amount : -t.amount;
     });
 
     let monthIncome = 0;
@@ -69,8 +70,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       else if (t.type === 'expense') monthExpense += t.amount;
     });
 
-    return { currentBalance, projectedBalance: projected, monthIncome, monthExpense };
-  }, [allTransactions, currentMonthTransactions, ccCurrentMonth]);
+    let ccPending = 0;
+    ccCurrentMonth.forEach(t => {
+      if (!t.isConsolidated) ccPending += t.amount;
+    });
+
+    const projectedBalance = pastAllBalance + monthIncome - monthExpense - ccPending;
+
+    return { currentBalance, projectedBalance, monthIncome, monthExpense };
+  }, [allTransactions, pastTransactions, currentMonthTransactions, ccCurrentMonth]);
 
   const greeting = useMemo(() => {
     const h = new Date().getHours();
@@ -361,6 +369,13 @@ const enhance = withObservables([], () => {
     allTransactions: database.get<Transaction>('transactions')
       .query(Q.where('credit_card_id', null))
       .observeWithColumns(['amount', 'type', 'is_consolidated']),
+
+    pastTransactions: database.get<Transaction>('transactions')
+      .query(
+        Q.where('credit_card_id', null),
+        Q.where('date', Q.lt(firstDay.getTime())),
+      )
+      .observeWithColumns(['amount', 'type']),
 
     currentMonthTransactions: database.get<Transaction>('transactions')
       .query(
