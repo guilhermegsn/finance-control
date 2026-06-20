@@ -1,154 +1,384 @@
-import { View, Text, ScrollView, StyleSheet, RefreshControl, Image, Dimensions } from 'react-native';
-import React, { useState } from 'react';
-import { useTheme } from '../contexts/ThemeContext';
-import DashboardSection from '../components/DashboardSection';
-import TransactionItem from '../components/TransactionItem';
+import React, { useMemo, useState } from 'react';
+import { View, ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { withObservables } from '@nozbe/watermelondb/react';
-import { database } from '../database';
 import { Q } from '@nozbe/watermelondb';
+import { database } from '../database';
 import Transaction from '../models/Transactions';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { AccountService } from '../service/AccountService';
+import { CategoryService } from '../service/CategoryService';
+import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigation } from '@react-navigation/native';
+import { Icon } from 'react-native-paper';
+import { LinearGradient } from 'expo-linear-gradient';
 import GlassHeader from '../components/GlassHeader';
+import TransactionTypeModal from '../components/TransactionTypeModal';
+import greetingsData from '../utils/greetings.json';
+import { useTranslation } from 'react-i18next';
 
 interface HomeScreenProps {
-  transactions: Transaction[];
+  allTransactions: Transaction[];
+  currentMonthTransactions: Transaction[];
+  ccCurrentMonth: Transaction[];
+  accounts: any[];
+  categories: any[];
 }
 
-const HomeScreen: React.FC<HomeScreenProps> = ({ transactions }) => {
-  const { theme } = useTheme();
-  const [refreshing, setRefreshing] = useState(false);
-  const { width: screenWidth } = Dimensions.get('window');
-  const onRefresh = () => {
-    setRefreshing(true);
-    // Simular refresh
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
+const HomeScreen: React.FC<HomeScreenProps> = ({
+  allTransactions,
+  currentMonthTransactions,
+  ccCurrentMonth,
+  accounts,
+  categories,
+}) => {
+  const { isDarkMode } = useTheme();
+  const { user } = useAuth();
+  const navigation = useNavigation();
+  const { t } = useTranslation();
+  const [typeModalVisible, setTypeModalVisible] = useState(false);
+
+  const c = {
+    bg: isDarkMode ? '#0D1117' : '#EEF2F7',
+    card: isDarkMode ? '#161C27' : '#FFFFFF',
+    border: isDarkMode ? '#2D3748' : '#E2E8F0',
+    textPrimary: isDarkMode ? '#E2E8F0' : '#1A202C',
+    textSecondary: isDarkMode ? '#718096' : '#64748B',
+    sectionLabel: isDarkMode ? '#4A5568' : '#94A3B8',
   };
 
-  // Filtrar transações recentes (últimas 10)
-  const recentTransactions = transactions.slice(0, 10);
+  const { currentBalance, projectedBalance, monthIncome, monthExpense } = useMemo(() => {
+    let currentBalance = 0;
+    allTransactions.forEach(t => {
+      if (t.isConsolidated) {
+        currentBalance += t.type === 'income' ? t.amount : -t.amount;
+      }
+    });
+
+    let projected = 0;
+    allTransactions.forEach(t => {
+      projected += t.type === 'income' ? t.amount : -t.amount;
+    });
+    ccCurrentMonth.forEach(t => {
+      if (!t.isConsolidated) projected -= t.amount;
+    });
+
+    let monthIncome = 0;
+    let monthExpense = 0;
+    currentMonthTransactions.forEach(t => {
+      if (t.type === 'income') monthIncome += t.amount;
+      else if (t.type === 'expense') monthExpense += t.amount;
+    });
+
+    return { currentBalance, projectedBalance: projected, monthIncome, monthExpense };
+  }, [allTransactions, currentMonthTransactions, ccCurrentMonth]);
+
+  const greeting = useMemo(() => {
+    const h = new Date().getHours();
+    if (h < 12) return t('Bom dia');
+    if (h < 18) return t('Boa tarde');
+    return t('Boa noite');
+  }, []);
+
+  const displayName = useMemo(() => {
+    const email = user?.email ?? '';
+    const raw: string =
+      user?.user_metadata?.full_name ??
+      user?.user_metadata?.name ??
+      email.split('@')[0] ??
+      '';
+    return raw.trim().split(' ')[0];
+  }, [user]);
+
+  const welcomeMessage = useMemo(() => {
+    const positive = currentBalance >= 0 && projectedBalance >= 0;
+    const list = positive ? greetingsData.positive : greetingsData.negative;
+    return list[Math.floor(Math.random() * list.length)];
+  }, [currentBalance >= 0, projectedBalance >= 0]);
+
+  const nav = navigation as any;
+
+  const handleSelectType = (type: 'income' | 'expense' | 'credit') => {
+    setTypeModalVisible(false);
+    const safeAccounts = accounts.map(a => ({ id: a.id, name: a.name, logoUrl: a.logoUrl, bankCode: a.bankCode }));
+    const safeCategories = categories.map(c => ({ id: c.id, name: c.name, icon: c.icon, type: c.type }));
+    if (type === 'credit') {
+      nav.navigate('CreditCardPurchase', { categories: safeCategories, accounts: safeAccounts });
+    } else {
+      nav.navigate('TransactionForm', { initialType: type, accounts: safeAccounts, categories: safeCategories });
+    }
+  };
+
+  const handleTransfer = () => {
+    setTypeModalVisible(false);
+    nav.navigate('TransferForm', { accounts });
+  };
+
+  const fmt = (v: number) => `R$ ${Math.abs(v).toFixed(2)}`;
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.background }}>
-
-      <GlassHeader title="" />
-
-     
-
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            padding: 10,
-            marginTop: -30
-          }}
-        >
-
-          <Image
-            source={require('../../assets/logos/butterflow.png')}
-            style={{
-              width: screenWidth * 0.10,
-              height: screenWidth * 0.10,
-              resizeMode: 'contain'
-            }}
-          />
-
-          <Text
-            style={{
-              fontSize: 20,
-              fontWeight: '900', // Peso máximo (Extra Bold/Black)
-              color: theme.text, // Branco puro para máximo contraste no Dark Theme
-              letterSpacing: 1.2, // Dá um respiro moderno entre as letras
-              marginLeft: 5, // Descola o texto da imagem
-              fontFamily: 'Poppins_900Black',
-            }}
-          >
-            Butter
-            {/* Destaque na palavra Flow com a cor principal do seu tema */}
-            <Text style={{ color: theme.success, fontFamily: 'Poppins_900Black', letterSpacing: 1.2 }}>
-              Flow
-            </Text>
+    <View style={[styles.root, { backgroundColor: c.bg }]}>
+      <GlassHeader />
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Greeting */}
+        <View style={styles.greetingSection}>
+          <Text style={[styles.greetingTitle, { color: c.textPrimary }]}>
+            {greeting}, {displayName} 👋
+          </Text>
+          <Text style={[styles.greetingMsg, { color: c.textSecondary }]}>
+            {welcomeMessage}
           </Text>
         </View>
-        <ScrollView
-          style={[styles.container, { backgroundColor: theme.background }]}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={[theme.primary]}
-            />
-          }
+
+        {/* Hero balance card */}
+        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>
+          VISÃO GERAL
+        </Text>
+        <LinearGradient
+          colors={['#4F46E5', '#7C3AED', '#A855F7']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.heroCard}
         >
-
-          {/* Dashboard Section */}
-          <DashboardSection />
-
-          {/* Transações Recentes */}
-          <View style={[styles.section, { backgroundColor: theme.card }]}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Transações Recentes
-            </Text>
-
-            {recentTransactions.length > 0 ? (
-              recentTransactions.map((transaction) => (
-                <TransactionItem
-                  key={transaction.id}
-                  transaction={transaction}
-                />
-              ))
-            ) : (
-              <View style={styles.emptyState}>
-                <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                  Nenhuma transação recente
-                </Text>
+          <View style={styles.heroBlock}>
+            <View style={styles.heroLabelRow}>
+              <View style={styles.heroIconPill}>
+                <Icon source="wallet" size={14} color="#FFFFFF" />
               </View>
-            )}
+              <Text style={styles.heroLabelText}>{t('Saldo Atual')}</Text>
+            </View>
+            <Text style={[styles.heroValue, { color: currentBalance >= 0 ? '#A7F3D0' : '#FECDD3' }]}>
+              {currentBalance < 0 ? '- ' : ''}{fmt(currentBalance)}
+            </Text>
           </View>
-        </ScrollView>
-      
+
+          <View style={styles.heroDivider} />
+
+          <View style={styles.heroBlock}>
+            <View style={styles.heroLabelRow}>
+              <View style={styles.heroIconPill}>
+                <Icon source="crystal-ball" size={14} color="#FFFFFF" />
+              </View>
+              <Text style={styles.heroLabelText}>{t('Projetado')}</Text>
+            </View>
+            <Text style={[styles.heroValueSmall, { color: projectedBalance >= 0 ? '#A7F3D0' : '#FECDD3' }]}>
+              {projectedBalance < 0 ? '- ' : ''}{fmt(projectedBalance)}
+            </Text>
+          </View>
+        </LinearGradient>
+
+        {/* This month summary */}
+        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>
+          ESTE MÊS
+        </Text>
+        <View style={styles.monthRow}>
+          <View style={[styles.monthCard, { backgroundColor: c.card, borderColor: c.border }]}>
+            <View style={styles.monthCardTop}>
+              <View style={[styles.monthIconPill, { backgroundColor: '#10B98118' }]}>
+                <Icon source="arrow-up-circle" size={14} color="#10B981" />
+              </View>
+              <Text style={[styles.monthCardLabel, { color: c.textSecondary }]}>{t('Entradas')}</Text>
+            </View>
+            <Text style={[styles.monthCardValue, { color: '#10B981' }]}>{fmt(monthIncome)}</Text>
+          </View>
+
+          <View style={[styles.monthCard, { backgroundColor: c.card, borderColor: c.border }]}>
+            <View style={styles.monthCardTop}>
+              <View style={[styles.monthIconPill, { backgroundColor: '#F43F5E18' }]}>
+                <Icon source="arrow-down-circle" size={14} color="#F43F5E" />
+              </View>
+              <Text style={[styles.monthCardLabel, { color: c.textSecondary }]}>{t('Saídas')}</Text>
+            </View>
+            <Text style={[styles.monthCardValue, { color: '#F43F5E' }]}>{fmt(monthExpense)}</Text>
+          </View>
+        </View>
+
+        {/* CTA */}
+        <TouchableOpacity
+          onPress={() => setTypeModalVisible(true)}
+          activeOpacity={0.85}
+          style={styles.ctaBtn}
+        >
+          <LinearGradient
+            colors={['#4F46E5', '#7C3AED']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.ctaGradient}
+          >
+            <Icon source="plus" size={20} color="#FFFFFF" />
+            <Text style={styles.ctaText}>{t('Nova Transação')}</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <View style={{ height: 100 }} />
+      </ScrollView>
+
+      <TransactionTypeModal
+        visible={typeModalVisible}
+        onClose={() => setTypeModalVisible(false)}
+        onSelectIncome={() => handleSelectType('income')}
+        onSelectExpense={() => handleSelectType('expense')}
+        onSelectCredit={() => handleSelectType('credit')}
+        onSelectTransfer={handleTransfer}
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  root: { flex: 1 },
+  scroll: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+
+  greetingSection: {
+    marginBottom: 28,
+  },
+  greetingTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  greetingMsg: {
+    fontSize: 14,
+    lineHeight: 21,
+  },
+
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    marginBottom: 10,
+    marginLeft: 2,
+  },
+
+  // Hero card
+  heroCard: {
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 28,
+  },
+  heroBlock: {
+    gap: 6,
+  },
+  heroLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  heroIconPill: {
+    width: 26,
+    height: 26,
+    borderRadius: 7,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heroLabelText: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  heroValue: {
+    fontSize: 34,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  heroDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    marginVertical: 20,
+  },
+  heroValueSmall: {
+    fontSize: 24,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+
+  // Month cards
+  monthRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 28,
+  },
+  monthCard: {
     flex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
   },
-  section: {
-    margin: 16,
+  monthCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 6,
+  },
+  monthIconPill: {
+    width: 26,
+    height: 26,
+    borderRadius: 7,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  monthCardLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  monthCardValue: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+
+  // CTA
+  ctaBtn: {
     borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    overflow: 'hidden',
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  emptyState: {
-    padding: 32,
+  ctaGradient: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 17,
+    gap: 10,
   },
-  emptyText: {
+  ctaText: {
+    color: '#FFFFFF',
     fontSize: 16,
-    textAlign: 'center',
+    fontWeight: '700',
   },
 });
 
-// Observables para conectar com o WatermelonDB
-const enhance = withObservables([], () => ({
-  transactions: database.get<Transaction>('transactions')
-    .query(
-      Q.sortBy('date', Q.desc)
-    )
-    .observe(),
-}));
+const enhance = withObservables([], () => {
+  const now = new Date();
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+  return {
+    allTransactions: database.get<Transaction>('transactions')
+      .query(Q.where('credit_card_id', null))
+      .observeWithColumns(['amount', 'type', 'is_consolidated']),
+
+    currentMonthTransactions: database.get<Transaction>('transactions')
+      .query(
+        Q.where('credit_card_id', null),
+        Q.where('date', Q.between(firstDay.getTime(), lastDay.getTime())),
+      )
+      .observeWithColumns(['amount', 'type', 'is_consolidated']),
+
+    ccCurrentMonth: database.get<Transaction>('transactions')
+      .query(
+        Q.where('credit_card_id', Q.notEq(null)),
+        Q.where('date', Q.between(firstDay.getTime(), lastDay.getTime())),
+      )
+      .observeWithColumns(['amount', 'is_consolidated']),
+
+    accounts: AccountService.observeAccounts(),
+    categories: CategoryService.observeCategories(),
+  };
+});
 
 export default enhance(HomeScreen);
