@@ -64,13 +64,13 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
 
   const openTransactionForm = (transaction?: Transaction, type?: 'income' | 'expense') => {
     // TAREFA 2: Proteção de transações consolidadas
-    if (transaction?.isConsolidated) {
-      Alert.alert(
-        t('Bloqueado'),
-        t('Transações já pagas não podem ser alteradas.')
-      );
-      return;
-    }
+    // if (transaction?.isConsolidated) {
+    //   Alert.alert(
+    //     t('Bloqueado'),
+    //     t('Transações já pagas não podem ser alteradas.')
+    //   );
+    //   return;
+    // }
 
     const safeAccounts = accounts.map(acc => ({
       id: acc.id,
@@ -237,7 +237,7 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
     };
 
     calculatePreviousBalances();
-  }, [currentDate, accounts, transactions.length]);
+  }, [currentDate, accounts, allTransactions]);
 
   const accountTransactionGroups = useMemo(() => {
     const groups: AccountTransactionGroup[] = [];
@@ -382,54 +382,31 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
     if (!user?.id) return;
 
     if (invoice.isPaid) {
-      Alert.alert(
-        t('Desfazer Pagamento'),
-        t(`Deseja desfazer o pagamento de R$ ${invoice.amount.toFixed(2)} de "${invoice.description}"?`),
-        [
-          { text: t('Cancelar'), style: 'cancel' },
-          {
-            text: t('Confirmar'),
-            onPress: async () => {
-              try {
-                await TransactionService.unpayCreditCardInvoice(
-                  invoice.accountId,
-                  `Pagamento ${invoice.description}`,
-                  invoice.transactionIds,
-                );
-              } catch (error) {
-                console.error('Erro ao desfazer pagamento:', error);
-                Alert.alert(t('Erro'), t('Ocorreu um erro ao desfazer o pagamento.'));
-              }
-            }
-          }
-        ]
-      );
+      try {
+        await TransactionService.unpayCreditCardInvoice(
+          invoice.accountId,
+          `Pagamento ${invoice.description}`,
+          invoice.transactionIds,
+          invoice.date,
+        );
+      } catch (error) {
+        console.error('Erro ao desfazer pagamento:', error);
+        Alert.alert(t('Erro'), t('Ocorreu um erro ao desfazer o pagamento.'));
+      }
     } else {
-      Alert.alert(
-        t('Pagar Fatura'),
-        t(`Deseja confirmar o pagamento de ${invoice.description} no valor de R$ ${invoice.amount.toFixed(2)}?`),
-        [
-          { text: t('Cancelar'), style: 'cancel' },
-          {
-            text: t('Confirmar'),
-            onPress: async () => {
-              try {
-                await TransactionService.payCreditCardInvoice(
-                  invoice.accountId,
-                  `Pagamento ${invoice.description}`,
-                  invoice.amount,
-                  invoice.date,
-                  user.id,
-                  invoice.transactionIds
-                );
-              } catch (error) {
-                console.error('Erro ao pagar fatura:', error);
-                Alert.alert(t('Erro'), t('Ocorreu um erro ao pagar a fatura.'));
-              }
-            }
-          }
-        ]
-      );
+      try {
+        await TransactionService.payCreditCardInvoice(
+          invoice.accountId,
+          `Pagamento ${invoice.description}`,
+          invoice.amount,
+          invoice.date,
+          user.id,
+          invoice.transactionIds
+        );
+      } catch (error) {
+        console.error('Erro ao pagar fatura:', error);
+        Alert.alert(t('Erro'), t('Ocorreu um erro ao pagar a fatura.'));
+      }
     }
   };
 
@@ -461,33 +438,6 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
           </TouchableOpacity>
         </View>
 
-        {/* Balance Cards */}
-        <View style={styles.balanceRow}>
-          <View style={[styles.balanceCard, { backgroundColor: c.card, borderColor: c.border }]}>
-            <View style={styles.balanceCardTop}>
-              <View style={[styles.balanceIconPill, { backgroundColor: '#10B98118' }]}>
-                <Icon source="wallet" size={14} color="#10B981" />
-              </View>
-              <Text style={[styles.balanceLabel, { color: c.textSecondary }]}>{t('Saldo Atual')}</Text>
-            </View>
-            <Text style={[styles.balanceValue, { color: currentBalance >= 0 ? '#10B981' : '#F43F5E' }]}>
-              R$ {currentBalance.toFixed(2)}
-            </Text>
-          </View>
-
-          <View style={[styles.balanceCard, { backgroundColor: c.card, borderColor: c.border }]}>
-            <View style={styles.balanceCardTop}>
-              <View style={[styles.balanceIconPill, { backgroundColor: '#6366F118' }]}>
-                <Icon source="crystal-ball" size={14} color="#6366F1" />
-              </View>
-              <Text style={[styles.balanceLabel, { color: c.textSecondary }]}>{t('Projetado')}</Text>
-            </View>
-            <Text style={[styles.balanceValue, { color: projectedBalance >= 0 ? '#10B981' : '#F43F5E' }]}>
-              R$ {projectedBalance.toFixed(2)}
-            </Text>
-          </View>
-        </View>
-
         <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false}>
 
           {/* Lista de Contas */}
@@ -511,7 +461,12 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
             onEditTransaction={openTransactionForm}
           />
 
-          <SummaryFooter currentDate={currentDate} isFutureMonth={isFutureMonth} />
+          <SummaryFooter
+            currentDate={currentDate}
+            isFutureMonth={isFutureMonth}
+            currentBalance={currentBalance}
+            projectedBalance={projectedBalance}
+          />
           <View style={{ height: 100 }} />
         </ScrollView>
 
@@ -560,40 +515,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'capitalize',
     letterSpacing: 0.3,
-  },
-
-  // Balance cards
-  balanceRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
-  },
-  balanceCard: {
-    flex: 1,
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 14,
-  },
-  balanceCardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    gap: 6,
-  },
-  balanceIconPill: {
-    width: 26,
-    height: 26,
-    borderRadius: 7,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  balanceLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  balanceValue: {
-    fontSize: 15,
-    fontWeight: '700',
   },
 
   // Section

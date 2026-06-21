@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { withObservables } from '@nozbe/watermelondb/react';
 import { Q } from '@nozbe/watermelondb';
@@ -15,6 +15,9 @@ import GlassHeader from '../components/GlassHeader';
 import TransactionTypeModal from '../components/TransactionTypeModal';
 import greetingsData from '../utils/greetings.json';
 import { useTranslation } from 'react-i18next';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const BALANCE_VISIBLE_KEY = '@balance_visible';
 
 interface HomeScreenProps {
   allTransactions: Transaction[];
@@ -38,6 +41,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const navigation = useNavigation();
   const { t } = useTranslation();
   const [typeModalVisible, setTypeModalVisible] = useState(false);
+  const [balancesVisible, setBalancesVisible] = useState(true);
+
+  useEffect(() => {
+    AsyncStorage.getItem(BALANCE_VISIBLE_KEY).then(val => {
+      if (val !== null) setBalancesVisible(val === 'true');
+    });
+  }, []);
+
+  const toggleBalancesVisible = async () => {
+    const next = !balancesVisible;
+    setBalancesVisible(next);
+    await AsyncStorage.setItem(BALANCE_VISIBLE_KEY, String(next));
+  };
 
   const c = {
     bg: isDarkMode ? '#0D1117' : '#EEF2F7',
@@ -49,7 +65,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   };
 
   const { currentBalance, projectedBalance, monthIncome, monthExpense } = useMemo(() => {
-    // Saldo Atual: todas as transações consolidadas não-CC (todo o histórico)
+    // Saldo Atual: consolidadas não-CC de todo o histórico
     let currentBalance = 0;
     allTransactions.forEach(t => {
       if (t.isConsolidated) {
@@ -57,7 +73,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       }
     });
 
-    // Projetado do mês: base histórica + tudo do mês atual - CC pendente
+    // Projetado: base histórica (tudo não-CC antes do mês) + mês atual - CC pendente
     let pastAllBalance = 0;
     pastTransactions.forEach(t => {
       pastAllBalance += t.type === 'income' ? t.amount : -t.amount;
@@ -67,7 +83,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     let monthExpense = 0;
     currentMonthTransactions.forEach(t => {
       if (t.type === 'income') monthIncome += t.amount;
-      else if (t.type === 'expense') monthExpense += t.amount;
+      else monthExpense += t.amount;
     });
 
     let ccPending = 0;
@@ -122,6 +138,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   };
 
   const fmt = (v: number) => `R$ ${Math.abs(v).toFixed(2)}`;
+  const masked = '• • • • •';
+  const maskedSmall = '• • •';
 
   return (
     <View style={[styles.root, { backgroundColor: c.bg }]}>
@@ -141,9 +159,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
 
         {/* Hero balance card */}
-        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>
-          VISÃO GERAL
-        </Text>
+        <View style={styles.sectionRow}>
+          <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>
+            VISÃO GERAL
+          </Text>
+          <TouchableOpacity onPress={toggleBalancesVisible} style={styles.eyeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Icon
+              source={balancesVisible ? 'eye-outline' : 'eye-off-outline'}
+              size={18}
+              color={c.textSecondary}
+            />
+          </TouchableOpacity>
+        </View>
+
         <LinearGradient
           colors={['#4F46E5', '#7C3AED', '#A855F7']}
           start={{ x: 0, y: 0 }}
@@ -157,9 +185,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               </View>
               <Text style={styles.heroLabelText}>{t('Saldo Atual')}</Text>
             </View>
-            <Text style={[styles.heroValue, { color: currentBalance >= 0 ? '#A7F3D0' : '#FECDD3' }]}>
-              {currentBalance < 0 ? '- ' : ''}{fmt(currentBalance)}
-            </Text>
+            {balancesVisible ? (
+              <Text style={[styles.heroValue, { color: currentBalance >= 0 ? '#A7F3D0' : '#FECDD3' }]}>
+                {currentBalance < 0 ? '- ' : ''}{fmt(currentBalance)}
+              </Text>
+            ) : (
+              <Text style={[styles.heroValue, { color: 'rgba(255,255,255,0.5)' }]}>{masked}</Text>
+            )}
           </View>
 
           <View style={styles.heroDivider} />
@@ -171,9 +203,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               </View>
               <Text style={styles.heroLabelText}>{t('Projetado')}</Text>
             </View>
-            <Text style={[styles.heroValueSmall, { color: projectedBalance >= 0 ? '#A7F3D0' : '#FECDD3' }]}>
-              {projectedBalance < 0 ? '- ' : ''}{fmt(projectedBalance)}
-            </Text>
+            {balancesVisible ? (
+              <Text style={[styles.heroValueSmall, { color: projectedBalance >= 0 ? '#A7F3D0' : '#FECDD3' }]}>
+                {projectedBalance < 0 ? '- ' : ''}{fmt(projectedBalance)}
+              </Text>
+            ) : (
+              <Text style={[styles.heroValueSmall, { color: 'rgba(255,255,255,0.5)' }]}>{masked}</Text>
+            )}
           </View>
         </LinearGradient>
 
@@ -189,7 +225,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               </View>
               <Text style={[styles.monthCardLabel, { color: c.textSecondary }]}>{t('Entradas')}</Text>
             </View>
-            <Text style={[styles.monthCardValue, { color: '#10B981' }]}>{fmt(monthIncome)}</Text>
+            <Text style={[styles.monthCardValue, { color: '#10B981' }]}>
+              {balancesVisible ? fmt(monthIncome) : maskedSmall}
+            </Text>
           </View>
 
           <View style={[styles.monthCard, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -199,7 +237,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               </View>
               <Text style={[styles.monthCardLabel, { color: c.textSecondary }]}>{t('Saídas')}</Text>
             </View>
-            <Text style={[styles.monthCardValue, { color: '#F43F5E' }]}>{fmt(monthExpense)}</Text>
+            <Text style={[styles.monthCardValue, { color: '#F43F5E' }]}>
+              {balancesVisible ? fmt(monthExpense) : maskedSmall}
+            </Text>
           </View>
         </View>
 
@@ -256,12 +296,20 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
 
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
   sectionLabel: {
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1.4,
-    marginBottom: 10,
     marginLeft: 2,
+  },
+  eyeBtn: {
+    padding: 2,
   },
 
   // Hero card
@@ -363,33 +411,33 @@ const styles = StyleSheet.create({
 const enhance = withObservables([], () => {
   const now = new Date();
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
   return {
     allTransactions: database.get<Transaction>('transactions')
       .query(Q.where('credit_card_id', null))
-      .observeWithColumns(['amount', 'type', 'is_consolidated']),
+      .observeWithColumns(['amount', 'type', 'is_consolidated', 'date']),
 
     pastTransactions: database.get<Transaction>('transactions')
       .query(
         Q.where('credit_card_id', null),
         Q.where('date', Q.lt(firstDay.getTime())),
       )
-      .observeWithColumns(['amount', 'type']),
+      .observeWithColumns(['amount', 'type', 'date']),
 
     currentMonthTransactions: database.get<Transaction>('transactions')
       .query(
         Q.where('credit_card_id', null),
         Q.where('date', Q.between(firstDay.getTime(), lastDay.getTime())),
       )
-      .observeWithColumns(['amount', 'type', 'is_consolidated']),
+      .observeWithColumns(['amount', 'type', 'is_consolidated', 'date']),
 
     ccCurrentMonth: database.get<Transaction>('transactions')
       .query(
         Q.where('credit_card_id', Q.notEq(null)),
         Q.where('date', Q.between(firstDay.getTime(), lastDay.getTime())),
       )
-      .observeWithColumns(['amount', 'is_consolidated']),
+      .observeWithColumns(['amount', 'is_consolidated', 'date']),
 
     accounts: AccountService.observeAccounts(),
     categories: CategoryService.observeCategories(),

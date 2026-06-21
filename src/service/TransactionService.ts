@@ -547,12 +547,18 @@ export const TransactionService = {
     accountId: string,
     paymentDescription: string, // ex: 'Pagamento Fatura Nubank'
     creditCardTransactionIds: string[],
+    invoiceDate: Date,
   ) => {
     await database.write(async () => {
+      // Filtrar pelo mês da fatura para não apagar pagamentos de outros meses
+      const startOfMonth = new Date(invoiceDate.getFullYear(), invoiceDate.getMonth(), 1).getTime();
+      const endOfMonth = new Date(invoiceDate.getFullYear(), invoiceDate.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
+
       // 1. Encontrar e marcar para exclusão a transação de pagamento da fatura
       const paymentTransactions = await database.get<Transaction>('transactions').query(
         Q.where('account_id', accountId),
         Q.where('description', paymentDescription),
+        Q.where('date', Q.between(startOfMonth, endOfMonth)),
       ).fetch();
 
       const deletions = paymentTransactions.map(t => t.prepareMarkAsDeleted());
@@ -722,9 +728,9 @@ export const TransactionService = {
       const transaction = await database.get<Transaction>('transactions').find(transactionId);
       
       // Verificar se a transação está consolidada
-      if (transaction.isConsolidated) {
-        throw new Error('Transações já pagas não podem ser alteradas');
-      }
+      // if (transaction.isConsolidated) {
+      //   throw new Error('Transações já pagas não podem ser alteradas');
+      // }
 
       // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
       const relatedTransactionId = transaction._raw?.related_transaction_id;
@@ -763,8 +769,6 @@ export const TransactionService = {
         // Determinar índice da parcela atual
         let installmentIndex = 0;
         if (relatedTransactionId) {
-          // Buscar transação original para determinar o índice
-          const originalTransaction = await database.get<Transaction>('transactions').find(relatedTransactionId);
           const allRelatedTransactions = await database.get<Transaction>('transactions')
             .query(
               Q.or(
@@ -774,8 +778,9 @@ export const TransactionService = {
               Q.sortBy('date', Q.asc)
             )
             .fetch();
-          
+
           installmentIndex = allRelatedTransactions.findIndex(t => t.id === transactionId);
+          if (installmentIndex < 0) installmentIndex = 0;
         }
 
         await transaction.update((tx) => {
@@ -888,9 +893,9 @@ export const TransactionService = {
       const transaction = await database.get<Transaction>('transactions').find(transactionId);
       
       // Verificar se a transação está consolidada
-      if (transaction.isConsolidated) {
-        throw new Error('Transações já pagas não podem ser excluídas');
-      }
+      // if (transaction.isConsolidated) {
+      //   throw new Error('Transações já pagas não podem ser excluídas');
+      // }
 
       // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
       const relatedTransactionId = transaction._raw?.related_transaction_id;

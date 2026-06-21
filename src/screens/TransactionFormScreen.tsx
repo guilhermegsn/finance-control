@@ -88,18 +88,7 @@ export default function TransactionFormScreen() {
     };
   });
 
-  useEffect(() => {
-    if (!transaction && formData.date) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const txDate = new Date(formData.date);
-      txDate.setHours(0, 0, 0, 0);
-      const shouldBeConsolidated = txDate <= today;
-      if (formData.isConsolidated !== shouldBeConsolidated) {
-        setFormData(prev => ({ ...prev, isConsolidated: shouldBeConsolidated }));
-      }
-    }
-  }, [transaction, formData.date, formData.isConsolidated]);
+
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
     if (selectedDate && activePicker) {

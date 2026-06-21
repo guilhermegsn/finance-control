@@ -11,24 +11,16 @@ import { useTranslation } from 'react-i18next';
 interface SummaryFooterProps {
   currentDate: Date;
   isFutureMonth: boolean;
+  currentBalance: number;
+  projectedBalance: number;
   transactions: Transaction[];
-  pastTransactions: Transaction[];
-  ccTransactions: Transaction[];
 }
 
-const SummaryFooterComponent = ({ isFutureMonth, transactions, pastTransactions, ccTransactions }: SummaryFooterProps) => {
+const SummaryFooterComponent = ({ isFutureMonth, currentBalance, projectedBalance, transactions }: SummaryFooterProps) => {
   const { t } = useTranslation();
   const { isDarkMode } = useTheme();
 
   const totals = useMemo(() => {
-    let pastConsolidatedBalance = 0;
-    let pastAllBalance = 0;
-    pastTransactions.forEach(t => {
-      const delta = t.type === 'income' ? t.amount : -t.amount;
-      pastAllBalance += delta;
-      if (t.isConsolidated) pastConsolidatedBalance += delta;
-    });
-
     let income = 0;
     let expense = 0;
     let consolidatedIncome = 0;
@@ -45,20 +37,8 @@ const SummaryFooterComponent = ({ isFutureMonth, transactions, pastTransactions,
       }
     });
 
-    let ccPendingExpense = 0;
-    ccTransactions.forEach(t => {
-      if (!t.isConsolidated) ccPendingExpense += t.amount;
-    });
-
-    return {
-      income,
-      expense,
-      consolidatedIncome,
-      consolidatedExpense,
-      currentBalance: pastConsolidatedBalance + consolidatedIncome - consolidatedExpense,
-      projectedBalance: pastAllBalance + income - expense - ccPendingExpense,
-    };
-  }, [transactions, pastTransactions, ccTransactions]);
+    return { income, expense, consolidatedIncome, consolidatedExpense };
+  }, [transactions]);
 
   const c = {
     card: isDarkMode ? '#161C27' : '#FFFFFF',
@@ -88,16 +68,16 @@ const SummaryFooterComponent = ({ isFutureMonth, transactions, pastTransactions,
       icon: 'wallet',
       iconColor: '#10B981',
       label: t('Saldo Atual'),
-      value: totals.currentBalance,
-      valueColor: totals.currentBalance >= 0 ? '#10B981' : '#F43F5E',
+      value: currentBalance,
+      valueColor: currentBalance >= 0 ? '#10B981' : '#F43F5E',
       pending: null,
     },
     {
       icon: 'crystal-ball',
       iconColor: '#6366F1',
       label: t('Projetado'),
-      value: totals.projectedBalance,
-      valueColor: totals.projectedBalance >= 0 ? '#10B981' : '#F43F5E',
+      value: projectedBalance,
+      valueColor: projectedBalance >= 0 ? '#10B981' : '#F43F5E',
       pending: null,
     },
   ];
@@ -108,7 +88,7 @@ const SummaryFooterComponent = ({ isFutureMonth, transactions, pastTransactions,
         {t('RESUMO MENSAL')}
       </Text>
       <Text style={[styles.subtitle, { color: c.textSecondary }]}>
-        {totals.projectedBalance >= 0
+        {projectedBalance >= 0
           ? t('Você está no caminho certo! 🚀')
           : t('Vamos melhorar isso juntos! 💪')}
       </Text>
@@ -194,7 +174,7 @@ const styles = StyleSheet.create({
 
 const enhanceSummaryFooter = withObservables(['currentDate'], ({ currentDate }: { currentDate: Date }) => {
   const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-  const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+  const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59, 999);
 
   return {
     transactions: database.get<Transaction>('transactions')
@@ -203,20 +183,6 @@ const enhanceSummaryFooter = withObservables(['currentDate'], ({ currentDate }: 
         Q.where('credit_card_id', null),
       )
       .observeWithColumns(['is_consolidated', 'amount', 'type']),
-
-    pastTransactions: database.get<Transaction>('transactions')
-      .query(
-        Q.where('date', Q.lt(firstDay.getTime())),
-        Q.where('credit_card_id', null),
-      )
-      .observeWithColumns(['is_consolidated', 'amount', 'type']),
-
-    ccTransactions: database.get<Transaction>('transactions')
-      .query(
-        Q.where('date', Q.between(firstDay.getTime(), lastDay.getTime())),
-        Q.where('credit_card_id', Q.notEq(null)),
-      )
-      .observeWithColumns(['is_consolidated', 'amount']),
   };
 });
 
