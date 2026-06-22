@@ -54,9 +54,7 @@ export default function AppNavigator() {
         <Stack.Screen
           name="TransferForm"
           component={TransferFormScreen}
-          options={{
-            title: t('Transferência'),
-          }}
+          options={{ headerShown: false }}
         />
 
         <Stack.Screen
