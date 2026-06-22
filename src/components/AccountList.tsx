@@ -1,88 +1,110 @@
 import React from 'react';
-import { View, FlatList, StyleSheet, Image } from 'react-native';
-import { List, IconButton, Text, Surface, useTheme } from 'react-native-paper';
+import { View, FlatList, StyleSheet, Image, TouchableOpacity, Alert, Text } from 'react-native';
+import { Icon } from 'react-native-paper';
 import { withObservables } from '@nozbe/watermelondb/react';
 import Account from '../models/Accounts';
 import { AccountService } from '../service/AccountService';
 import BankService from '../service/BankService';
+import { useTheme } from '../contexts/ThemeContext';
 
-// Componente de Item Individual
+const TYPE_LABEL: Record<string, string> = {
+  checking: 'Corrente',
+  savings: 'Poupança',
+  investment: 'Investimento',
+};
+
 const AccountItem = ({ account, onEdit }: { account: Account; onEdit?: (account: Account) => void }) => {
+  const { isDarkMode } = useTheme();
 
-  const theme = useTheme()
+  const c = {
+    card: isDarkMode ? '#161C27' : '#FFFFFF',
+    border: isDarkMode ? '#2D3748' : '#E2E8F0',
+    textPrimary: isDarkMode ? '#E2E8F0' : '#1A202C',
+    textSecondary: isDarkMode ? '#718096' : '#64748B',
+    sectionLabel: isDarkMode ? '#4A5568' : '#94A3B8',
+  };
+
   const handleDelete = () => {
-    AccountService.delete(account.id);
+    Alert.alert(
+      'Excluir conta',
+      `Deseja excluir a conta "${account.name}"?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Excluir', style: 'destructive', onPress: () => AccountService.delete(account.id) },
+      ]
+    );
   };
 
-  const handleEdit = () => {
-    if (onEdit) {
-      onEdit(account);
-    }
-  };
-
-  // Determinar qual ícone/logo usar
-  const renderLeftIcon = (props: any) => {
-    // Se houver logoUrl (que agora é um require local)
+  const logoSource = (() => {
     if (account.logoUrl) {
-      return (
-        <Image
-          source={typeof account.logoUrl === 'string' ? { uri: account.logoUrl } : account.logoUrl}
-          style={styles.bankLogo}
-        />
-      );
+      return typeof account.logoUrl === 'string' ? { uri: account.logoUrl } : account.logoUrl;
     }
-
-    // Se houver código do banco, tentar buscar logo
-    if (account.bankCode && account.bankCode.trim() !== '') {
+    if (account.bankCode?.trim()) {
       const bank = BankService.getBankByCode(account.bankCode);
-      if (bank) {
-        return (
-          <Image
-            source={bank.logoUrl}
-            style={styles.bankLogo}
-          />
-        );
-      }
+      if (bank) return bank.logoUrl;
     }
+    return null;
+  })();
 
-    // Caso contrário, usar ícone padrão
-    return <List.Icon {...props} icon="wallet" color={account.color} />;
-  };
+  const accentColor = account.color || '#6366F1';
+  const typeLabel = TYPE_LABEL[account.type] ?? account.type;
 
   return (
-    <Surface style={[styles.card,{
-      backgroundColor: theme.dark ? '#2A2D3E' : '#FFFFFF',
-      borderColor: theme.dark ? 'transparent' : '#E5E7EB',
-      borderWidth: theme.dark ? 0 : 1,
-    }]} elevation={1}>
-      <List.Item
-        title={account.name}
-        left={renderLeftIcon}
-        right={props => (
-          <View style={{ flexDirection: 'row' }}>
-            {onEdit && (
-              <IconButton {...props} icon="pencil" onPress={handleEdit} />
-            )}
-            <IconButton {...props} icon="delete" onPress={handleDelete} />
-          </View>
+    <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+      {/* Logo / fallback */}
+      <View style={[styles.logoWrap, { backgroundColor: `${accentColor}20` }]}>
+        {logoSource ? (
+          <Image source={logoSource} style={styles.logo} />
+        ) : (
+          <Icon source="wallet" size={22} color={accentColor} />
         )}
-      />
-    </Surface>
+      </View>
+
+      {/* Info */}
+      <View style={styles.info}>
+        <Text style={[styles.accountName, { color: c.textPrimary }]}>{account.name}</Text>
+        <View style={[styles.typeBadge, { backgroundColor: `${accentColor}18` }]}>
+          <Text style={[styles.typeBadgeText, { color: accentColor }]}>{typeLabel}</Text>
+        </View>
+      </View>
+
+      {/* Actions */}
+      <View style={styles.actions}>
+        {onEdit && (
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: '#6366F114' }]}
+            onPress={() => onEdit(account)}
+            activeOpacity={0.7}
+          >
+            <Icon source="pencil-outline" size={16} color="#6366F1" />
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={[styles.actionBtn, { backgroundColor: '#F43F5E14' }]}
+          onPress={handleDelete}
+          activeOpacity={0.7}
+        >
+          <Icon source="trash-can-outline" size={16} color="#F43F5E" />
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 };
 
-// Wrapper para tornar o item reativo (se mudar o nome, atualiza sozinho)
 const EnhancedAccountItem = withObservables(['account'], ({ account }) => ({
-  account, // Observa o próprio objeto
+  account,
 }))(AccountItem);
 
-// Componente da Lista
 const AccountList = ({ accounts, onEdit }: { accounts: Account[]; onEdit?: (account: Account) => void }) => {
-  const theme = useTheme()
+  const { isDarkMode } = useTheme();
+  const textSecondary = isDarkMode ? '#718096' : '#64748B';
+
   if (accounts.length === 0) {
     return (
       <View style={styles.empty}>
-        <Text>Nenhuma conta cadastrada.</Text>
+        <Icon source="wallet-outline" size={48} color={textSecondary} />
+        <Text style={[styles.emptyText, { color: textSecondary }]}>Nenhuma conta cadastrada</Text>
+        <Text style={[styles.emptyHint, { color: textSecondary }]}>Toque em + para adicionar</Text>
       </View>
     );
   }
@@ -92,36 +114,85 @@ const AccountList = ({ accounts, onEdit }: { accounts: Account[]; onEdit?: (acco
       data={accounts}
       keyExtractor={item => item.id}
       renderItem={({ item }) => <EnhancedAccountItem account={item} onEdit={onEdit} />}
-      contentContainerStyle={styles.listContainer}
+      contentContainerStyle={styles.list}
+      showsVerticalScrollIndicator={false}
     />
   );
 };
 
-// 1. A MAGIA: Conecta a query do banco às props do componente
 const enhance = withObservables([], () => ({
   accounts: AccountService.observeAccounts(),
 }));
 
-
 export default enhance(AccountList);
 
 const styles = StyleSheet.create({
-  listContainer: {
+  list: {
     padding: 16,
+    gap: 10,
   },
   card: {
-    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    gap: 12,
+  },
+  logoWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logo: {
+    width: 36,
+    height: 36,
     borderRadius: 8,
   },
-  empty: {
-    padding: 20,
-    alignItems: 'center'
+  info: {
+    flex: 1,
+    gap: 5,
   },
-  bankLogo: {
-    width: 40,
-    height: 40,
+  accountName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  typeBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     borderRadius: 20,
-    margin: 8,
-    marginLeft: 18
+  },
+  typeBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  empty: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 80,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  emptyHint: {
+    fontSize: 13,
   },
 });

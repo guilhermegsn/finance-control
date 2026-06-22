@@ -1,123 +1,110 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Alert, FlatList, TouchableOpacity, Image } from 'react-native';
-import { Portal, Modal, TextInput, Button, Card, IconButton, FAB, List } from 'react-native-paper';
+import {
+  View, StyleSheet, Alert, TouchableOpacity, Image,
+  Modal, ScrollView, Text, KeyboardAvoidingView, Platform, TouchableWithoutFeedback,
+} from 'react-native';
+import { TextInput, Icon } from 'react-native-paper';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { AccountService } from '../service/AccountService';
 import BankService, { BankWithLogo } from '../service/BankService';
 import AccountList from '../components/AccountList';
-import Account from '../models/Accounts';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const ACCOUNT_TYPES = [
+  { value: 'checking', label: 'Corrente', icon: 'bank-outline' },
+  { value: 'savings', label: 'Poupança', icon: 'piggy-bank-outline' },
+  { value: 'investment', label: 'Investimento', icon: 'trending-up' },
+];
+
+const PRESET_COLORS = [
+  '#6366F1', '#10B981', '#F59E0B', '#F43F5E',
+  '#3B82F6', '#8B5CF6', '#EC4899', '#14B8A6',
+];
 
 export default function AccountsScreen() {
   const { user } = useAuth();
+  const { isDarkMode } = useTheme();
+  const insets = useSafeAreaInsets();
   const [modalVisible, setModalVisible] = useState(false);
   const [editingAccount, setEditingAccount] = useState<any>(null);
   const [bankSuggestions, setBankSuggestions] = useState<BankWithLogo[]>([]);
   const [selectedBank, setSelectedBank] = useState<BankWithLogo | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [emptyParams] = useState<Partial<Account>>({
-    name: "",
-    type: "checking",
-    color: "#6200ee",
-    logoUrl: "",
-    bankCode: "",
-  })
-  const [params, setParams] = useState<Partial<Account>>(emptyParams)
+  const c = {
+    bg: isDarkMode ? '#0D1117' : '#EEF2F7',
+    card: isDarkMode ? '#161C27' : '#FFFFFF',
+    sheetBg: isDarkMode ? '#1C2333' : '#FFFFFF',
+    border: isDarkMode ? '#2D3748' : '#E2E8F0',
+    textPrimary: isDarkMode ? '#E2E8F0' : '#1A202C',
+    textSecondary: isDarkMode ? '#718096' : '#64748B',
+    sectionLabel: isDarkMode ? '#4A5568' : '#94A3B8',
+    overlay: isDarkMode ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.4)',
+  };
 
-  // Buscar sugestões de bancos quando o termo de busca mudar
+  const inputTheme = {
+    colors: {
+      background: isDarkMode ? '#2D3748' : '#F8FAFC',
+      onSurfaceVariant: c.textSecondary,
+      primary: '#6366F1',
+      outline: c.border,
+      onSurface: c.textPrimary,
+    },
+  };
+
+  const emptyParams = { name: '', type: 'checking', color: '#6366F1', logoUrl: '', bankCode: '' };
+  const [params, setParams] = useState(emptyParams);
+
   useEffect(() => {
-    if (searchQuery.length < 2) {
-      setBankSuggestions([]);
-      return;
-    }
-
+    if (searchQuery.length < 2) { setBankSuggestions([]); return; }
     const suggestions = BankService.searchBanks(searchQuery);
-    setBankSuggestions(suggestions.slice(0, 5)); // Limitar a 5 sugestões
+    setBankSuggestions(suggestions.slice(0, 5));
   }, [searchQuery]);
 
   const handleBankSelect = (bank: BankWithLogo) => {
     setSelectedBank(bank);
-    setParams({
-      ...params,
-      name: bank.displayName,
-      logoUrl: bank.logoUrl,
-      bankCode: bank.code || '',
-    });
+    setParams(prev => ({ ...prev, name: bank.displayName, logoUrl: bank.logoUrl, bankCode: bank.code || '' }));
     setSearchQuery(bank.displayName);
     setBankSuggestions([]);
   };
 
   const handleAdd = async () => {
-    if (!params.name || !user) {
-      Alert.alert('Erro', 'Preencha o nome da conta');
-      return;
-    }
-
+    if (!params.name || !user) { Alert.alert('Erro', 'Preencha o nome da conta'); return; }
     try {
       await AccountService.create({
-        name: params.name,
-        type: params.type || 'checking',
-        color: params.color || '#6200ee',
-        logoUrl: params.logoUrl || '',
-        bankCode: params.bankCode || '',
-        userId: user.id,
+        name: params.name, type: params.type, color: params.color,
+        logoUrl: params.logoUrl || '', bankCode: params.bankCode || '', userId: user.id,
       });
-
       resetForm();
-
     } catch (error) {
-      console.error(error);
       Alert.alert('Erro', 'Erro ao criar conta');
     }
   };
 
   const handleEdit = (account: any) => {
     setEditingAccount(account);
-    setParams({
-      name: account.name,
-      type: account.type,
-      color: account.color,
-      logoUrl: account.logoUrl || '',
-      bankCode: account.bankCode || '',
-    });
-    
-    // Se houver código do banco, tentar buscar informações
+    setParams({ name: account.name, type: account.type, color: account.color || '#6366F1', logoUrl: account.logoUrl || '', bankCode: account.bankCode || '' });
     if (account.bankCode) {
       const bank = BankService.getBankByCode(account.bankCode);
-      if (bank) {
-        setSelectedBank(bank);
-        setSearchQuery(bank.name);
-      } else {
-        setSelectedBank(null);
-        setSearchQuery(account.name);
-      }
+      if (bank) { setSelectedBank(bank); setSearchQuery(bank.name); }
+      else { setSelectedBank(null); setSearchQuery(account.name); }
     } else {
-      setSelectedBank(null);
-      setSearchQuery(account.name);
+      setSelectedBank(null); setSearchQuery(account.name);
     }
-    
     setModalVisible(true);
   };
 
   const handleUpdate = async () => {
-    if (!editingAccount || !params.name || !user) {
-      Alert.alert('Erro', 'Preencha o nome da conta');
-      return;
-    }
-
+    if (!editingAccount || !params.name || !user) { Alert.alert('Erro', 'Preencha o nome da conta'); return; }
     try {
       await AccountService.update(editingAccount.id, {
-        name: params.name,
-        type: params.type || 'checking',
-        color: params.color || '#6200ee',
-        logoUrl: params.logoUrl || '',
-        bankCode: params.bankCode || '',
+        name: params.name, type: params.type, color: params.color,
+        logoUrl: params.logoUrl || '', bankCode: params.bankCode || '',
       });
-
       resetForm();
-
     } catch (error) {
-      console.error(error);
       Alert.alert('Erro', 'Erro ao atualizar conta');
     }
   };
@@ -131,191 +118,391 @@ export default function AccountsScreen() {
     setModalVisible(false);
   };
 
-  const renderBankSuggestion = ({ item }: { item: BankWithLogo }) => (
-    <TouchableOpacity onPress={() => handleBankSelect(item)}>
-      <List.Item
-        title={item.displayName}
-        description={item.name}
-        left={() => (
-          <Image
-            source={item.logoUrl}
-            style={styles.bankLogo}
-          />
-        )}
-        right={props => item.code && <List.Icon {...props} icon="chevron-right" />}
-      />
-    </TouchableOpacity>
-  );
-
   return (
-    <View style={styles.container}>
-
-      {/* Lista de Contas */}
+    <View style={[styles.root, { backgroundColor: c.bg }]}>
       <AccountList onEdit={handleEdit} />
 
-      {/* Floating Action Button para adicionar nova conta */}
-      <FAB
+      {/* FAB */}
+      <TouchableOpacity
         style={styles.fab}
-        icon="plus"
-        color="white"
         onPress={() => setModalVisible(true)}
-      />
-
-      {/* Modal para adicionar nova conta */}
-      <Portal>
-        <Modal
-          visible={modalVisible}
-          onDismiss={resetForm}
-          contentContainerStyle={styles.modalContainer}
+        activeOpacity={0.85}
+      >
+        <LinearGradient
+          colors={['#6366F1', '#7C3AED']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.fabGradient}
         >
-          <Card>
-            <Card.Title
-              title={editingAccount ? 'Editando conta' : "Nova Conta"}
-              right={(props) => (
-                <IconButton
-                  {...props}
-                  icon="close"
-                  onPress={resetForm}
-                />
-              )}
-            />
-            <Card.Content>
-              {/* Campo de busca inteligente de bancos */}
-              <View style={styles.bankSearchContainer}>
+          <Icon source="plus" size={24} color="#FFFFFF" />
+        </LinearGradient>
+      </TouchableOpacity>
+
+      {/* Bottom Sheet Modal */}
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={resetForm}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalWrapper}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <TouchableWithoutFeedback onPress={resetForm}>
+            <View style={[styles.overlay, { backgroundColor: c.overlay }]} />
+          </TouchableWithoutFeedback>
+
+          <View style={[styles.sheet, { backgroundColor: c.sheetBg, paddingBottom: insets.bottom + 16 }]}>
+            {/* Handle */}
+            <View style={[styles.handle, { backgroundColor: c.border }]} />
+
+            {/* Sheet header */}
+            <View style={styles.sheetHeader}>
+              <Text style={[styles.sheetTitle, { color: c.textPrimary }]}>
+                {editingAccount ? 'Editar Conta' : 'Nova Conta'}
+              </Text>
+              <TouchableOpacity style={styles.closeBtn} onPress={resetForm}>
+                <Icon source="close" size={20} color={c.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+
+              {/* Bank search */}
+              <Text style={[styles.fieldLabel, { color: c.sectionLabel }]}>BANCO</Text>
+              <View style={styles.searchWrap}>
                 <TextInput
-                  label="Nome do Banco (ex: Nubank, Itaú)"
-                  value={searchQuery}
-                  onChangeText={(text) => {
-                    setSearchQuery(text);
-                    setParams({ ...params, name: text });
-                    if (!text) {
-                      setSelectedBank(null);
-                      setParams({ ...params, logoUrl: '', bankCode: '' });
-                    }
-                  }}
-                  style={styles.input}
                   mode="outlined"
-                  autoFocus
-                  right={
-                    selectedBank ? (
-                      <TextInput.Icon 
-                        icon="close" 
-                        onPress={() => {
-                          setSelectedBank(null);
-                          setSearchQuery('');
-                          setParams({ ...params, logoUrl: '', bankCode: '' });
-                        }}
-                      />
-                    ) : null
+                  label="Buscar banco (ex: Nubank, Itaú)"
+                  value={searchQuery}
+                  onChangeText={text => {
+                    setSearchQuery(text);
+                    setParams(prev => ({ ...prev, name: text }));
+                    if (!text) { setSelectedBank(null); setParams(prev => ({ ...prev, logoUrl: '', bankCode: '' })); }
+                  }}
+                  theme={inputTheme}
+                  style={{ backgroundColor: inputTheme.colors.background }}
+                  autoCorrect={false}
+                  right={selectedBank
+                    ? <TextInput.Icon icon="close" onPress={() => { setSelectedBank(null); setSearchQuery(''); setParams(prev => ({ ...prev, logoUrl: '', bankCode: '' })); }} />
+                    : undefined
                   }
                 />
 
-               
-                {/* Lista de sugestões */}
+                {/* Suggestions */}
                 {bankSuggestions.length > 0 && (
-                  <Card style={styles.suggestionsCard}>
-                    <Card.Content style={{ padding: 0 }}>
-                      <FlatList
-                        data={bankSuggestions}
-                        renderItem={renderBankSuggestion}
-                        keyExtractor={(item) => item.id}
-                        keyboardShouldPersistTaps="handled"
-                      />
-                    </Card.Content>
-                  </Card>
+                  <View style={[styles.suggestions, { backgroundColor: c.card, borderColor: c.border }]}>
+                    {bankSuggestions.map(bank => (
+                      <TouchableOpacity
+                        key={bank.id}
+                        style={[styles.suggestionItem, { borderBottomColor: c.border }]}
+                        onPress={() => handleBankSelect(bank)}
+                        activeOpacity={0.7}
+                      >
+                        <Image source={bank.logoUrl} style={styles.suggestionLogo} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.suggestionName, { color: c.textPrimary }]}>{bank.displayName}</Text>
+                          {bank.code && (
+                            <Text style={[styles.suggestionCode, { color: c.textSecondary }]}>Código {bank.code}</Text>
+                          )}
+                        </View>
+                        <Icon source="chevron-right" size={16} color={c.sectionLabel} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {/* Selected bank preview */}
+                {selectedBank && (
+                  <View style={[styles.selectedBank, { backgroundColor: `${params.color}12`, borderColor: `${params.color}30` }]}>
+                    <Image source={selectedBank.logoUrl} style={styles.selectedLogo} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.selectedName, { color: c.textPrimary }]}>{selectedBank.displayName}</Text>
+                      <Text style={[styles.selectedCode, { color: c.textSecondary }]}>{selectedBank.name}</Text>
+                    </View>
+                    <Icon source="check-circle" size={20} color="#10B981" />
+                  </View>
                 )}
               </View>
 
-              <TextInput
-                label="Tipo (checking, savings, investment)"
-                value={params.type || ''}
-                onChangeText={(text) => setParams({ ...params, type: text })}
-                style={styles.input}
-                mode="outlined"
-              />
-              <TextInput
-                label="Cor (hexadecimal)"
-                value={params.color || ''}
-                onChangeText={(text) => setParams({ ...params, color: text })}
-                style={styles.input}
-                mode="outlined"
-              />
-            </Card.Content>
-            <Card.Actions>
-              <Button onPress={resetForm}>
-                Cancelar
-              </Button>
-              <Button mode="contained" onPress={editingAccount ? handleUpdate : handleAdd}>
-                Salvar
-              </Button>
-            </Card.Actions>
-          </Card>
-        </Modal>
-      </Portal>
+              {/* Account type */}
+              <Text style={[styles.fieldLabel, { color: c.sectionLabel }]}>TIPO DE CONTA</Text>
+              <View style={styles.typeRow}>
+                {ACCOUNT_TYPES.map(type => {
+                  const active = params.type === type.value;
+                  return (
+                    <TouchableOpacity
+                      key={type.value}
+                      style={[
+                        styles.typeBtn,
+                        { borderColor: active ? params.color : c.border, backgroundColor: active ? `${params.color}18` : c.card },
+                      ]}
+                      onPress={() => setParams(prev => ({ ...prev, type: type.value }))}
+                      activeOpacity={0.7}
+                    >
+                      <Icon source={type.icon} size={18} color={active ? params.color : c.textSecondary} />
+                      <Text style={[styles.typeBtnText, { color: active ? params.color : c.textSecondary }]}>
+                        {type.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
+              {/* Color swatches */}
+              <Text style={[styles.fieldLabel, { color: c.sectionLabel }]}>COR DE ACENTO</Text>
+              <View style={styles.colorRow}>
+                {PRESET_COLORS.map(color => (
+                  <TouchableOpacity
+                    key={color}
+                    style={[
+                      styles.colorSwatch,
+                      { backgroundColor: color },
+                      params.color === color && styles.colorSwatchSelected,
+                    ]}
+                    onPress={() => setParams(prev => ({ ...prev, color }))}
+                    activeOpacity={0.8}
+                  >
+                    {params.color === color && (
+                      <Icon source="check" size={14} color="#FFFFFF" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
 
+              <View style={{ height: 8 }} />
+
+              {/* Footer buttons */}
+              <View style={styles.sheetFooter}>
+                <TouchableOpacity
+                  style={[styles.cancelBtn, { backgroundColor: c.card, borderColor: c.border }]}
+                  onPress={resetForm}
+                >
+                  <Text style={[styles.cancelBtnText, { color: c.textSecondary }]}>Cancelar</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={editingAccount ? handleUpdate : handleAdd}
+                  disabled={!params.name.trim()}
+                  style={[styles.saveBtn, { opacity: !params.name.trim() ? 0.45 : 1 }]}
+                >
+                  <LinearGradient
+                    colors={['#6366F1', '#7C3AED']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.saveGradient}
+                  >
+                    <Text style={styles.saveBtnText}>
+                      {editingAccount ? 'Salvar alterações' : 'Criar conta'}
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  root: { flex: 1 },
+
   fab: {
     position: 'absolute',
-    margin: 16,
-    right: 0,
-    bottom: 0,
+    bottom: 24,
+    right: 20,
+    borderRadius: 28,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  fabGradient: {
     width: 56,
     height: 56,
-    borderRadius: 28,
-    backgroundColor: '#6200ee',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  input: {
-    marginBottom: 12
+
+  // Modal / Bottom sheet
+  modalWrapper: {
+    flex: 1,
+    justifyContent: 'flex-end',
   },
-  modalContainer: {
-    padding: 20,
-    maxHeight: '80%',
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
   },
-  bankSearchContainer: {
-    position: 'relative',
+  sheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    maxHeight: '90%',
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
     marginBottom: 16,
   },
-  suggestionsCard: {
-    position: 'absolute',
-    top: 60,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-    maxHeight: 200,
-    elevation: 5,
-  },
-  bankLogo: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 8,
-  },
-  selectedBankContainer: {
+  sheetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
+    marginBottom: 20,
   },
-  selectedBankLogo: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 12,
-  },
-  selectedBankInfo: {
+  sheetTitle: {
     flex: 1,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  fieldLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    marginBottom: 10,
+    marginTop: 16,
+    marginLeft: 2,
+  },
+
+  // Bank search
+  searchWrap: {
+    position: 'relative',
+  },
+  suggestions: {
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  suggestionLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+  },
+  suggestionName: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  suggestionCode: {
+    fontSize: 12,
+    marginTop: 1,
+  },
+  selectedBank: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    marginTop: 8,
+    gap: 12,
+  },
+  selectedLogo: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+  },
+  selectedName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  selectedCode: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+
+  // Account type
+  typeRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  typeBtn: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 4,
+  },
+  typeBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  // Colors
+  colorRow: {
+    flexDirection: 'row',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  colorSwatch: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  colorSwatchSelected: {
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+
+  // Footer
+  sheetFooter: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 16,
+  },
+  cancelBtn: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  cancelBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  saveBtn: {
+    flex: 2,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  saveGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  saveBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });
