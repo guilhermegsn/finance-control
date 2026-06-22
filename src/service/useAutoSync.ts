@@ -47,18 +47,21 @@ export function useAutoSync() {
   
   // Efeito para configurar listeners de AppState
   useEffect(() => {
+    // Sync inicial ao montar o hook (app acabou de abrir)
+    performSync('app_mount');
+
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       console.log(`📱 AppState mudou para: ${nextAppState}`);
-      
-      // Gatilho 1: App voltou para ativo (usuário abriu o app ou voltou de outro app)
+
+      // App voltou para ativo (usuário voltou de outro app ou tela bloqueada)
       if (nextAppState === 'active') {
         performSync('app_state_active');
       }
     };
-    
+
     // Adicionar listener
     const subscription = AppState.addEventListener('change', handleAppStateChange);
-    
+
     // Limpeza
     return () => {
       subscription.remove();
