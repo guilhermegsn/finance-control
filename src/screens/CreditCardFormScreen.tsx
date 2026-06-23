@@ -154,27 +154,25 @@ const CreditCardFormScreen = () => {
 
         {/* Bandeira */}
         <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>BANDEIRA</Text>
-        <View style={[styles.sectionCard, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Select
-            items={brandOptions}
-            selectedValue={brand}
-            onSelect={val => setBrand(val)}
-            placeholder={t('Selecione a bandeira')}
-            fontColor={c.textPrimary}
-          />
-        </View>
+        <Select
+          items={brandOptions}
+          selectedValue={brand}
+          onSelect={val => setBrand(val)}
+          placeholder={t('Selecione a bandeira')}
+          fontColor={c.textPrimary}
+          backgroundColor={c.card}
+        />
 
         {/* Conta padrão */}
         <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>CONTA DE PAGAMENTO</Text>
-        <View style={[styles.sectionCard, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Select
-            items={accounts}
-            selectedValue={accountId}
-            onSelect={val => setAccountId(val)}
-            placeholder={t('Selecione a conta')}
-            fontColor={c.textPrimary}
-          />
-        </View>
+        <Select
+          items={accounts}
+          selectedValue={accountId}
+          onSelect={val => setAccountId(val)}
+          placeholder={t('Selecione a conta')}
+          fontColor={c.textPrimary}
+          backgroundColor={c.card}
+        />
 
         {/* Limite */}
         <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>LIMITE</Text>
@@ -192,7 +190,7 @@ const CreditCardFormScreen = () => {
 
         {/* Datas */}
         <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>DATAS</Text>
-        <View style={[styles.sectionCard, { backgroundColor: c.card, borderColor: c.border }]}>
+        <View style={[styles.datesCard, { backgroundColor: c.card, borderColor: c.border }]}>
           <View style={styles.datesRow}>
             <View style={styles.dateField}>
               <View style={[styles.dateIconWrap, { backgroundColor: `${color}18` }]}>
@@ -329,7 +327,7 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
 
-  sectionCard: {
+  datesCard: {
     borderRadius: 14,
     borderWidth: 1,
     overflow: 'hidden',
