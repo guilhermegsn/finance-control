@@ -56,17 +56,13 @@ export default function AppNavigator() {
         <Stack.Screen
           name="CreditCardList"
           component={CreditCardListScreen}
-          options={{
-            title: t('Cartões de crédito'),
-          }}
+          options={{ headerShown: false }}
         />
 
         <Stack.Screen
           name="CreditCardForm"
           component={CreditCardFormScreen}
-          options={{
-            title: t('Cartão de crédito'),
-          }}
+          options={{ headerShown: false }}
         />
 
 
