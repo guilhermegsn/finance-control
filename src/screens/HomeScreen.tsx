@@ -23,7 +23,7 @@ interface HomeScreenProps {
   allTransactions: Transaction[];
   pastTransactions: Transaction[];
   currentMonthTransactions: Transaction[];
-  ccCurrentMonth: Transaction[];
+  ccDueUpToMonth: Transaction[];
   accounts: any[];
   categories: any[];
 }
@@ -32,7 +32,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   allTransactions,
   pastTransactions,
   currentMonthTransactions,
-  ccCurrentMonth,
+  ccDueUpToMonth,
   accounts,
   categories,
 }) => {
@@ -87,14 +87,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     });
 
     let ccPending = 0;
-    ccCurrentMonth.forEach(t => {
-      if (!t.isConsolidated) ccPending += t.amount;
+    ccDueUpToMonth.forEach((t: Transaction) => {
+      ccPending += t.amount;
     });
 
     const projectedBalance = pastAllBalance + monthIncome - monthExpense - ccPending;
 
     return { currentBalance, projectedBalance, monthIncome, monthExpense };
-  }, [allTransactions, pastTransactions, currentMonthTransactions, ccCurrentMonth]);
+  }, [allTransactions, pastTransactions, currentMonthTransactions, ccDueUpToMonth]);
+
+  const endOfMonthLabel = useMemo(() => {
+    const now = new Date();
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return lastDay.toLocaleDateString('pt-BR');
+  }, []);
 
   const greeting = useMemo(() => {
     const h = new Date().getHours();
@@ -201,7 +207,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               <View style={styles.heroIconPill}>
                 <Icon source="crystal-ball" size={14} color="#FFFFFF" />
               </View>
-              <Text style={styles.heroLabelText}>{t('Projetado')}</Text>
+              <Text style={styles.heroLabelText}>{t('Projetado para')} {endOfMonthLabel}</Text>
             </View>
             {balancesVisible ? (
               <Text style={[styles.heroValueSmall, { color: projectedBalance >= 0 ? '#A7F3D0' : '#FECDD3' }]}>
@@ -432,10 +438,11 @@ const enhance = withObservables([], () => {
       )
       .observeWithColumns(['amount', 'type', 'is_consolidated', 'date']),
 
-    ccCurrentMonth: database.get<Transaction>('transactions')
+    ccDueUpToMonth: database.get<Transaction>('transactions')
       .query(
         Q.where('credit_card_id', Q.notEq(null)),
-        Q.where('date', Q.between(firstDay.getTime(), lastDay.getTime())),
+        Q.where('is_consolidated', false),
+        Q.where('date', Q.lte(lastDay.getTime())),
       )
       .observeWithColumns(['amount', 'is_consolidated', 'date']),
 

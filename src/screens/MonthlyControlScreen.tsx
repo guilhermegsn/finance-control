@@ -205,13 +205,18 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
       currentMonthTotal += t.type === 'income' ? t.amount : -t.amount;
     });
 
-    // Fatura CC pendente: compras CC do mês não-consolidadas
-    // Quando paga: purchases ficam consolidadas → ccPendingExpense = 0
+    // Fatura CC pendente: parcelas com vencimento até o fim do mês visualizado
+    // Inclui o mês atual + faturas de meses anteriores ainda não pagas (atrasadas)
+    // Quando paga: purchases ficam consolidadas → não entra aqui
     //              e o pagamento já está em currentMonthTotal
+    const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59, 999);
     let ccPendingExpense = 0;
-    allFilteredTransactions.forEach(t => {
+    allTransactions.forEach(t => {
       if ((t as any)._raw?.credit_card_id == null) return;
-      if (!t.isConsolidated) ccPendingExpense += t.amount;
+      if (t.isConsolidated) return;
+      if (new Date(t.date).getTime() <= endOfMonth.getTime()) {
+        ccPendingExpense += t.amount;
+      }
     });
 
     return pastAllBalance + currentMonthTotal - ccPendingExpense;
