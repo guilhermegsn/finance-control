@@ -11,6 +11,7 @@ import BankService, { BankWithLogo } from '../service/BankService';
 import AccountList from '../components/AccountList';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 
 const ACCOUNT_TYPES = [
   { value: 'checking', label: 'Corrente', icon: 'bank-outline' },
@@ -27,6 +28,7 @@ export default function AccountsScreen() {
   const { user } = useAuth();
   const { isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const [modalVisible, setModalVisible] = useState(false);
   const [editingAccount, setEditingAccount] = useState<any>(null);
   const [bankSuggestions, setBankSuggestions] = useState<BankWithLogo[]>([]);
@@ -120,6 +122,15 @@ export default function AccountsScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: c.bg }]}>
+      {/* Header */}
+      <View style={[styles.header, { backgroundColor: c.bg, paddingTop: insets.top }]}>
+        <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
+          <Icon source="arrow-left" size={22} color={c.textPrimary} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: c.textPrimary }]}>Minhas Contas</Text>
+        <View style={styles.headerBtn} />
+      </View>
+
       <AccountList onEdit={handleEdit} />
 
       {/* FAB */}
@@ -309,6 +320,25 @@ export default function AccountsScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  headerBtn: {
+    width: 38,
+    height: 38,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 17,
+    fontWeight: '700',
+  },
 
   fab: {
     position: 'absolute',

@@ -11,6 +11,7 @@ import CategoryList from '../components/CategoryList';
 import Category from '../models/Caterogy';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 
 const PRESET_COLORS = [
   '#6366F1', '#10B981', '#F59E0B', '#F43F5E',
@@ -30,6 +31,7 @@ export default function CategoriesScreen() {
   const { user } = useAuth();
   const { isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [params, setParams] = useState(DEFAULT_PARAMS);
@@ -85,6 +87,15 @@ export default function CategoriesScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: c.bg }]}>
+      {/* Header */}
+      <View style={[styles.header, { backgroundColor: c.bg, paddingTop: insets.top }]}>
+        <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
+          <Icon source="arrow-left" size={22} color={c.textPrimary} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: c.textPrimary }]}>Categorias</Text>
+        <View style={styles.headerBtn} />
+      </View>
+
       <CategoryList onEdit={handleEdit} />
 
       {/* FAB */}
@@ -228,6 +239,25 @@ export default function CategoriesScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  headerBtn: {
+    width: 38,
+    height: 38,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 17,
+    fontWeight: '700',
+  },
 
   fab: {
     position: 'absolute',

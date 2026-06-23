@@ -32,17 +32,13 @@ export default function AppNavigator() {
         <Stack.Screen
           name="Accounts"
           component={AccountsScreen}
-          options={{
-            title: t('Minhas contas'),
-          }}
+          options={{ headerShown: false }}
         />
 
         <Stack.Screen
           name="Categories"
           component={CategoriesScreen}
-          options={{
-            title: t('Categorias'),
-          }}
+          options={{ headerShown: false }}
         />
 
         <Stack.Screen
