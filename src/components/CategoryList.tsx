@@ -1,127 +1,105 @@
 import React from 'react';
-import { View, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
-import { IconButton, Text, Surface, Icon, useTheme } from 'react-native-paper';
+import { View, FlatList, StyleSheet, TouchableOpacity, Alert, Text } from 'react-native';
+import { Icon } from 'react-native-paper';
 import { withObservables } from '@nozbe/watermelondb/react';
 import Category from '../models/Caterogy';
 import { CategoryService } from '../service/CategoryService';
+import { useTheme } from '../contexts/ThemeContext';
 import { useTranslation } from 'react-i18next';
 
-// Componente de Item Individual
-const CategoryItem = ({ category, onEdit }: { category: Category; onEdit?: (category: Category) => void }) => {
-  const theme = useTheme();
+const TYPE_COLOR = { income: '#10B981', expense: '#F43F5E' };
+const TYPE_LABEL = { income: 'Entrada', expense: 'Despesa' };
+
+const CategoryItem = ({ category, onEdit }: { category: Category; onEdit?: (c: Category) => void }) => {
+  const { isDarkMode } = useTheme();
   const { t } = useTranslation();
 
+  const c = {
+    card: isDarkMode ? '#161C27' : '#FFFFFF',
+    border: isDarkMode ? '#2D3748' : '#E2E8F0',
+    textPrimary: isDarkMode ? '#E2E8F0' : '#1A202C',
+    textSecondary: isDarkMode ? '#718096' : '#64748B',
+  };
+
+  const accent = category.color || '#6366F1';
+  const typeColor = TYPE_COLOR[category.type] ?? '#6366F1';
+  const typeLabel = TYPE_LABEL[category.type] ?? category.type;
+  const displayName = category.isSystem ? t(`categories:${category.name}`) : category.name;
+
   const handleDelete = () => {
-    CategoryService.delete(category.id);
-  };
-
-  const handleEdit = () => {
-    if (onEdit) {
-      onEdit(category);
-    }
-  };
-
-  const getTypeColor = (type: string) => {
-    return type === 'income' ? '#56D6A3' : '#FF7285';
-  };
-
-  const getTypeText = (type: string) => {
-    return type === 'income' ? t('Entrada') : t('Despesa');
+    Alert.alert(
+      'Excluir categoria',
+      `Deseja excluir "${displayName}"?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Excluir', style: 'destructive', onPress: () => CategoryService.delete(category.id) },
+      ]
+    );
   };
 
   return (
-    <Surface style={[
-      styles.card,
-      styles.cardElevated,
-      {
-        backgroundColor: theme.dark ? '#2A2D3E' : '#FFFFFF',
-        borderColor: theme.dark ? 'transparent' : '#E5E7EB',
-        borderWidth: theme.dark ? 0 : 1,
-      }
-    ]}>
-      <TouchableOpacity onPress={handleEdit} activeOpacity={0.7} disabled={category.isSystem}>
-        <View style={styles.cardContent}>
-          <View style={[
-            styles.iconContainer,
-            { backgroundColor: `${category.color}20` } // Cor com 20% de opacidade
-          ]}>
-            <Icon source={category.icon} size={24} color={category.color} />
+    <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+      <View style={[styles.iconWrap, { backgroundColor: `${accent}20` }]}>
+        <Icon source={category.icon || 'tag'} size={22} color={accent} />
+      </View>
+
+      <View style={styles.info}>
+        <Text style={[styles.name, { color: c.textPrimary }]}>{displayName}</Text>
+        <View style={styles.badgeRow}>
+          <View style={[styles.typeBadge, { backgroundColor: `${typeColor}18` }]}>
+            <Icon
+              source={category.type === 'income' ? 'arrow-up-circle' : 'arrow-down-circle'}
+              size={11}
+              color={typeColor}
+            />
+            <Text style={[styles.typeBadgeText, { color: typeColor }]}>{typeLabel}</Text>
           </View>
-          <View style={styles.textContainer}>
-            <Text style={[
-              styles.title,
-              { color: theme.dark ? '#FFFFFF' : '#1F2937' }
-            ]}>
-              {category.isSystem ? t(`categories:${category.name}`) : category.name}
-            </Text>
-            <View style={styles.detailsContainer}>
-              <View style={[
-                styles.typeBadge,
-                { backgroundColor: `${getTypeColor(category.type)}20` }
-              ]}>
-                <Icon 
-                  source={category.type === 'income' ? 'arrow-up-circle' : 'arrow-down-circle'} 
-                  size={12} 
-                  color={getTypeColor(category.type)} 
-                />
-                <Text style={[
-                  styles.typeText,
-                  { color: getTypeColor(category.type) }
-                ]}>
-                  {getTypeText(category.type)}
-                </Text>
-              </View>
-              <Text style={[
-                styles.iconText,
-                { color: theme.dark ? '#E5E7EB' : '#4B5563' }
-              ]}>
-                {t("Ícone")}: {category.icon}
-              </Text>
+          {category.isSystem && (
+            <View style={[styles.sysBadge, { backgroundColor: isDarkMode ? '#2D3748' : '#F1F5F9' }]}>
+              <Text style={[styles.sysBadgeText, { color: c.textSecondary }]}>Sistema</Text>
             </View>
-          </View>
-          <View style={styles.actionsContainer}>
-            {onEdit && !category.isSystem && (
-              <IconButton 
-                icon="pencil" 
-                size={20} 
-                onPress={handleEdit}
-                iconColor={theme.dark ? '#9CA3AF' : '#6B7280'}
-              />
-            )}
-            {!category.isSystem && (
-              <IconButton 
-                icon="delete" 
-                size={20} 
-                onPress={handleDelete}
-                iconColor={theme.dark ? '#9CA3AF' : '#6B7280'}
-              />
-            )}
-          </View>
+          )}
         </View>
-      </TouchableOpacity>
-    </Surface>
+      </View>
+
+      {!category.isSystem && (
+        <View style={styles.actions}>
+          {onEdit && (
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: '#6366F114' }]}
+              onPress={() => onEdit(category)}
+              activeOpacity={0.7}
+            >
+              <Icon source="pencil-outline" size={16} color="#6366F1" />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: '#F43F5E14' }]}
+            onPress={handleDelete}
+            activeOpacity={0.7}
+          >
+            <Icon source="trash-can-outline" size={16} color="#F43F5E" />
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
   );
 };
 
-// Wrapper para tornar o item reativo (se mudar o nome, atualiza sozinho)
 const EnhancedCategoryItem = withObservables(['category'], ({ category }) => ({
-  category, // Observa o próprio objeto
+  category,
 }))(CategoryItem);
 
-// Componente da Lista
-const CategoryList = ({ categories, onEdit }: { categories: Category[]; onEdit?: (category: Category) => void }) => {
-  const theme = useTheme();
-  
+const CategoryList = ({ categories, onEdit }: { categories: Category[]; onEdit?: (c: Category) => void }) => {
+  const { isDarkMode } = useTheme();
+  const textSecondary = isDarkMode ? '#718096' : '#64748B';
+
   if (categories.length === 0) {
     return (
       <View style={styles.empty}>
-        <Icon source="tag-outline" size={48} color={theme.dark ? '#9CA3AF' : '#6B7280'} />
-        <Text style={[
-          styles.emptyText,
-          { color: theme.dark ? '#E5E7EB' : '#4B5563' }
-        ]}>
-          Nenhuma categoria cadastrada.
-        </Text>
+        <Icon source="tag-outline" size={48} color={textSecondary} />
+        <Text style={[styles.emptyText, { color: textSecondary }]}>Nenhuma categoria cadastrada</Text>
+        <Text style={[styles.emptyHint, { color: textSecondary }]}>Toque em + para adicionar</Text>
       </View>
     );
   }
@@ -131,86 +109,96 @@ const CategoryList = ({ categories, onEdit }: { categories: Category[]; onEdit?:
       data={categories}
       keyExtractor={item => item.id}
       renderItem={({ item }) => <EnhancedCategoryItem category={item} onEdit={onEdit} />}
-      contentContainerStyle={styles.listContainer}
+      contentContainerStyle={styles.list}
+      showsVerticalScrollIndicator={false}
     />
   );
 };
 
-// 1. A MAGIA: Conecta a query do banco às props do componente
 const enhance = withObservables([], () => ({
   categories: CategoryService.observeCategories(),
 }));
 
-
 export default enhance(CategoryList);
 
 const styles = StyleSheet.create({
-  listContainer: {
+  list: {
     padding: 16,
+    gap: 10,
   },
   card: {
-    marginBottom: 12,
-    borderRadius: 12,
-    padding: 16,
-  },
-  cardElevated: {
-    elevation: 2,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    gap: 12,
   },
-  iconContainer: {
-    width: 48,
-    height: 48,
+  iconWrap: {
+    width: 44,
+    height: 44,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
   },
-  textContainer: {
+  info: {
     flex: 1,
+    gap: 5,
   },
-  title: {
-    fontSize: 16,
+  name: {
+    fontSize: 15,
     fontWeight: '600',
-    marginBottom: 8,
   },
-  detailsContainer: {
+  badgeRow: {
     flexDirection: 'row',
+    gap: 6,
     alignItems: 'center',
-    gap: 12,
   },
   typeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4,
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 20,
   },
-  typeText: {
-    fontSize: 12,
+  typeBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  sysBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 20,
+  },
+  sysBadgeText: {
+    fontSize: 10,
     fontWeight: '500',
   },
-  iconText: {
-    fontSize: 12,
-    opacity: 0.8,
-  },
-  actionsContainer: {
+  actions: {
     flexDirection: 'row',
+    gap: 8,
+  },
+  actionBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   empty: {
-    padding: 40,
-    alignItems: 'center',
+    flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 80,
   },
   emptyText: {
-    marginTop: 12,
-    fontSize: 14,
-    opacity: 0.8,
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  emptyHint: {
+    fontSize: 13,
   },
 });
