@@ -72,6 +72,13 @@ export default function AccountsScreen() {
     setBankSuggestions([]);
   };
 
+  const handleBankDeselect = () => {
+    setSelectedBank(null);
+    setSearchQuery('');
+    setBankSuggestions([]);
+    setParams(prev => ({ ...prev, logoUrl: '', bankCode: '' }));
+  };
+
   const handleAdd = async () => {
     if (!params.name || !user) { Alert.alert('Erro', 'Preencha o nome da conta'); return; }
     try {
@@ -183,57 +190,58 @@ export default function AccountsScreen() {
               {/* Bank search */}
               <Text style={[styles.fieldLabel, { color: c.sectionLabel }]}>BANCO</Text>
               <View style={styles.searchWrap}>
-                <TextInput
-                  mode="outlined"
-                  label="Buscar banco (ex: Nubank, Itaú)"
-                  value={searchQuery}
-                  onChangeText={text => {
-                    setSearchQuery(text);
-                    setParams(prev => ({ ...prev, name: text }));
-                    if (!text) { setSelectedBank(null); setParams(prev => ({ ...prev, logoUrl: '', bankCode: '' })); }
-                  }}
-                  theme={inputTheme}
-                  style={{ backgroundColor: inputTheme.colors.background }}
-                  autoCorrect={false}
-                  right={selectedBank
-                    ? <TextInput.Icon icon="close" onPress={() => { setSelectedBank(null); setSearchQuery(''); setParams(prev => ({ ...prev, logoUrl: '', bankCode: '' })); }} />
-                    : undefined
-                  }
-                />
-
-                {/* Suggestions */}
-                {bankSuggestions.length > 0 && (
-                  <View style={[styles.suggestions, { backgroundColor: c.card, borderColor: c.border }]}>
-                    {bankSuggestions.map(bank => (
-                      <TouchableOpacity
-                        key={bank.id}
-                        style={[styles.suggestionItem, { borderBottomColor: c.border }]}
-                        onPress={() => handleBankSelect(bank)}
-                        activeOpacity={0.7}
-                      >
-                        <Image source={bank.logoUrl} style={styles.suggestionLogo} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={[styles.suggestionName, { color: c.textPrimary }]}>{bank.displayName}</Text>
-                          {bank.code && (
-                            <Text style={[styles.suggestionCode, { color: c.textSecondary }]}>Código {bank.code}</Text>
-                          )}
-                        </View>
-                        <Icon source="chevron-right" size={16} color={c.sectionLabel} />
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-
-                {/* Selected bank preview */}
-                {selectedBank && (
-                  <View style={[styles.selectedBank, { backgroundColor: `${params.color}12`, borderColor: `${params.color}30` }]}>
+                {selectedBank ? (
+                  /* Selected bank preview */
+                  <TouchableOpacity
+                    style={[styles.selectedBank, { backgroundColor: `${params.color}12`, borderColor: `${params.color}30` }]}
+                    onPress={handleBankDeselect}
+                    activeOpacity={0.7}
+                  >
                     <Image source={selectedBank.logoUrl} style={styles.selectedLogo} />
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.selectedName, { color: c.textPrimary }]}>{selectedBank.displayName}</Text>
                       <Text style={[styles.selectedCode, { color: c.textSecondary }]}>{selectedBank.name}</Text>
                     </View>
                     <Icon source="check-circle" size={20} color="#10B981" />
-                  </View>
+                  </TouchableOpacity>
+                ) : (
+                  <>
+                    <TextInput
+                      mode="outlined"
+                      label="Buscar banco (ex: Nubank, Itaú)"
+                      value={searchQuery}
+                      onChangeText={text => {
+                        setSearchQuery(text);
+                        setParams(prev => ({ ...prev, name: text }));
+                      }}
+                      theme={inputTheme}
+                      style={{ backgroundColor: inputTheme.colors.background }}
+                      autoCorrect={false}
+                    />
+
+                    {/* Suggestions */}
+                    {bankSuggestions.length > 0 && (
+                      <View style={[styles.suggestions, { backgroundColor: c.card, borderColor: c.border }]}>
+                        {bankSuggestions.map(bank => (
+                          <TouchableOpacity
+                            key={bank.id}
+                            style={[styles.suggestionItem, { borderBottomColor: c.border }]}
+                            onPress={() => handleBankSelect(bank)}
+                            activeOpacity={0.7}
+                          >
+                            <Image source={bank.logoUrl} style={styles.suggestionLogo} />
+                            <View style={{ flex: 1 }}>
+                              <Text style={[styles.suggestionName, { color: c.textPrimary }]}>{bank.displayName}</Text>
+                              {bank.code && (
+                                <Text style={[styles.suggestionCode, { color: c.textSecondary }]}>Código {bank.code}</Text>
+                              )}
+                            </View>
+                            <Icon source="chevron-right" size={16} color={c.sectionLabel} />
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </>
                 )}
               </View>
 
