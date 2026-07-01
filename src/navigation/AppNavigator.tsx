@@ -11,6 +11,7 @@ import CreditCardListScreen from '../screens/CreditCardListScreen';
 import CreditCardFormScreen from '../screens/CreditCardFormScreen';
 import { useTranslation } from 'react-i18next';
 import CreditCardPurchaseScreen from '../screens/CreditCardPurchaseScreen';
+import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -69,6 +70,12 @@ export default function AppNavigator() {
         <Stack.Screen
           name="CreditCardPurchase"
           component={CreditCardPurchaseScreen}
+          options={{ headerShown: false }}
+        />
+
+        <Stack.Screen
+          name="NotificationSettings"
+          component={NotificationSettingsScreen}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>

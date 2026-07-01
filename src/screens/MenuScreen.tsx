@@ -15,6 +15,7 @@ const ICON_COLORS: Record<string, string> = {
   'chart-bar': '#3B82F6',
   flag: '#F43F5E',
   'brightness-6': '#6366F1',
+  'bell-outline': '#10B981',
   logout: '#EF4444',
 };
 
@@ -145,6 +146,18 @@ export default function MenuScreen() {
               ios_backgroundColor="#CBD5E1"
             />
           </View>
+          <View style={[styles.divider, { backgroundColor: c.border }]} />
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => navigation.navigate('NotificationSettings' as never)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.iconPill, { backgroundColor: '#10B9811A' }]}>
+              <Icon source="bell-outline" size={20} color="#10B981" />
+            </View>
+            <Text style={[styles.rowLabel, { color: c.textPrimary }]}>{t('Notificações')}</Text>
+            <Icon source="chevron-right" size={18} color={c.sectionLabel} />
+          </TouchableOpacity>
         </View>
 
         {/* Sair */}
