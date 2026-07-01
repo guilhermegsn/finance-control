@@ -1,15 +1,18 @@
+import { Q } from '@nozbe/watermelondb';
 import { database } from '../database';
 import Category from '../models/Caterogy';
 
 export const CategoryService = {
-  // Observar todas as categorias ativas (WatermelonDB já filtra as marcadas para deletar)
-  observeCategories: () => {
-    return database.get<Category>('categories').query().observe();
+  observeCategories: (userId: string) => {
+    return database.get<Category>('categories')
+      .query(Q.where('user_id', userId))
+      .observe();
   },
 
-  // Buscar todas as categorias ativas
-  fetchAll: async () => {
-    return await database.get<Category>('categories').query().fetch();
+  fetchAll: async (userId: string) => {
+    return await database.get<Category>('categories')
+      .query(Q.where('user_id', userId))
+      .fetch();
   },
 
   // Buscar categoria por ID
@@ -69,9 +72,10 @@ export const CategoryService = {
     console.log('Categoria marcada para exclusão. Execute o Sync para atualizar o servidor.');
   },
 
-  // Inicializar categorias padrão se a tabela estiver vazia
   initializeDefaults: async (userId: string) => {
-    const count = await database.get<Category>('categories').query().fetchCount();
+    const count = await database.get<Category>('categories')
+      .query(Q.where('user_id', userId))
+      .fetchCount();
     if (count === 0) {
       await database.write(async () => {
         const batch = [

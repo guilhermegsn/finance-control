@@ -115,8 +115,8 @@ const CategoryList = ({ categories, onEdit }: { categories: Category[]; onEdit?:
   );
 };
 
-const enhance = withObservables([], () => ({
-  categories: CategoryService.observeCategories(),
+const enhance = withObservables(['userId'], ({ userId }: { userId: string }) => ({
+  categories: CategoryService.observeCategories(userId),
 }));
 
 export default enhance(CategoryList);

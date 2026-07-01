@@ -8,6 +8,7 @@ const RETRY_DELAYS_MS = [5_000, 15_000, 30_000]; // 3 tentativas: 5s, 15s, 30s
 export function useAutoSync() {
   const { user } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const isSyncingRef = useRef(false);
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -36,6 +37,7 @@ export function useAutoSync() {
       isSyncingRef.current = true;
       setIsSyncing(true);
       await sync();
+      setLastSyncedAt(Date.now());
       console.log(`✅ [${trigger}] Sincronização concluída com sucesso`);
     } catch (error) {
       console.error(`❌ [${trigger}] Erro na sincronização:`, error);
@@ -80,7 +82,7 @@ export function useAutoSync() {
 
   const forceSync = useCallback(() => performSync('manual'), [performSync]);
 
-  return { isSyncing, forceSync };
+  return { isSyncing, lastSyncedAt, forceSync };
 }
 
 export function useSyncStatus() {

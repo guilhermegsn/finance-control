@@ -414,7 +414,7 @@ const styles = StyleSheet.create({
   },
 });
 
-const enhance = withObservables([], () => {
+const enhance = withObservables(['userId'], ({ userId }: { userId: string }) => {
   const now = new Date();
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
@@ -447,8 +447,15 @@ const enhance = withObservables([], () => {
       .observeWithColumns(['amount', 'is_consolidated', 'date']),
 
     accounts: AccountService.observeAccounts(),
-    categories: CategoryService.observeCategories(),
+    categories: CategoryService.observeCategories(userId),
   };
 });
 
-export default enhance(HomeScreen);
+const EnhancedHomeScreen = enhance(HomeScreen);
+
+const HomeScreenWrapper = () => {
+  const { user } = useAuth();
+  return <EnhancedHomeScreen userId={user?.id || ''} />;
+};
+
+export default HomeScreenWrapper;

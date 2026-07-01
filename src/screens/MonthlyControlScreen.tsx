@@ -597,7 +597,7 @@ const MonthlyControlScreenWrapper = () => {
       ).observe()
       : [],
     accounts: AccountService.observeAccounts(),
-    categories: CategoryService.observeCategories(),
+    categories: CategoryService.observeCategories(userId),
   }))(MonthlyControlScreen);
 
   return <ScreenWithData userId={user?.id || ''} />;

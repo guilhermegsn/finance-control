@@ -96,7 +96,7 @@ export default function CategoriesScreen() {
         <View style={styles.headerBtn} />
       </View>
 
-      <CategoryList onEdit={handleEdit} />
+      <CategoryList onEdit={handleEdit} userId={user?.id || ''} />
 
       {/* FAB */}
       <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)} activeOpacity={0.85}>
