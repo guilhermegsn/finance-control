@@ -6,6 +6,7 @@ import { database } from '../database';
 import Transaction from '../models/Transactions';
 import { AccountService } from '../service/AccountService';
 import { CategoryService } from '../service/CategoryService';
+import CreditCardService from '../service/CreditCardService';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigation } from '@react-navigation/native';
@@ -13,6 +14,7 @@ import { Icon } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import GlassHeader from '../components/GlassHeader';
 import TransactionTypeModal from '../components/TransactionTypeModal';
+import OnboardingChecklistCard from '../components/OnboardingChecklistCard';
 import greetingsData from '../utils/greetings.json';
 import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -26,6 +28,7 @@ interface HomeScreenProps {
   ccDueUpToMonth: Transaction[];
   accounts: any[];
   categories: any[];
+  cards: any[];
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -35,6 +38,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   ccDueUpToMonth,
   accounts,
   categories,
+  cards,
 }) => {
   const { isDarkMode } = useTheme();
   const { user } = useAuth();
@@ -143,6 +147,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     nav.navigate('TransferForm', { accounts });
   };
 
+  const hasCreditCard = cards.length > 0;
+  const hasTransaction = allTransactions.length > 0;
+  const handleAddCreditCard = () => nav.navigate('CreditCardForm');
+  const handleAddTransaction = () => handleSelectType('expense');
+
   const fmt = (v: number) => `R$ ${Math.abs(v).toFixed(2)}`;
   const masked = '• • • • •';
   const maskedSmall = '• • •';
@@ -163,6 +172,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             {welcomeMessage}
           </Text>
         </View>
+
+        {(!hasCreditCard || !hasTransaction) && (
+          <OnboardingChecklistCard
+            hasCreditCard={hasCreditCard}
+            hasTransaction={hasTransaction}
+            onAddCreditCard={handleAddCreditCard}
+            onAddTransaction={handleAddTransaction}
+          />
+        )}
 
         {/* Hero balance card */}
         <View style={styles.sectionRow}>
@@ -421,11 +439,12 @@ const enhance = withObservables(['userId'], ({ userId }: { userId: string }) => 
 
   return {
     allTransactions: database.get<Transaction>('transactions')
-      .query(Q.where('credit_card_id', null))
+      .query(Q.where('user_id', userId), Q.where('credit_card_id', null))
       .observeWithColumns(['amount', 'type', 'is_consolidated', 'date']),
 
     pastTransactions: database.get<Transaction>('transactions')
       .query(
+        Q.where('user_id', userId),
         Q.where('credit_card_id', null),
         Q.where('date', Q.lt(firstDay.getTime())),
       )
@@ -433,6 +452,7 @@ const enhance = withObservables(['userId'], ({ userId }: { userId: string }) => 
 
     currentMonthTransactions: database.get<Transaction>('transactions')
       .query(
+        Q.where('user_id', userId),
         Q.where('credit_card_id', null),
         Q.where('date', Q.between(firstDay.getTime(), lastDay.getTime())),
       )
@@ -440,6 +460,7 @@ const enhance = withObservables(['userId'], ({ userId }: { userId: string }) => 
 
     ccDueUpToMonth: database.get<Transaction>('transactions')
       .query(
+        Q.where('user_id', userId),
         Q.where('credit_card_id', Q.notEq(null)),
         Q.where('is_consolidated', false),
         Q.where('date', Q.lte(lastDay.getTime())),
@@ -448,6 +469,7 @@ const enhance = withObservables(['userId'], ({ userId }: { userId: string }) => 
 
     accounts: AccountService.observeAccounts(),
     categories: CategoryService.observeCategories(userId),
+    cards: CreditCardService.observeAll(userId),
   };
 });
 
