@@ -584,10 +584,12 @@ const MonthlyControlScreenWrapper = () => {
 
   const ScreenWithData = withObservables(['userId'], ({ userId }: { userId: string }) => ({
     transactions: database.get<Transaction>('transactions').query(
+      Q.where('user_id', userId),
       Q.where('credit_card_id', null),
       Q.sortBy('date', Q.desc)
     ).observeWithColumns(['date', 'purchase_date', 'amount', 'description', 'category_id', 'is_consolidated', 'credit_card_id']),
     allTransactions: database.get<Transaction>('transactions').query(
+      Q.where('user_id', userId),
       Q.sortBy('date', Q.desc)
     ).observeWithColumns(['date', 'purchase_date', 'amount', 'description', 'category_id', 'is_consolidated', 'credit_card_id', 'related_transaction_id']),
     creditCards: userId

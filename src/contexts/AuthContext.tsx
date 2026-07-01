@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useContext } from 'react';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { database } from '../database';
 
 interface AuthContextProps {
     user: User | null;
@@ -108,6 +109,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             // ignorar se o usuário não estava logado com Google
         }
         await supabase.auth.signOut();
+        // Limpa o banco local para evitar vazamento de dados entre usuários
+        await database.unsafeResetDatabase();
     };
 
     return (
