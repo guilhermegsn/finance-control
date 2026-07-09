@@ -31,7 +31,9 @@ There are no automated tests in this project. Verification is done by running th
 
 ### Sync flow (`src/service/sync.ts`)
 
-Tables are synced in dependency order: `accounts → categories → credit_cards → transactions`. The pull phase uses `updated_at > lastPulledAt` (numeric) filtered by `user_id`. The push phase sends created/updated/deleted records, always setting `updated_at = Date.now()`.
+Tables are synced in dependency order: `accounts → categories → credit_cards → transactions`. The pull phase uses `updated_at > lastPulledAt` (numeric) filtered by `user_id` — except `categories`, which also pulls global system categories (`user_id IS NULL`). The push phase sends created/updated/deleted records, always setting `updated_at = Date.now()`; system categories (`is_system = true`) are never pushed.
+
+System categories live once in Supabase with `user_id = NULL` and are read-only for all users (no seeding per user). On logout, the local database is wiped via `unsafeResetDatabase()` to prevent data leaking between accounts.
 
 ### WatermelonDB patterns
 
@@ -42,7 +44,7 @@ Tables are synced in dependency order: `accounts → categories → credit_cards
 
 ### Authentication (`src/contexts/AuthContext.tsx`)
 
-Google Sign-In → Supabase `signInWithIdToken`. The `useAuth()` hook exposes `user`, `session`, `loading`, `signInWithGoogle`, `signOut`. Session is persisted via AsyncStorage. On login, `CategoryService.initializeDefaults(userId)` seeds system categories.
+Google Sign-In → Supabase `signInWithIdToken`, plus email OTP (`signInWithEmail`/`verifyEmailOtp`). The `useAuth()` hook exposes `user`, `session`, `loading`, `pendingEmail`, `signInWithGoogle`, `signInWithEmail`, `verifyEmailOtp`, `cancelEmailLogin`, `signOut`. Session is persisted via AsyncStorage.
 
 ### Navigation (`src/navigation/`)
 

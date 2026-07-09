@@ -165,6 +165,49 @@ class NotificationService {
     await Promise.all(toCancel.map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)));
   }
 
+  async scheduleTransactionNotification(
+    transactionId: string,
+    description: string,
+    date: Date,
+    type: 'income' | 'expense'
+  ): Promise<void> {
+    const granted = await this.requestPermissions();
+    if (!granted) return;
+
+    const settings = await this.getSettings();
+    const hour = settings.invoiceDue.hourOfDay;
+
+    const target = new Date(date);
+    target.setHours(hour, 0, 0, 0);
+
+    // Don't schedule if date is in the past
+    if (target.getTime() <= Date.now()) return;
+
+    const identifier = `transaction_due_${transactionId}`;
+
+    await Notifications.scheduleNotificationAsync({
+      identifier,
+      content: {
+        title: type === 'expense' ? 'Conta a pagar hoje 💸' : 'Recebimento esperado hoje 💰',
+        body: description,
+        data: { transactionId, type: 'transaction_due' },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: target,
+      },
+    });
+  }
+
+  async cancelTransactionNotification(transactionId: string): Promise<void> {
+    await Notifications.cancelScheduledNotificationAsync(`transaction_due_${transactionId}`);
+  }
+
+  async isTransactionNotificationScheduled(transactionId: string): Promise<boolean> {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    return scheduled.some((n) => n.identifier === `transaction_due_${transactionId}`);
+  }
+
   async cancelAllInvoiceNotifications(): Promise<void> {
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     const toCancel = scheduled.filter((n) => n.identifier.startsWith('invoice_due_'));

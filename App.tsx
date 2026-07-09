@@ -1,11 +1,10 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import { PaperProvider, MD3DarkTheme, MD3LightTheme } from 'react-native-paper';
 import AppNavigator from './src/navigation/AppNavigator';
 import OnboardingNavigator from './src/navigation/OnboardingNavigator';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
-import { CategoryService } from './src/service/CategoryService';
 import useAutoSync from './src/service/useAutoSync';
 import { useNotifications } from './src/hooks/useNotifications';
 import { useOnboardingStatus } from './src/hooks/useOnboardingStatus';
@@ -16,20 +15,11 @@ import OtpScreen from './src/screens/auth/OtpScreen';
 // Componente que decide o que mostrar
 const RootNavigation = () => {
   const { user, loading, pendingEmail } = useAuth();
-  const { needsOnboarding, isLoading: onboardingLoading, markCompleted } = useOnboardingStatus(user?.id);
+  const { lastSyncedAt, syncGaveUp } = useAutoSync();
+  const syncResolved = lastSyncedAt !== null || syncGaveUp;
+  const { needsOnboarding, isLoading: onboardingLoading, markCompleted } = useOnboardingStatus(user?.id, syncResolved);
 
-  const { lastSyncedAt } = useAutoSync();
   useNotifications(user?.id);
-
-  // Inicializa categorias padrão apenas após o primeiro sync bem-sucedido,
-  // garantindo que o PULL já trouxe os dados do Supabase antes de criar localmente.
-  useEffect(() => {
-    if (lastSyncedAt && user?.id) {
-      CategoryService.initializeDefaults(user.id).catch((error) => {
-        console.error('Erro ao inicializar categorias padrão:', error);
-      });
-    }
-  }, [lastSyncedAt, user?.id]);
 
   if (loading) {
     return (

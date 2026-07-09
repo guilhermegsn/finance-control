@@ -9,6 +9,7 @@ export function useAutoSync() {
   const { user } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
+  const [syncGaveUp, setSyncGaveUp] = useState(false);
   const isSyncingRef = useRef(false);
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -38,6 +39,7 @@ export function useAutoSync() {
       setIsSyncing(true);
       await sync();
       setLastSyncedAt(Date.now());
+      setSyncGaveUp(false);
       console.log(`✅ [${trigger}] Sincronização concluída com sucesso`);
     } catch (error) {
       console.error(`❌ [${trigger}] Erro na sincronização:`, error);
@@ -50,6 +52,7 @@ export function useAutoSync() {
         }, delay);
       } else {
         console.log(`⛔ [${trigger}] Todas as tentativas esgotadas.`);
+        setSyncGaveUp(true);
       }
     } finally {
       isSyncingRef.current = false;
@@ -65,6 +68,10 @@ export function useAutoSync() {
       return;
     }
 
+    // Novo usuário logado: descarta o resultado do sync anterior (relevante em
+    // troca de conta no mesmo aparelho) antes de disparar a sincronização.
+    setLastSyncedAt(null);
+    setSyncGaveUp(false);
     performSync('auth_ready');
 
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
@@ -82,7 +89,7 @@ export function useAutoSync() {
 
   const forceSync = useCallback(() => performSync('manual'), [performSync]);
 
-  return { isSyncing, lastSyncedAt, forceSync };
+  return { isSyncing, lastSyncedAt, syncGaveUp, forceSync };
 }
 
 export function useSyncStatus() {

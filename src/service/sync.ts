@@ -31,11 +31,15 @@ export async function sync() {
 
         for (const table of TABLES) {
           // FILTRO COM NÚMERO (lastPulledAt ou 0)
-          const { data, error } = await supabase
+          // Categorias de sistema são globais (user_id NULL) e visíveis a todos
+          const baseQuery = supabase
             .from(table)
             .select('*')
-            .gt('updated_at', lastPulledAt || 0)
-            .eq('user_id', userId);
+            .gt('updated_at', lastPulledAt || 0);
+
+          const { data, error } = table === 'categories'
+            ? await baseQuery.or(`user_id.eq.${userId},user_id.is.null`)
+            : await baseQuery.eq('user_id', userId);
 
           if (error) throw new Error(`Erro ao puxar ${table}: ${error.message}`);
 
@@ -71,9 +75,15 @@ export async function sync() {
           const tableChanges = (changes as any)[table];
           if (!tableChanges) continue;
 
+          // Categorias de sistema são globais e read-only: nunca enviar ao servidor
+          const isPushable = (record: any) => {
+            const data = record._raw || record;
+            return !(table === 'categories' && data.is_system);
+          };
+
           // A. CRIADOS
-          if (tableChanges.created?.length > 0) {
-            const records = tableChanges.created.map((record: any) => {
+          if (tableChanges.created?.filter(isPushable).length > 0) {
+            const records = tableChanges.created.filter(isPushable).map((record: any) => {
               const data = record._raw || record;
               const { _status, _changed, ...dataClean } = data;
 
@@ -91,8 +101,8 @@ export async function sync() {
           }
 
           // B. ATUALIZADOS
-          if (tableChanges.updated?.length > 0) {
-            const records = tableChanges.updated.map((record: any) => {
+          if (tableChanges.updated?.filter(isPushable).length > 0) {
+            const records = tableChanges.updated.filter(isPushable).map((record: any) => {
               const data = record._raw || record;
               const { _status, _changed, ...dataClean } = data;
 

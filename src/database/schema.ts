@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const mySchema = appSchema({
-  version: 2,
+  version: 3,
   tables: [
     // 1. ACCOUNTS
     tableSchema({
@@ -23,7 +23,8 @@ export const mySchema = appSchema({
     tableSchema({
       name: 'categories',
       columns: [
-        { name: 'user_id', type: 'string' },
+        // NULL = categoria global do sistema, visível a todos os usuários
+        { name: 'user_id', type: 'string', isOptional: true },
         { name: 'name', type: 'string' },
         { name: 'icon', type: 'string' },
         { name: 'color', type: 'string' },

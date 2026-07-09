@@ -45,10 +45,10 @@ export const TransactionService = {
     isRecurring?: boolean;
     recurringEndDate?: Date;
   }) => {
-    await database.write(async () => {
-      // Se não for recorrente, cria apenas uma transação
+    return await database.write(async () => {
+      // Se não for recorrente, cria apenas uma transação e retorna ela
       if (!data.isRecurring) {
-        await database.get<Transaction>('transactions').create((transaction) => {
+        return await database.get<Transaction>('transactions').create((transaction) => {
           // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
           transaction._raw.account_id = data.accountId;
           // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
@@ -72,7 +72,6 @@ export const TransactionService = {
             transaction._raw.related_transaction_id = data.relatedTransactionId;
           }
         });
-        return;
       }
 
       // Se for recorrente, cria uma série de transações usando database.batch()

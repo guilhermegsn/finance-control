@@ -3,15 +3,16 @@ import { database } from '../database';
 import Category from '../models/Caterogy';
 
 export const CategoryService = {
+  // Retorna as categorias do usuário + as globais do sistema (user_id NULL)
   observeCategories: (userId: string) => {
     return database.get<Category>('categories')
-      .query(Q.where('user_id', userId))
+      .query(Q.or(Q.where('user_id', userId), Q.where('user_id', null)))
       .observe();
   },
 
   fetchAll: async (userId: string) => {
     return await database.get<Category>('categories')
-      .query(Q.where('user_id', userId))
+      .query(Q.or(Q.where('user_id', userId), Q.where('user_id', null)))
       .fetch();
   },
 
@@ -70,74 +71,5 @@ export const CategoryService = {
     });
 
     console.log('Categoria marcada para exclusão. Execute o Sync para atualizar o servidor.');
-  },
-
-  initializeDefaults: async (userId: string) => {
-    const count = await database.get<Category>('categories')
-      .query(Q.where('user_id', userId))
-      .fetchCount();
-    if (count === 0) {
-      await database.write(async () => {
-        const batch = [
-          database.get<Category>('categories').prepareCreate((category) => {
-            category.name = 'Alimentação';
-            category.icon = 'food';
-            category.color = '#FF6347';
-            category.type = 'expense';
-            category.userId = userId;
-            category.isSystem = true;
-          }),
-          database.get<Category>('categories').prepareCreate((category) => {
-            category.name = 'Transporte';
-            category.icon = 'car';
-            category.color = '#4682B4';
-            category.type = 'expense';
-            category.userId = userId;
-            category.isSystem = true;
-          }),
-          database.get<Category>('categories').prepareCreate((category) => {
-            category.name = 'Moradia';
-            category.icon = 'home';
-            category.color = '#32CD32';
-            category.type = 'expense';
-            category.userId = userId;
-            category.isSystem = true;
-          }),
-          database.get<Category>('categories').prepareCreate((category) => {
-            category.name = 'Lazer';
-            category.icon = 'gamepad';
-            category.color = '#FFD700';
-            category.type = 'expense';
-            category.userId = userId;
-            category.isSystem = true;
-          }),
-          database.get<Category>('categories').prepareCreate((category) => {
-            category.name = 'Saúde';
-            category.icon = 'medical-bag';
-            category.color = '#FF4500';
-            category.type = 'expense';
-            category.userId = userId;
-            category.isSystem = true;
-          }),
-          database.get<Category>('categories').prepareCreate((category) => {
-            category.name = 'Salário';
-            category.icon = 'cash';
-            category.color = '#228B22';
-            category.type = 'income';
-            category.userId = userId;
-            category.isSystem = true;
-          }),
-          database.get<Category>('categories').prepareCreate((category) => {
-            category.name = 'Investimentos';
-            category.icon = 'chart-line';
-            category.color = '#1E90FF';
-            category.type = 'income';
-            category.userId = userId;
-            category.isSystem = true;
-          }),
-        ];
-        await database.batch(batch);
-      });
-    }
   }
 };

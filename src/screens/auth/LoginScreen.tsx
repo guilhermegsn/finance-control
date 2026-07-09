@@ -4,6 +4,7 @@ import { Text, TextInput, Button, Surface, HelperText } from 'react-native-paper
 import { useFonts, Poppins_900Black } from '@expo-google-fonts/poppins';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { supabase } from '../../lib/supabase';
 
 export default function LoginScreen() {
     const { signInWithGoogle, signInWithEmail } = useAuth();
@@ -48,9 +49,22 @@ export default function LoginScreen() {
     const handleGoogleLogin = async () => {
         setLoadingGoogle(true);
         try {
+
+
+
+            supabase.auth.onAuthStateChange((event, session) => {
+                if (session) {
+                    console.log('ACCESS TOKEN:', session.access_token)
+                }
+            })
+
+
+
             await signInWithGoogle();
-        } catch {
-            // erro já tratado no AuthContext
+
+
+        } catch (e) {
+            console.log(e)
         } finally {
             setLoadingGoogle(false);
         }

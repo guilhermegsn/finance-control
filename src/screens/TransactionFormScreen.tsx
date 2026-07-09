@@ -5,6 +5,7 @@ import { View, TouchableOpacity, ScrollView, Alert, StyleSheet, Text } from 'rea
 import { TextInput, Switch, Portal, Dialog, Button, Icon } from 'react-native-paper';
 import { Select } from '../components/Select';
 import { TransactionService } from '../service/TransactionService';
+import NotificationService from '../service/NotificationService';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -23,6 +24,7 @@ interface FormData {
   isRecurring: boolean;
   recurringEndDate?: Date | null;
   isConsolidated: boolean;
+  notify: boolean;
   accountId: string;
   categoryId: string;
 }
@@ -69,6 +71,7 @@ export default function TransactionFormScreen() {
         isRecurring: false,
         recurringEndDate: null,
         isConsolidated: transaction.isConsolidated,
+        notify: false,
         accountId: transaction.accountId || '',
         categoryId: transaction.categoryId || '',
       };
@@ -83,10 +86,38 @@ export default function TransactionFormScreen() {
       isRecurring: false,
       recurringEndDate: null,
       isConsolidated: true,
+      notify: false,
       accountId: accounts.length > 0 ? accounts[0].id : '',
       categoryId: categories.length > 0 ? categories[0].id : '',
     };
   });
+
+  // Para edição: verifica se já existe notificação agendada para esta transação
+  useEffect(() => {
+    if (!transaction?.id) return;
+    NotificationService.isTransactionNotificationScheduled(transaction.id).then((scheduled) => {
+      if (scheduled) setFormData(prev => ({ ...prev, notify: true }));
+    });
+  }, [transaction?.id]);
+
+
+  useEffect(() => {
+    if (formData.date && formData.date.getTime() > Date.now()) {
+      setFormData(prevData => ({
+        ...prevData,
+        isConsolidated: false
+      }))
+    }
+  },[formData?.date])
+
+    useEffect(() => {
+    if (formData.isRecurring) {
+      setFormData(prevData => ({
+        ...prevData,
+        isConsolidated: false
+      }))
+    }
+  },[formData?.isRecurring, formData.isConsolidated])
 
 
 
@@ -142,11 +173,23 @@ export default function TransactionFormScreen() {
             date: transactionData.date,
             isConsolidated: transactionData.isConsolidated,
           });
+          if (formData.notify && !formData.isConsolidated) {
+            await NotificationService.scheduleTransactionNotification(
+              transaction.id, formData.description, formData.date, formData.type!
+            );
+          } else {
+            await NotificationService.cancelTransactionNotification(transaction.id);
+          }
           onSave?.();
           navigation.goBack();
         }
       } else {
-        await TransactionService.create(transactionData);
+        const created = await TransactionService.create(transactionData);
+        if (created && formData.notify && !formData.isConsolidated) {
+          await NotificationService.scheduleTransactionNotification(
+            created.id, formData.description, formData.date, formData.type!
+          );
+        }
         onSave?.();
         navigation.goBack();
       }
@@ -413,6 +456,29 @@ export default function TransactionFormScreen() {
               thumbColor="#FFFFFF"
             />
           </View>
+
+          {!formData.isConsolidated && !formData.isRecurring && (
+            <>
+              <View style={[styles.divider, { backgroundColor: c.border }]} />
+              <View style={styles.toggleRow}>
+                <View style={[styles.toggleIconPill, { backgroundColor: '#F59E0B18' }]}>
+                  <Icon source="bell-outline" size={16} color="#F59E0B" />
+                </View>
+                <View style={styles.toggleTextWrap}>
+                  <Text style={[styles.toggleLabel, { color: c.textPrimary }]}>{t('Notificar')}</Text>
+                  <Text style={[styles.toggleHint, { color: c.textSecondary }]}>
+                    {formData.notify ? t('Aviso no dia da transação') : t('Sem notificação')}
+                  </Text>
+                </View>
+                <Switch
+                  value={formData.notify}
+                  onValueChange={value => setFormData(prev => ({ ...prev, notify: value }))}
+                  trackColor={{ false: '#CBD5E1', true: '#F59E0B' }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+            </>
+          )}
 
           <View style={[styles.divider, { backgroundColor: c.border }]} />
 

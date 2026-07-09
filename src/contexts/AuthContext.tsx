@@ -103,14 +103,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     const signOut = async () => {
+        // Bloqueia a UI imediatamente para evitar que o novo login comece
+        // antes do banco local estar limpo
+        setLoading(true);
         try {
-            await GoogleSignin.signOut();
-        } catch {
-            // ignorar se o usuário não estava logado com Google
+            try {
+                await GoogleSignin.signOut();
+            } catch {
+                // ignorar se o usuário não estava logado com Google
+            }
+            // Reseta o banco ANTES do signOut para garantir que nenhum observer
+            // do novo usuário encontre dados do usuário anterior.
+            // unsafeResetDatabase() precisa rodar dentro de um writer block.
+            await database.write(async () => {
+                await database.unsafeResetDatabase();
+            });
+            await supabase.auth.signOut();
+            // setLoading(false) é chamado pelo onAuthStateChange após o signOut
+        } catch (error) {
+            console.error('Erro ao sair da conta:', error);
+            setLoading(false);
         }
-        await supabase.auth.signOut();
-        // Limpa o banco local para evitar vazamento de dados entre usuários
-        await database.unsafeResetDatabase();
     };
 
     return (
