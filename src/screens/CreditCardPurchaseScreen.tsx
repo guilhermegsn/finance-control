@@ -45,6 +45,7 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
   const { transactionId, categories = [], onSave } = route.params || {};
   const [isEditing, setIsEditing] = useState(false);
   const [currentTransaction, setCurrentTransaction] = useState<Transaction | null>(null);
+  const [isInstallmentPurchase, setIsInstallmentPurchase] = useState(false);
 
   const c = {
     bg: isDarkMode ? '#0D1117' : '#EEF2F7',
@@ -87,6 +88,7 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
         if (tx) {
           setCurrentTransaction(tx);
           setIsEditing(true);
+          setIsInstallmentPurchase(await TransactionService.isInstallmentPurchase(tx));
           // @ts-ignore
           const creditCardId = tx._raw?.credit_card_id;
           // @ts-ignore
@@ -145,11 +147,8 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
 
   const handleDelete = async () => {
     if (!user || !currentTransaction) return;
-    // @ts-ignore
-    const relatedTransactionId = currentTransaction._raw?.related_transaction_id;
-    const isInstallment = !!relatedTransactionId;
 
-    if (isInstallment) {
+    if (isInstallmentPurchase) {
       Alert.alert(
         t('Excluir Compra Parcelada'),
         t('Esta compra faz parte de um parcelamento. Como deseja excluir?'),
@@ -214,9 +213,7 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
     setCalculating(true);
     try {
       if (isEditing && currentTransaction) {
-        // @ts-ignore
-        const relatedId = currentTransaction._raw?.related_transaction_id;
-        if (relatedId) {
+        if (isInstallmentPurchase) {
           Alert.alert(
             t('Editar Compra Parcelada'),
             t('Esta compra faz parte de um parcelamento. Como deseja editar?'),

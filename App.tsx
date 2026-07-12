@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, ActivityIndicator, Text } from 'react-native';
 import { PaperProvider, MD3DarkTheme, MD3LightTheme } from 'react-native-paper';
 import AppNavigator from './src/navigation/AppNavigator';
 import OnboardingNavigator from './src/navigation/OnboardingNavigator';
@@ -14,7 +14,7 @@ import OtpScreen from './src/screens/auth/OtpScreen';
 
 // Componente que decide o que mostrar
 const RootNavigation = () => {
-  const { user, loading, pendingEmail } = useAuth();
+  const { user, loading, loadingMessage, pendingEmail } = useAuth();
   const { lastSyncedAt, syncGaveUp } = useAutoSync();
   const syncResolved = lastSyncedAt !== null || syncGaveUp;
   const { needsOnboarding, isLoading: onboardingLoading, markCompleted } = useOnboardingStatus(user?.id, syncResolved);
@@ -25,6 +25,9 @@ const RootNavigation = () => {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#6200ee" />
+        {loadingMessage && (
+          <Text style={styles.loadingMessage}>{loadingMessage}</Text>
+        )}
       </View>
     );
   }
@@ -82,5 +85,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingMessage: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#64748B',
   },
 });

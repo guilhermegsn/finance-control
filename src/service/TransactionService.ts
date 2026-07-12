@@ -883,6 +883,20 @@ export const TransactionService = {
     });
   },
 
+  // Verificar se uma transação faz parte de uma compra parcelada:
+  // ou é uma parcela filha (tem related_transaction_id), ou é a primeira
+  // parcela (outras parcelas apontam para ela)
+  isInstallmentPurchase: async (transaction: Transaction): Promise<boolean> => {
+    // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
+    if (transaction._raw?.related_transaction_id) return true;
+
+    const childCount = await database.get<Transaction>('transactions')
+      .query(Q.where('related_transaction_id', transaction.id))
+      .fetchCount();
+
+    return childCount > 0;
+  },
+
   // Excluir compra no cartão de crédito (TAREFA 3)
   deleteCreditCardPurchase: async (
     transactionId: string,

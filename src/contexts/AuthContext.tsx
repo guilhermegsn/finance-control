@@ -1,13 +1,16 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
+import { Alert } from 'react-native';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { database } from '../database';
+import { sync } from '../service/sync';
 
 interface AuthContextProps {
     user: User | null;
     session: Session | null;
     loading: boolean;
+    loadingMessage: string | null;
     pendingEmail: string | null;
     signInWithGoogle: () => Promise<void>;
     signInWithEmail: (email: string) => Promise<void>;
@@ -22,6 +25,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
+    const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
     const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
     useEffect(() => {
@@ -41,6 +45,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             setSession(session);
             setUser(session?.user ?? null);
             setLoading(false);
+            setLoadingMessage(null);
         });
 
         return () => subscription.unsubscribe();
@@ -102,9 +107,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setPendingEmail(null);
     };
 
-    const signOut = async () => {
-        // Bloqueia a UI imediatamente para evitar que o novo login comece
-        // antes do banco local estar limpo
+    // Limpa o banco local e encerra a sessão. O banco é resetado ANTES do
+    // signOut para que nenhum observer do próximo usuário veja dados antigos.
+    const performLogout = async () => {
+        setLoadingMessage('Saindo...');
         setLoading(true);
         try {
             try {
@@ -112,9 +118,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             } catch {
                 // ignorar se o usuário não estava logado com Google
             }
-            // Reseta o banco ANTES do signOut para garantir que nenhum observer
-            // do novo usuário encontre dados do usuário anterior.
-            // unsafeResetDatabase() precisa rodar dentro de um writer block.
+            // unsafeResetDatabase() precisa rodar dentro de um writer block
             await database.write(async () => {
                 await database.unsafeResetDatabase();
             });
@@ -123,7 +127,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } catch (error) {
             console.error('Erro ao sair da conta:', error);
             setLoading(false);
+            setLoadingMessage(null);
         }
+    };
+
+    const signOut = async () => {
+        // O logout apaga o banco local, então alterações pendentes precisam
+        // subir ao servidor antes — senão são perdidas para sempre.
+        setLoadingMessage('Salvando alterações...');
+        setLoading(true);
+        try {
+            await sync();
+        } catch (error) {
+            console.error('Sync antes do logout falhou:', error);
+            setLoading(false);
+            setLoadingMessage(null);
+            Alert.alert(
+                'Alterações não salvas',
+                'Não foi possível enviar suas alterações ao servidor. Se sair agora, elas serão perdidas. Deseja sair mesmo assim?',
+                [
+                    { text: 'Cancelar', style: 'cancel' },
+                    { text: 'Sair mesmo assim', style: 'destructive', onPress: () => { performLogout(); } },
+                ]
+            );
+            return;
+        }
+        await performLogout();
     };
 
     return (
@@ -131,6 +160,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             user,
             session,
             loading,
+            loadingMessage,
             pendingEmail,
             signInWithGoogle,
             signInWithEmail,

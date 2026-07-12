@@ -16,6 +16,11 @@ function TransactionItemComponent({ transaction, onLongPress }: TransactionItemP
 
   const { theme } = useTheme()
 
+  // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
+  const isCreditCardTransaction = !!transaction._raw?.credit_card_id;
+  // Transações de cartão não têm conceito de consolidação na exibição
+  const textColor = isCreditCardTransaction || transaction.isConsolidated ? theme.text : 'gray';
+
   const handleToggleConsolidated = async () => {
     try {
       await TransactionService.toggleConsolidated(transaction);
@@ -27,8 +32,7 @@ function TransactionItemComponent({ transaction, onLongPress }: TransactionItemP
   return (
     <TouchableOpacity onLongPress={onLongPress} style={{ flexDirection: 'row', alignItems: 'center' }}>
       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-        {/* @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos */}
-        {!transaction._raw?.credit_card_id && (
+        {!isCreditCardTransaction && (
           <TouchableOpacity onPress={handleToggleConsolidated}>
             <Icon
               source={transaction.isConsolidated ? "check-circle" : "check-circle-outline"}
@@ -43,9 +47,8 @@ function TransactionItemComponent({ transaction, onLongPress }: TransactionItemP
 
         <Text variant='labelMedium'
           style={{
-            /* @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos */
-            width: 50, marginLeft: transaction._raw?.credit_card_id ? 32 : 15,
-            color: transaction.isConsolidated ? theme.text : 'gray'
+            width: 50, marginLeft: isCreditCardTransaction ? 32 : 15,
+            color: textColor
           }}>
           {transaction.purchaseDate
             ? new Date(transaction.purchaseDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
@@ -53,13 +56,13 @@ function TransactionItemComponent({ transaction, onLongPress }: TransactionItemP
         </Text>
 
         <Text variant='labelMedium'
-          style={{ flex: 1, color: transaction.isConsolidated ? theme.text : 'gray' }}>
+          style={{ flex: 1, color: textColor }}>
           {transaction.description}
         </Text>
 
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Text variant='labelMedium'
-            style={{ color: transaction.isConsolidated ? theme.text : 'gray' }}>
+            style={{ color: textColor }}>
             R$ {transaction.amount.toFixed(2)}
           </Text>
         </View>

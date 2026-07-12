@@ -99,7 +99,9 @@ export async function sync() {
                 deleted_at: null
               };
             });
-            const { error } = await supabase.from(table).insert(records);
+            // upsert (não insert): se um push anterior falhou no meio, o retry
+            // reenvia registros que já existem no servidor — upsert é idempotente
+            const { error } = await supabase.from(table).upsert(records);
             if (error) throw new Error(`Erro ao inserir ${table}: ${error.message}`);
           }
 

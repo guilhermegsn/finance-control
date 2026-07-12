@@ -77,6 +77,10 @@ export function useAutoSync() {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
         performSync('app_state_active');
+      } else if (nextAppState === 'background') {
+        // Best-effort: empurra alterações pendentes antes do sistema congelar o app.
+        // O que não subir aqui, sobe no próximo 'active'.
+        performSync('app_background');
       }
     };
     const appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
