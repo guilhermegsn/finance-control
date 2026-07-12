@@ -6,7 +6,8 @@ const TABLES = [
   'accounts',      // 1º (Pai de todos)
   'categories',    // 2º (Pai das transações)
   'credit_cards',  // 3º (Filho da conta, mas pai das transações)
-  'transactions'   // 4º (Filho de todo mundo - o último a ser salvo)
+  'transactions',  // 4º (Filho de todo mundo - o último a ser salvo)
+  'portfolios'     // 5º (Independente - carteira de ações do Sentinela)
 ];
 
 // Helper simples para garantir que temos um número (timestamp)
@@ -42,6 +43,8 @@ export async function sync() {
             : await baseQuery.eq('user_id', userId);
 
           if (error) throw new Error(`Erro ao puxar ${table}: ${error.message}`);
+
+          console.log(`📥 ${table}: ${data?.length ?? 0} registro(s) recebido(s)`);
 
           const created: any[] = [];
           const updated: any[] = [];

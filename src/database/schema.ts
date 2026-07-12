@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const mySchema = appSchema({
-  version: 3,
+  version: 5,
   tables: [
     // 1. ACCOUNTS
     tableSchema({
@@ -74,6 +74,22 @@ export const mySchema = appSchema({
         { name: 'auto_debit', type: 'boolean' },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
+        { name: 'deleted_at', type: 'number', isOptional: true },
+      ],
+    }),
+    // 5. PORTFOLIOS (carteira de ações — dados de mercado ficam no Sentinela)
+    tableSchema({
+      name: 'portfolios',
+      columns: [
+        { name: 'user_id', type: 'string' },
+        { name: 'ticker', type: 'string' },
+        { name: 'quantity', type: 'number' },
+        { name: 'average_price', type: 'number' },
+        { name: 'purchased_at', type: 'number', isOptional: true },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+        // isOptional é obrigatório: os filtros usam deleted_at = null (como em credit_cards);
+        // sem isOptional o WatermelonDB converte null em 0 e os registros somem das queries
         { name: 'deleted_at', type: 'number', isOptional: true },
       ],
     }),

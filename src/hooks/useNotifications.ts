@@ -14,6 +14,7 @@ export function useNotifications(userId: string | undefined) {
     // Bootstrap: register device and schedule notifications
     (async () => {
       await NotificationService.registerDevice(userId);
+      await NotificationService.registerSentinelaToken();
       const cards = await CreditCardService.getAll(userId);
       await NotificationService.scheduleInvoiceNotifications(cards);
     })();

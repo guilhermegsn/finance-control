@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { MaterialIcons } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen';
 import MonthlyControlScreen from '../screens/MonthlyControlScreen';
+import SentinelaScreen from '../screens/SentinelaScreen';
 import MenuScreen from '../screens/MenuScreen';
 
 const Tab = createBottomTabNavigator()
@@ -41,6 +42,17 @@ export default function BottomNavigator() {
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="today" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name='SentinelaScreen'
+        component={SentinelaScreen}
+        options={{
+          tabBarLabel: 'Sentinela',
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="trending-up" size={size} color={color} />
           ),
         }}
       />

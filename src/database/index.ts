@@ -8,6 +8,7 @@ import Account from '../models/Accounts';
 import Category from '../models/Caterogy';
 import Transaction from '../models/Transactions';
 import CreditCard from '../models/CreditCard';
+import Portfolio from '../models/Portfolio';
 
 // Migração da versão 1 para 2: adicionar colunas recurring_id e is_recurring na tabela transactions
 const adapter = new SQLiteAdapter({
@@ -20,5 +21,5 @@ const adapter = new SQLiteAdapter({
 
 export const database = new Database({
   adapter,
-  modelClasses: [Account, Category, Transaction, CreditCard],
+  modelClasses: [Account, Category, Transaction, CreditCard, Portfolio],
 });

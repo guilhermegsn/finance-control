@@ -3,6 +3,7 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
+import SentinelaService from './SentinelaService';
 import CreditCard from '../models/CreditCard';
 
 const SETTINGS_KEY = '@butterflow_notification_settings';
@@ -87,6 +88,20 @@ class NotificationService {
       },
       { onConflict: 'user_id' }
     );
+  }
+
+  // Registra o Expo push token no backend do Sentinela (alertas de variação de preço).
+  // Sem permissão ou em emulador o token vem null e o registro é apenas pulado;
+  // falhas de rede/auth não podem travar o fluxo de login.
+  async registerSentinelaToken(): Promise<void> {
+    const token = await this.getExpoPushToken();
+    if (!token) return;
+
+    try {
+      await SentinelaService.registerDeviceToken(token, Platform.OS);
+    } catch (error) {
+      console.log('Falha ao registrar push token no Sentinela:', error);
+    }
   }
 
   async updateLastSeen(userId: string): Promise<void> {
