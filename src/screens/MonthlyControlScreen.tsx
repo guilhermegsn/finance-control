@@ -12,6 +12,7 @@ import CreditCard from '../models/CreditCard';
 import { Q } from '@nozbe/watermelondb';
 import { database } from '../database';
 import SummaryFooter from '../components/SummaryFooter';
+import MonthlyFlowChart from '../components/MonthlyFlowChart';
 import AccountsTable from '../components/AccountsTable';
 import TransactionTypeModal from '../components/TransactionTypeModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -472,6 +473,9 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
             currentBalance={currentBalance}
             projectedBalance={projectedBalance}
           />
+
+          <MonthlyFlowChart allTransactions={allTransactions} currentDate={currentDate} />
+
           <View style={{ height: 100 }} />
         </ScrollView>
 
