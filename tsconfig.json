@@ -4,6 +4,7 @@
     "strict": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
+    "types": ["jest", "node"],
   },
   "exclude": [
     "node_modules",

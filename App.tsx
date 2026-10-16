@@ -1,5 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, ActivityIndicator, Text } from 'react-native';
+import * as Sentry from '@sentry/react-native';
+import ErrorFallback from './src/components/ErrorFallback';
 import { PaperProvider, MD3DarkTheme, MD3LightTheme } from 'react-native-paper';
 import AppNavigator from './src/navigation/AppNavigator';
 import OnboardingNavigator from './src/navigation/OnboardingNavigator';
@@ -11,6 +13,12 @@ import { useOnboardingStatus } from './src/hooks/useOnboardingStatus';
 import './src/i18n';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import OtpScreen from './src/screens/auth/OtpScreen';
+
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  // Sem DSN configurado (ou em dev, onde os logs do Metro bastam) fica desativado.
+  enabled: !!process.env.EXPO_PUBLIC_SENTRY_DSN && !__DEV__,
+});
 
 // Componente que decide o que mostrar
 const RootNavigation = () => {
@@ -66,15 +74,19 @@ const ThemedApp = () => {
 };
 
 // 3. App Principal
-export default function App() {
+function App() {
   return (
-    <AuthProvider>
-      <ThemeProvider>
-        <ThemedApp />
-      </ThemeProvider>
-    </AuthProvider>
+    <Sentry.ErrorBoundary fallback={({ resetError }) => <ErrorFallback resetError={resetError} />}>
+      <AuthProvider>
+        <ThemeProvider>
+          <ThemedApp />
+        </ThemeProvider>
+      </AuthProvider>
+    </Sentry.ErrorBoundary>
   );
 }
+
+export default Sentry.wrap(App);
 
 const styles = StyleSheet.create({
   container: {

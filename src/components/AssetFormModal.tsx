@@ -91,9 +91,10 @@ export default function AssetFormModal({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+        <Pressable style={styles.overlay} onPress={onClose}>
+
           <Pressable
             style={[styles.bottomSheet, { backgroundColor: c.card }]}
             onPress={(e) => e.stopPropagation()}
@@ -171,9 +172,9 @@ export default function AssetFormModal({
               </TouchableOpacity>
             </View>
           </Pressable>
-        </KeyboardAvoidingView>
-      </Pressable>
-    </Modal>
+        </Pressable>
+      </Modal>
+    </KeyboardAvoidingView>
   );
 }
 

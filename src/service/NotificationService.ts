@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import * as IntentLauncher from 'expo-intent-launcher';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
@@ -231,6 +232,69 @@ class NotificationService {
 
   async cancelAllNotifications(): Promise<void> {
     await Notifications.cancelAllScheduledNotificationsAsync();
+  }
+
+  // Reagenda todas as notificações (fatura + transação) no horário configurado.
+  // Necessário porque notificações já agendadas mantêm o horário antigo quando
+  // o usuário muda o horário nas configurações.
+  async rescheduleAllAtConfiguredHour(cards: CreditCard[]): Promise<void> {
+    const settings = await this.getSettings();
+    const hour = settings.invoiceDue.hourOfDay;
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+
+    // Transações: preserva conteúdo e data, ajusta apenas o horário
+    const transactionNotifs = scheduled.filter((n) => n.identifier.startsWith('transaction_due_'));
+    for (const n of transactionNotifs) {
+      // No Android o trigger de data vem como { type: 'date', value: timestamp }
+      const ts = (n.trigger as any)?.value ?? (n.trigger as any)?.date;
+      if (typeof ts !== 'number') continue;
+
+      const target = new Date(ts);
+      target.setHours(hour, 0, 0, 0);
+
+      await Notifications.cancelScheduledNotificationAsync(n.identifier);
+      if (target.getTime() <= Date.now()) continue;
+
+      await Notifications.scheduleNotificationAsync({
+        identifier: n.identifier,
+        content: {
+          title: n.content.title ?? '',
+          body: n.content.body ?? '',
+          data: n.content.data,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: target,
+        },
+      });
+    }
+
+    // Faturas: cancela tudo e reconstrói a partir dos cartões
+    await this.cancelAllInvoiceNotifications();
+    await this.scheduleInvoiceNotifications(cards);
+  }
+
+  // Android 12+ entrega notificações agendadas com atraso (alarme inexato /
+  // Doze) se o app não tiver a permissão "Alarmes e lembretes". No Android 14+
+  // ela vem negada por padrão e só pode ser concedida pelo usuário nesta tela.
+  needsExactAlarmPermission(): boolean {
+    return Platform.OS === 'android' && Number(Platform.Version) >= 31;
+  }
+
+  async openExactAlarmSettings(): Promise<void> {
+    if (Platform.OS !== 'android') return;
+    try {
+      await IntentLauncher.startActivityAsync(
+        'android.settings.REQUEST_SCHEDULE_EXACT_ALARM',
+        { data: 'package:com.anonymous.financecontrol' }
+      );
+    } catch {
+      // Fallback: tela geral de configurações do app
+      await IntentLauncher.startActivityAsync(
+        IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS,
+        { data: 'package:com.anonymous.financecontrol' }
+      );
+    }
   }
 }
 

@@ -1,5 +1,51 @@
-import Transaction from '../models/Transactions';
-import CreditCard from '../models/CreditCard';
+import type Transaction from '../models/Transactions';
+import type CreditCard from '../models/CreditCard';
+
+/**
+ * Calcula a data de vencimento de uma parcela de compra no cartão.
+ *
+ * Regras (mantidas em sincronia com a REGRA 1 do accordion):
+ * 1. Compra no dia do fechamento ou depois entra na fatura seguinte.
+ * 2. Se o vencimento é numericamente menor que o fechamento (ex: fecha 20,
+ *    vence 05), o pagamento cai no mês seguinte ao fechamento.
+ * 3. Cada parcela adiciona um mês; meses curtos são ajustados para o último dia.
+ *
+ * USO: TransactionService (createCreditCardPurchase / updateCreditCardPurchase)
+ */
+export function getInstallmentDueDate(
+  purchaseDate: Date,
+  card: Pick<CreditCard, 'closingDay' | 'dueDay'>,
+  installmentIndex: number
+): Date {
+  let month = purchaseDate.getMonth();
+  let year = purchaseDate.getFullYear();
+
+  // 1. Passou da data de fechamento? Pula um mês.
+  if (purchaseDate.getDate() >= card.closingDay) {
+    month++;
+  }
+  // 2. O vencimento vem numericamente antes do fechamento? (Ex: fecha 20, vence 05)
+  // Então o pagamento é no mês seguinte. Pula mais um mês.
+  if (card.dueDay < card.closingDay) {
+    month++;
+  }
+
+  // 3. Adiciona os meses do parcelamento atual
+  month += installmentIndex;
+
+  // 4. Trata a virada de ano (ex: Dezembro -> Janeiro)
+  while (month > 11) {
+    month -= 12;
+    year++;
+  }
+
+  const dueDate = new Date(year, month, card.dueDay);
+  // Trata meses que acabam dia 28/30
+  if (dueDate.getDate() !== card.dueDay) {
+    dueDate.setDate(0);
+  }
+  return dueDate;
+}
 
 /**
  * Determina se uma transação pertence à fatura de um determinado mês,

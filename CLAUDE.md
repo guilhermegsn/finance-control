@@ -12,9 +12,14 @@ npm run ios            # run on iOS simulator/device
 
 # Type checking
 npm run type-check     # tsc --noEmit
+
+# Unit tests (jest-expo)
+npm test               # jest
 ```
 
-There are no automated tests in this project. Verification is done by running the app.
+Unit tests live in `__tests__` folders next to the code (currently covering `src/utils/creditCardInvoiceHelper.ts` — the invoice date rules). Pure calculation logic should be extracted to `src/utils/` and tested there; UI/service verification is still done by running the app.
+
+Crash reporting uses Sentry (`@sentry/react-native`): initialized in `App.tsx`, enabled only in release builds when `EXPO_PUBLIC_SENTRY_DSN` is set in `.env`. Persistent sync failures (after all retries) are reported via `Sentry.captureException` in `useAutoSync`.
 
 ## Architecture Overview
 

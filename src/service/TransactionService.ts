@@ -2,6 +2,7 @@ import { database } from '../database';
 import Transaction from '../models/Transactions';
 import CreditCard from '../models/CreditCard';
 import { Q } from '@nozbe/watermelondb';
+import { getInstallmentDueDate } from '../utils/creditCardInvoiceHelper';
 
 export const TransactionService = {
   // Observar todas as transações ativas ordenadas por data (mais recente primeiro)
@@ -615,38 +616,6 @@ export const TransactionService = {
 
       const purchaseDate = new Date(data.date);
 
-      // 🔥 A MÁGICA MATEMÁTICA BRASILEIRA ESTÁ AQUI 🔥
-      const getInstallmentDueDate = (installmentIndex: number) => {
-        let month = purchaseDate.getMonth();
-        let year = purchaseDate.getFullYear();
-
-        // 1. Passou da data de fechamento? Pula um mês.
-        if (purchaseDate.getDate() >= creditCard.closingDay) {
-          month++;
-        }
-        // 2. O vencimento vem numericamente antes do fechamento? (Ex: fecha 20, vence 05)
-        // Então o pagamento é no mês seguinte. Pula mais um mês.
-        if (creditCard.dueDay < creditCard.closingDay) {
-          month++;
-        }
-
-        // 3. Adiciona os meses do parcelamento atual
-        month += installmentIndex;
-
-        // 4. Trata a virada de ano (ex: Dezembro -> Janeiro)
-        while (month > 11) {
-          month -= 12;
-          year++;
-        }
-
-        const dueDate = new Date(year, month, creditCard.dueDay);
-        // Trata meses que acabam dia 28/30
-        if (dueDate.getDate() !== creditCard.dueDay) {
-          dueDate.setDate(0); 
-        }
-        return dueDate;
-      };
-
       const firstTransaction = await database.get<Transaction>('transactions').create((transaction) => {
         // @ts-ignore
         transaction._raw.account_id = creditCard.accountId || '';
@@ -657,7 +626,7 @@ export const TransactionService = {
         transaction.type = 'expense';
         
         // As DUAS datas salvas corretamente
-        transaction.date = getInstallmentDueDate(0); // A Competência / Fluxo de caixa
+        transaction.date = getInstallmentDueDate(purchaseDate, creditCard, 0); // A Competência / Fluxo de caixa
         transaction.purchaseDate = purchaseDate;     // A data que passou o cartão
         
         transaction.userId = data.userId;
@@ -681,7 +650,7 @@ export const TransactionService = {
             transaction.description = `${data.description} (${i + 1}/${data.installments})`;
             transaction.amount = installmentAmount;
             transaction.type = 'expense';
-            transaction.date = getInstallmentDueDate(i);
+            transaction.date = getInstallmentDueDate(purchaseDate, creditCard, i);
             transaction.purchaseDate = purchaseDate;
             transaction.userId = data.userId;
             transaction.isConsolidated = false;
@@ -740,30 +709,6 @@ export const TransactionService = {
         
         // Recalcular datas se necessário
         const purchaseDate = new Date(data.date);
-        const getInstallmentDueDate = (installmentIndex: number) => {
-          let month = purchaseDate.getMonth();
-          let year = purchaseDate.getFullYear();
-
-          if (purchaseDate.getDate() >= creditCard.closingDay) {
-            month++;
-          }
-          if (creditCard.dueDay < creditCard.closingDay) {
-            month++;
-          }
-
-          month += installmentIndex;
-
-          while (month > 11) {
-            month -= 12;
-            year++;
-          }
-
-          const dueDate = new Date(year, month, creditCard.dueDay);
-          if (dueDate.getDate() !== creditCard.dueDay) {
-            dueDate.setDate(0); 
-          }
-          return dueDate;
-        };
 
         // Determinar índice da parcela atual
         let installmentIndex = 0;
@@ -790,7 +735,7 @@ export const TransactionService = {
           tx.description = data.installments > 1 ? `${data.description} (${installmentIndex + 1}/${data.installments})` : data.description;
           tx.amount = data.amount;
           tx.type = 'expense';
-          tx.date = getInstallmentDueDate(installmentIndex);
+          tx.date = getInstallmentDueDate(purchaseDate, creditCard, installmentIndex);
           tx.purchaseDate = purchaseDate;
           // @ts-ignore
           tx._raw.credit_card_id = data.creditCardId;
@@ -836,31 +781,6 @@ export const TransactionService = {
           }
         }
 
-        const getInstallmentDueDate = (installmentIndex: number) => {
-          let month = purchaseDate.getMonth();
-          let year = purchaseDate.getFullYear();
-
-          if (purchaseDate.getDate() >= creditCard.closingDay) {
-            month++;
-          }
-          if (creditCard.dueDay < creditCard.closingDay) {
-            month++;
-          }
-
-          month += installmentIndex;
-
-          while (month > 11) {
-            month -= 12;
-            year++;
-          }
-
-          const dueDate = new Date(year, month, creditCard.dueDay);
-          if (dueDate.getDate() !== creditCard.dueDay) {
-            dueDate.setDate(0); 
-          }
-          return dueDate;
-        };
-
         // Preparar atualizações em batch
         const updates = allRelatedTransactions.map((tx, index) => 
           tx.prepareUpdate((record) => {
@@ -871,7 +791,7 @@ export const TransactionService = {
             record.description = data.installments > 1 ? `${data.description} (${index + 1}/${data.installments})` : data.description;
             record.amount = installmentAmount;
             record.type = 'expense';
-            record.date = getInstallmentDueDate(index);
+            record.date = getInstallmentDueDate(purchaseDate, creditCard, index);
             record.purchaseDate = purchaseDate;
             // @ts-ignore
             record._raw.credit_card_id = data.creditCardId;

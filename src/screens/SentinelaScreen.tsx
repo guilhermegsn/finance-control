@@ -455,14 +455,14 @@ const SentinelaScreen = ({ portfolios }: { portfolios: Portfolio[] }) => {
           )}
         </View>
 
+        <PortfolioSummary c={c} portfolios={portfolios} quotes={quotes} />
+
         <PerformanceSection
           c={c}
           hasAssets={portfolios.length > 0}
           tickers={tickers}
           onAuthError={handleAuthError}
         />
-
-        <PortfolioSummary c={c} portfolios={portfolios} quotes={quotes} />
 
         <View style={{ height: 90 }} />
       </ScrollView>

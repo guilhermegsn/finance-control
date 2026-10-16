@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 import { sync } from './sync';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -53,6 +54,10 @@ export function useAutoSync() {
       } else {
         console.log(`⛔ [${trigger}] Todas as tentativas esgotadas.`);
         setSyncGaveUp(true);
+        // Falha transitória o retry resolve sozinho; aqui é falha persistente.
+        Sentry.captureException(error, {
+          tags: { feature: 'sync', trigger },
+        });
       }
     } finally {
       isSyncingRef.current = false;

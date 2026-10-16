@@ -58,7 +58,7 @@ export default function NotificationSettingsScreen() {
       await NotificationService.saveSettings(next);
       if (user?.id) {
         const cards = await CreditCardService.getAll(user.id);
-        await NotificationService.scheduleInvoiceNotifications(cards);
+        await NotificationService.rescheduleAllAtConfiguredHour(cards);
       }
     } finally {
       setSaving(false);
@@ -112,6 +112,25 @@ export default function NotificationSettingsScreen() {
               Permissão de notificações negada. Ative nas configurações do dispositivo.
             </Text>
           </View>
+        )}
+
+        {/* Alarmes exatos (Android 12+): sem essa permissão o sistema atrasa
+            as notificações agendadas (entrega em lote ao sair do modo Doze) */}
+        {NotificationService.needsExactAlarmPermission() && (
+          <TouchableOpacity
+            style={[styles.warningCard, { backgroundColor: '#6366F118', borderColor: '#6366F1' }]}
+            onPress={() => NotificationService.openExactAlarmSettings()}
+            activeOpacity={0.7}
+          >
+            <Icon source="clock-alert-outline" size={20} color="#6366F1" />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.warningText, { color: '#6366F1' }]}>
+                Para receber os avisos na hora certa, permita "Alarmes e lembretes" nas
+                configurações do sistema. Sem isso, o Android pode atrasar as notificações.
+              </Text>
+              <Text style={[styles.warningLink, { color: '#6366F1' }]}>Abrir configurações →</Text>
+            </View>
+          </TouchableOpacity>
         )}
 
         {/* Vencimento de fatura */}
@@ -270,6 +289,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '500',
+  },
+  warningLink: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 6,
   },
   sectionLabel: {
     fontSize: 11,
