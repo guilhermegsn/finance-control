@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
 import dayjs from 'dayjs';
+import 'dayjs/locale/pt-br';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import Transaction from '../models/Transactions';
@@ -42,7 +43,8 @@ const MonthlyFlowChart = ({
   allTransactions: Transaction[];
   currentDate: Date;
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.resolvedLanguage?.startsWith('en') ? 'en' : 'pt-br';
   const { isDarkMode } = useTheme();
 
   const c = {
@@ -56,7 +58,7 @@ const MonthlyFlowChart = ({
 
   const monthsData = useMemo(() => {
     return Array.from({ length: MONTHS_SHOWN }, (_, idx) => {
-      const monthDate = dayjs(currentDate).subtract(MONTHS_SHOWN - 1 - idx, 'month');
+      const monthDate = dayjs(currentDate).locale(dateLocale).subtract(MONTHS_SHOWN - 1 - idx, 'month');
       const year = monthDate.year();
       const month = monthDate.month();
       const monthRef = new Date(year, month, 1);
@@ -90,7 +92,7 @@ const MonthlyFlowChart = ({
 
       return { label: monthDate.format('MMM'), income, expense };
     });
-  }, [allTransactions, currentDate]);
+  }, [allTransactions, currentDate, dateLocale]);
 
   const maxValue = Math.max(...monthsData.flatMap((m) => [m.income, m.expense]));
   const hasData = maxValue > 0;

@@ -67,7 +67,7 @@ export default function AccountsScreen() {
 
   const handleBankSelect = (bank: BankWithLogo) => {
     setSelectedBank(bank);
-    setParams(prev => ({ ...prev, name: bank.displayName, logoUrl: bank.logoUrl, bankCode: bank.code || '' }));
+    setParams(prev => ({ ...prev, name: bank.displayName, logoUrl: '', bankCode: bank.code || bank.id }));
     setSearchQuery(bank.displayName);
     setBankSuggestions([]);
   };
@@ -96,11 +96,21 @@ export default function AccountsScreen() {
     setEditingAccount(account);
     setParams({ name: account.name, type: account.type, color: account.color || '#6366F1', logoUrl: account.logoUrl || '', bankCode: account.bankCode || '' });
     if (account.bankCode) {
-      const bank = BankService.getBankByCode(account.bankCode);
-      if (bank) { setSelectedBank(bank); setSearchQuery(bank.name); }
+      const bank = BankService.getBankByCode(account.bankCode) || BankService.getBankByName(account.name);
+      if (bank) {
+        setSelectedBank(bank);
+        setSearchQuery(bank.name);
+        setParams(prev => ({ ...prev, logoUrl: '', bankCode: bank.code || bank.id }));
+      }
       else { setSelectedBank(null); setSearchQuery(account.name); }
     } else {
-      setSelectedBank(null); setSearchQuery(account.name);
+      const bank = BankService.getBankByName(account.name);
+      if (bank) {
+        setSelectedBank(bank);
+        setSearchQuery(bank.name);
+        setParams(prev => ({ ...prev, logoUrl: '', bankCode: bank.code || bank.id }));
+      }
+      else { setSelectedBank(null); setSearchQuery(account.name); }
     }
     setModalVisible(true);
   };

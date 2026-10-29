@@ -5,6 +5,7 @@ import { withObservables } from '@nozbe/watermelondb/react';
 import Transaction from '../models/Transactions';
 import { TransactionService } from '../service/TransactionService';
 import { useTheme } from '../contexts/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
 
 interface TransactionItemProps {
@@ -15,6 +16,8 @@ interface TransactionItemProps {
 function TransactionItemComponent({ transaction, onLongPress }: TransactionItemProps) {
 
   const { theme } = useTheme()
+  const { i18n } = useTranslation();
+  const dateLocale = i18n.resolvedLanguage?.startsWith('en') ? 'en-US' : 'pt-BR';
 
   // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
   const isCreditCardTransaction = !!transaction._raw?.credit_card_id;
@@ -51,8 +54,8 @@ function TransactionItemComponent({ transaction, onLongPress }: TransactionItemP
             color: textColor
           }}>
           {transaction.purchaseDate
-            ? new Date(transaction.purchaseDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-            : new Date(transaction.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+            ? new Date(transaction.purchaseDate).toLocaleDateString(dateLocale, { day: '2-digit', month: '2-digit' })
+            : new Date(transaction.date).toLocaleDateString(dateLocale, { day: '2-digit', month: '2-digit' })}
         </Text>
 
         <Text variant='labelMedium'

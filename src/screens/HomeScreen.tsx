@@ -43,7 +43,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const { isDarkMode } = useTheme();
   const { user } = useAuth();
   const navigation = useNavigation();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [typeModalVisible, setTypeModalVisible] = useState(false);
   const [balancesVisible, setBalancesVisible] = useState(true);
 
@@ -103,15 +103,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const endOfMonthLabel = useMemo(() => {
     const now = new Date();
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    return lastDay.toLocaleDateString('pt-BR');
-  }, []);
+    const locale = i18n.resolvedLanguage?.startsWith('en') ? 'en-US' : 'pt-BR';
+    return lastDay.toLocaleDateString(locale);
+  }, [i18n.resolvedLanguage]);
 
   const greeting = useMemo(() => {
     const h = new Date().getHours();
     if (h < 12) return t('Bom dia');
     if (h < 18) return t('Boa tarde');
     return t('Boa noite');
-  }, []);
+  }, [t]);
 
   const displayName = useMemo(() => {
     const email = user?.email ?? '';
@@ -169,7 +170,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             {greeting}, {displayName} 👋
           </Text>
           <Text style={[styles.greetingMsg, { color: c.textSecondary }]}>
-            {welcomeMessage}
+            {t(welcomeMessage)}
           </Text>
         </View>
 
@@ -185,7 +186,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* Hero balance card */}
         <View style={styles.sectionRow}>
           <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>
-            VISÃO GERAL
+            {t('VISÃO GERAL')}
           </Text>
           <TouchableOpacity onPress={toggleBalancesVisible} style={styles.eyeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Icon
@@ -239,7 +240,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 
         {/* This month summary */}
         <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>
-          ESTE MÊS
+          {t('ESTE MÊS')}
         </Text>
         <View style={styles.monthRow}>
           <View style={[styles.monthCard, { backgroundColor: c.card, borderColor: c.border }]}>

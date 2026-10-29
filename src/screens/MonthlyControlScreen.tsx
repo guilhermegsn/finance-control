@@ -1,4 +1,5 @@
 import dayjs from "dayjs";
+import 'dayjs/locale/pt-br';
 import React, { useState, useMemo, useEffect } from "react";
 import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Icon, Text } from "react-native-paper";
@@ -35,7 +36,8 @@ interface MonthlyControlScreenProps {
 }
 
 function MonthlyControlScreen({ transactions, allTransactions, creditCards, accounts, categories }: MonthlyControlScreenProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.resolvedLanguage?.startsWith('en') ? 'en' : 'pt-br';
   const navigation = useNavigation();
   const { user } = useAuth();
   const { isDarkMode } = useTheme();
@@ -52,15 +54,11 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
   }, [currentDate]);
 
   const goToPreviousMonth = () => {
-    const prev = new Date(currentDate);
-    prev.setMonth(prev.getUTCMonth() - 1);
-    setCurrentDate(prev);
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
   };
 
   const goToNextMonth = () => {
-    const next = new Date(currentDate);
-    next.setMonth(next.getUTCMonth() + 1);
-    setCurrentDate(next);
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
   };
 
   const openTransactionForm = (transaction?: Transaction, type?: 'income' | 'expense') => {
@@ -437,7 +435,7 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
             <Icon source="chevron-left" size={20} color={c.textSecondary} />
           </TouchableOpacity>
           <Text style={[styles.monthText, { color: c.textPrimary }]}>
-            {dayjs(currentDate).format('MMMM YYYY')}
+            {dayjs(currentDate).locale(dateLocale).format('MMMM YYYY')}
           </Text>
           <TouchableOpacity style={[styles.navBtn, { backgroundColor: c.navBtn, borderColor: c.border }]} onPress={goToNextMonth}>
             <Icon source="chevron-right" size={20} color={c.textSecondary} />
@@ -459,7 +457,10 @@ function MonthlyControlScreen({ transactions, allTransactions, creditCards, acco
             currentDate={currentDate}
           />
 
-
+          <Text 
+          style={[styles.sectionTitle, { color: c.sectionLabel, marginTop: 20 }]}>
+            {t('CARTÕES DE CRÉDITO')}
+            </Text>
           <CreditCardSectionComponent
             creditCards={creditCards}
             allTransactions={allTransactions}

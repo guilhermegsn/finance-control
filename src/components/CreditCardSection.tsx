@@ -121,10 +121,6 @@ function CreditCardSectionComponent({
 
   return (
     <DataTable>
-      <Text style={{ fontSize: 16, fontWeight: "600", marginTop: 20, marginBottom: 8 }}>
-        {t("Cartões de Crédito", { ns: "common" })}
-      </Text>
-
       {creditCardGroups.map((group) => {
         const isExpanded = expandedCards.has(group.cardId);
 

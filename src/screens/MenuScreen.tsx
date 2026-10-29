@@ -23,7 +23,8 @@ export default function MenuScreen() {
   const navigation = useNavigation();
   const { isDarkMode, toggleDarkMode } = useTheme();
   const { user, signOut } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currentLanguage = i18n.resolvedLanguage ?? i18n.language;
 
   const c = {
     bg: isDarkMode ? '#0D1117' : '#EEF2F7',
@@ -118,7 +119,7 @@ export default function MenuScreen() {
                 </View>
                 <Text style={[styles.rowLabel, { color: c.textPrimary }]}>{item.label}</Text>
                 <View style={styles.comingSoonBadge}>
-                  <Text style={styles.comingSoonText}>Em breve</Text>
+                  <Text style={styles.comingSoonText}>{t('Em breve')}</Text>
                 </View>
               </View>
               {i < insightItems.length - 1 && (
@@ -147,6 +148,38 @@ export default function MenuScreen() {
             />
           </View>
           <View style={[styles.divider, { backgroundColor: c.border }]} />
+          <View style={styles.row}>
+            <View style={[styles.iconPill, { backgroundColor: '#0EA5E91A' }]}>
+              <Icon source="translate" size={20} color="#0EA5E9" />
+            </View>
+            <Text style={[styles.rowLabel, { color: c.textPrimary }]}>{t('Idioma')}</Text>
+            <View style={[styles.languagePicker, { backgroundColor: c.bg }]}>
+              {[
+                { code: 'pt', label: 'Português' },
+                { code: 'en', label: 'English' },
+              ].map((language) => {
+                const selected = currentLanguage.startsWith(language.code);
+                return (
+                  <TouchableOpacity
+                    key={language.code}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    onPress={() => i18n.changeLanguage(language.code)}
+                    style={[
+                      styles.languageOption,
+                      selected && { backgroundColor: isDarkMode ? '#6366F1' : '#4F46E5' },
+                    ]}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[styles.languageOptionText, { color: selected ? '#FFFFFF' : c.textSecondary }]}>
+                      {language.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+          <View style={[styles.divider, { backgroundColor: c.border }]} />
           <TouchableOpacity
             style={styles.row}
             onPress={() => navigation.navigate('NotificationSettings' as never)}
@@ -167,7 +200,7 @@ export default function MenuScreen() {
           activeOpacity={0.7}
         >
           <Icon source="logout" size={20} color="#EF4444" />
-          <Text style={styles.signOutText}>{t('Sair')}</Text>
+          <Text style={styles.signOutText}>{t('auth:Sair')}</Text>
         </TouchableOpacity>
 
         <Text style={[styles.footer, { color: c.sectionLabel }]}>ButterFlow v1.0.0</Text>
@@ -272,6 +305,20 @@ const styles = StyleSheet.create({
   divider: {
     height: StyleSheet.hairlineWidth,
     marginLeft: 68,
+  },
+  languagePicker: {
+    flexDirection: 'row',
+    padding: 3,
+    borderRadius: 10,
+  },
+  languageOption: {
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  languageOptionText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 
   // Badges

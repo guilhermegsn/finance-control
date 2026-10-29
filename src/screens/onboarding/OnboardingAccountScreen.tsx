@@ -10,9 +10,10 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { AccountService } from '../../service/AccountService';
 import BankService, { BankWithLogo } from '../../service/BankService';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 
 const ACCOUNT_TYPES = [
-  { value: 'checking', label: 'Corrente', icon: 'bank-outline' },
+  { value: 'checking', label: 'Conta corrente', icon: 'bank-outline' },
   { value: 'savings', label: 'Poupança', icon: 'piggy-bank-outline' },
   { value: 'investment', label: 'Investimento', icon: 'trending-up' },
 ];
@@ -24,6 +25,7 @@ const PRESET_COLORS = [
 
 export default function OnboardingAccountScreen({ navigation }: any) {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const { theme, isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
   const [saving, setSaving] = useState(false);
@@ -50,7 +52,7 @@ export default function OnboardingAccountScreen({ navigation }: any) {
 
   const handleBankSelect = (bank: BankWithLogo) => {
     setSelectedBank(bank);
-    setParams(prev => ({ ...prev, name: bank.displayName, logoUrl: bank.logoUrl, bankCode: bank.code || '' }));
+    setParams(prev => ({ ...prev, name: bank.displayName, logoUrl: '', bankCode: bank.code || bank.id }));
     setSearchQuery(bank.displayName);
     setBankSuggestions([]);
   };
@@ -63,7 +65,7 @@ export default function OnboardingAccountScreen({ navigation }: any) {
   };
 
   const handleCreate = async () => {
-    if (!params.name.trim() || !user) { Alert.alert('Erro', 'Preencha o nome da conta'); return; }
+    if (!params.name.trim() || !user) { Alert.alert(t('Erro'), t('Preencha o nome da conta')); return; }
     setSaving(true);
     try {
       await AccountService.create({
@@ -72,7 +74,7 @@ export default function OnboardingAccountScreen({ navigation }: any) {
       });
       navigation.navigate('CreditCard');
     } catch (error) {
-      Alert.alert('Erro', 'Erro ao criar conta');
+      Alert.alert(t('Erro'), t('Erro ao criar conta'));
     } finally {
       setSaving(false);
     }
@@ -87,16 +89,16 @@ export default function OnboardingAccountScreen({ navigation }: any) {
         <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
           <Icon source="arrow-left" size={22} color={theme.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Sua primeira conta</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>{t('Sua primeira conta')}</Text>
         <View style={styles.headerBtn} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Text style={[styles.hint, { color: theme.textSecondary }]}>
-          Toda transação precisa estar ligada a uma conta. Busque seu banco ou dê um nome para a conta.
+          {t('Toda transação precisa estar ligada a uma conta. Busque seu banco ou dê um nome para a conta.')}
         </Text>
 
-        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>BANCO</Text>
+        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>{t('BANCO')}</Text>
         <View style={styles.searchWrap}>
           {selectedBank ? (
             <TouchableOpacity
@@ -115,7 +117,7 @@ export default function OnboardingAccountScreen({ navigation }: any) {
             <>
               <TextInput
                 mode="outlined"
-                label="Buscar banco (ex: Nubank, Itaú)"
+                label={t('Buscar banco (ex: Nubank, Itaú)')}
                 value={searchQuery}
                 onChangeText={text => {
                   setSearchQuery(text);
@@ -139,7 +141,7 @@ export default function OnboardingAccountScreen({ navigation }: any) {
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.suggestionName, { color: theme.text }]}>{bank.displayName}</Text>
                         {bank.code && (
-                          <Text style={[styles.suggestionCode, { color: theme.textSecondary }]}>Código {bank.code}</Text>
+                          <Text style={[styles.suggestionCode, { color: theme.textSecondary }]}>{t('Código')} {bank.code}</Text>
                         )}
                       </View>
                       <Icon source="chevron-right" size={16} color={theme.textSecondary} />
@@ -151,7 +153,7 @@ export default function OnboardingAccountScreen({ navigation }: any) {
           )}
         </View>
 
-        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>TIPO DE CONTA</Text>
+        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>{t('TIPO DE CONTA')}</Text>
         <View style={styles.typeRow}>
           {ACCOUNT_TYPES.map(type => {
             const active = params.type === type.value;
@@ -167,14 +169,14 @@ export default function OnboardingAccountScreen({ navigation }: any) {
               >
                 <Icon source={type.icon} size={18} color={active ? params.color : theme.textSecondary} />
                 <Text style={[styles.typeBtnText, { color: active ? params.color : theme.textSecondary }]}>
-                  {type.label}
+                  {t(type.label)}
                 </Text>
               </TouchableOpacity>
             );
           })}
         </View>
 
-        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>COR DE ACENTO</Text>
+        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>{t('COR DE ACENTO')}</Text>
         <View style={styles.colorRow}>
           {PRESET_COLORS.map(color => (
             <TouchableOpacity
@@ -205,7 +207,7 @@ export default function OnboardingAccountScreen({ navigation }: any) {
             end={{ x: 1, y: 0 }}
             style={styles.saveGradient}
           >
-            <Text style={styles.saveBtnText}>Criar conta e continuar</Text>
+            <Text style={styles.saveBtnText}>{t('Criar conta e continuar')}</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AccountService } from '../service/AccountService';
 
@@ -7,16 +7,25 @@ const ONBOARDING_STORAGE_KEY = '@finance-control:onboarding-completed';
 export function useOnboardingStatus(userId: string | undefined, syncResolved: boolean) {
   const [isLoading, setIsLoading] = useState(true);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const checkedUserIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
 
     const check = async () => {
       if (!userId) {
+        checkedUserIdRef.current = undefined;
         setIsLoading(false);
         return;
       }
-      setIsLoading(true);
+
+      // `syncResolved` changes after the first sync. Keep the app navigator
+      // mounted during that check so React Navigation preserves the active tab.
+      // Show the loading screen only when checking a different signed-in user.
+      if (checkedUserIdRef.current !== userId) {
+        checkedUserIdRef.current = userId;
+        setIsLoading(true);
+      }
       try {
         const flag = await AsyncStorage.getItem(ONBOARDING_STORAGE_KEY);
         if (cancelled) return;

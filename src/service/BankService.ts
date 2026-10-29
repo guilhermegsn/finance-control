@@ -126,6 +126,12 @@ const BANKS_DATA: Record<string, { name: string; displayName: string; code: stri
     code: null,
     logo: require('../../assets/logos/wise.png'),
   },
+  arq: {
+    name: 'ARQ (DolarApp)',
+    displayName: 'ARQ',
+    code: null,
+    logo: require('../../assets/logos/arq.png'),
+  },
   paypal: {
     name: 'PayPal',
     displayName: 'PayPal',
@@ -186,7 +192,10 @@ export const BankService = {
 
   // Buscar banco por código
   getBankByCode: (code: string): BankWithLogo | null => {
-    const entry = Object.entries(BANKS_DATA).find(([_, data]) => data.code === code);
+    const normalizedCode = code.trim().toLowerCase();
+    const entry = Object.entries(BANKS_DATA).find(([id, data]) =>
+      data.code === code || id === normalizedCode
+    );
     if (!entry) return null;
 
     const [id, data] = entry;

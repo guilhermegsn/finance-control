@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { Icon } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { withObservables } from '@nozbe/watermelondb/react';
@@ -24,6 +23,7 @@ import SentinelaService, { Quote, SentinelaAuthError } from '../service/Sentinel
 import AssetFormModal, { AssetFormData } from '../components/AssetFormModal';
 import PerformanceSection from '../components/PerformanceSection';
 import PortfolioSummary from '../components/PortfolioSummary';
+import GlassHeader from '../components/GlassHeader';
 
 const fmt = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
@@ -145,8 +145,12 @@ const AssetBlock = ({
 }) => {
   const { t } = useTranslation();
 
-  const totalReturn = quote ? ((quote.price - asset.averagePrice) / asset.averagePrice) * 100 : null;
-  const pl = quote ? (quote.price - asset.averagePrice) * asset.quantity : null;
+  const price = quote?.price;
+  const dailyVar = quote?.daily_var;
+  const hasPrice = typeof price === 'number' && Number.isFinite(price);
+  const hasDailyVar = typeof dailyVar === 'number' && Number.isFinite(dailyVar);
+  const totalReturn = hasPrice ? ((price - asset.averagePrice) / asset.averagePrice) * 100 : null;
+  const pl = hasPrice ? (price - asset.averagePrice) * asset.quantity : null;
 
   const dash = <Text style={[styles.kvText, { color: c.textSecondary }]}>—</Text>;
 
@@ -163,7 +167,7 @@ const AssetBlock = ({
         <View style={styles.assetTitleWrap}>
           <View style={styles.tickerRow}>
             <Text style={[styles.ticker, { color: c.textPrimary }]}>{asset.ticker}</Text>
-            {quote && <Pill value={quote.daily_var} kind="percent" />}
+            {hasDailyVar && <Pill value={dailyVar} kind="percent" />}
           </View>
           {!!quote?.name && (
             <Text style={[styles.nameText, { color: c.textSecondary }]} numberOfLines={1}>
@@ -183,8 +187,8 @@ const AssetBlock = ({
           <Text style={[styles.kvText, { color: c.textSecondary }]}>{fmt(asset.averagePrice)}</Text>
         </Cell>
         <Cell label={t('Cotação')} c={c} align="center">
-          {quote
-            ? <Text style={[styles.kvText, styles.kvStrong, { color: c.textPrimary }]}>{fmt(quote.price)}</Text>
+          {hasPrice
+            ? <Text style={[styles.kvText, styles.kvStrong, { color: c.textPrimary }]}>{fmt(price)}</Text>
             : dash}
         </Cell>
         <Cell label={t('Qtd')} c={c} align="flex-end">
@@ -203,8 +207,6 @@ const SentinelaScreen = ({ portfolios }: { portfolios: Portfolio[] }) => {
   const { isDarkMode } = useTheme();
   const { user, signOut } = useAuth();
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
-
   const [sortBy, setSortBy] = useState<'pl' | 'daily'>('pl');
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
   const [quotesError, setQuotesError] = useState<string | null>(null);
@@ -234,9 +236,14 @@ const SentinelaScreen = ({ portfolios }: { portfolios: Portfolio[] }) => {
     const metricOf = (p: Portfolio) => {
       const quote = quotes[p.ticker];
       if (!quote) return Number.NEGATIVE_INFINITY;
-      return sortBy === 'pl'
-        ? (quote.price - p.averagePrice) * p.quantity
-        : quote.daily_var;
+      if (sortBy === 'pl') {
+        return typeof quote.price === 'number' && Number.isFinite(quote.price)
+          ? (quote.price - p.averagePrice) * p.quantity
+          : Number.NEGATIVE_INFINITY;
+      }
+      return typeof quote.daily_var === 'number' && Number.isFinite(quote.daily_var)
+        ? quote.daily_var
+        : Number.NEGATIVE_INFINITY;
     };
     return [...portfolios].sort((a, b) => metricOf(b) - metricOf(a));
   }, [portfolios, quotes, sortBy]);
@@ -372,11 +379,7 @@ const SentinelaScreen = ({ portfolios }: { portfolios: Portfolio[] }) => {
 
   return (
     <View style={[styles.root, { backgroundColor: c.bg }]}>
-      <View style={[styles.header, { backgroundColor: c.bg, paddingTop: insets.top }]}>
-        <View style={styles.headerBtn} />
-        <Text style={[styles.headerTitle, { color: c.textPrimary }]}>Sentinela</Text>
-        <View style={styles.headerBtn} />
-      </View>
+      <GlassHeader />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -507,25 +510,6 @@ export default SentinelaScreenWrapper;
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  headerBtn: {
-    width: 38,
-    height: 38,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 17,
-    fontWeight: '700',
-  },
 
   scroll: {
     padding: 16,

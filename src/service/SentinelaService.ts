@@ -5,8 +5,8 @@ const BASE_URL = 'https://sentinela.butterflow.com.br/api/butterflow';
 export interface Quote {
   ticker: string;
   name?: string | null;
-  price: number;
-  daily_var: number;
+  price: number | null;
+  daily_var: number | null;
   logo_url?: string | null;
   updated_at?: string | null;
 }

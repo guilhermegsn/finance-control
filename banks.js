@@ -21,6 +21,7 @@ const banks = {
   "revolut": "revolut.com",
   "monzo": "monzo.com",
   "wise": "wise.com",
+  "arq": "arqfinance.com",
   "paypal": "paypal.com",
   "mercadopago": "mercadopago.com.br"
 };

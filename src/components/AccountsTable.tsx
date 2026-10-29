@@ -5,6 +5,7 @@ import TransactionItem from './TransactionItem';
 import BankService from '../service/BankService';
 import Transaction from '../models/Transactions';
 import { useTheme } from '../contexts/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
 export type SyntheticTransaction = {
   id: string;
@@ -61,6 +62,7 @@ export default function AccountsTable({
 }: AccountsTableProps) {
 
   const { theme } = useTheme()
+  const { t } = useTranslation();
 
   const renderAccountLogo = (group: AccountTransactionGroup) => {
     const account = accounts.find(acc => acc.id === group.accountId);
@@ -125,6 +127,21 @@ export default function AccountsTable({
             {isExpanded && (
               <>
 
+                {/* Saldo Anterior */}
+                {group.previousBalance !== 0 && (
+                  <DataTable.Row>
+                    <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 10 }}>
+                      <Icon source="history" size={16} />
+                    </DataTable.Cell>
+                    <DataTable.Cell>
+                      <Text variant="labelMedium" style={{ marginLeft: 20 }}>{t('Saldo Inicial do Mês')}</Text>
+                    </DataTable.Cell>
+                    <DataTable.Cell numeric>
+                      <Text variant="labelMedium">R$ {group.previousBalance.toFixed(2)}</Text>
+                    </DataTable.Cell>
+                  </DataTable.Row>
+                )}
+
                 {/* Entradas */}
                 {group.income.transactions.length > 0 && (
                   <>
@@ -133,7 +150,7 @@ export default function AccountsTable({
                         <Icon source="arrow-up-bold-circle" size={16} color={theme.success} />
                       </DataTable.Cell>
                       <DataTable.Cell style={{ paddingLeft: 20 }}>
-                        <Text style={{ color: theme.success, fontWeight: '600' }}>Entradas</Text>
+                        <Text style={{ color: theme.success, fontWeight: '600' }}>{t('Entradas')}</Text>
                       </DataTable.Cell>
                       <DataTable.Cell numeric>
                         <View style={{ alignItems: 'flex-end' }}>
@@ -149,20 +166,6 @@ export default function AccountsTable({
                       </DataTable.Cell>
                     </DataTable.Row>
 
-                    {/* Saldo Anterior */}
-                    {group.previousBalance !== 0 && (
-                      <DataTable.Row>
-                        <DataTable.Cell style={{ maxWidth: 70, paddingLeft: 10 }}>
-                          <Icon source="history" size={16} />
-                        </DataTable.Cell>
-                        <DataTable.Cell>
-                          <Text variant="labelMedium" style={{ marginLeft: 20 }}>Saldo Inicial do Mês</Text>
-                        </DataTable.Cell>
-                        <DataTable.Cell numeric>
-                          <Text  variant="labelMedium">R$ {group.previousBalance.toFixed(2)}</Text>
-                        </DataTable.Cell>
-                      </DataTable.Row>
-                    )}
                     {group.income.transactions.map((item) => (
                       <DataTable.Row key={item.id} onLongPress={() => onEditTransaction(item)}>
                         <DataTable.Cell style={{ paddingLeft: 10 }}>
@@ -181,7 +184,7 @@ export default function AccountsTable({
                         <Icon source="arrow-down-bold-circle" size={16} color={theme.danger} />
                       </DataTable.Cell>
                       <DataTable.Cell style={{ paddingLeft: 20 }}>
-                        <Text style={{ color: theme.danger, fontWeight: '600' }}>Saídas</Text>
+                        <Text style={{ color: theme.danger, fontWeight: '600' }}>{t('Saídas')}</Text>
                       </DataTable.Cell>
                       <DataTable.Cell numeric>
                         <View style={{ alignItems: 'flex-end' }}>
@@ -243,7 +246,7 @@ export default function AccountsTable({
       {/* Total Geral */}
       <DataTable.Row>
         <DataTable.Cell>
-          <Text style={{ fontWeight: 'bold' }}>TOTAL GERAL</Text>
+          <Text style={{ fontWeight: 'bold' }}>{t('TOTAL GERAL')}</Text>
         </DataTable.Cell>
         <DataTable.Cell numeric>
           <Text

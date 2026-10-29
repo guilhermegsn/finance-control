@@ -48,7 +48,12 @@ const PortfolioSummary = ({
       invested += positionCost;
 
       const quote = quotes[p.ticker];
-      if (quote && quote.daily_var > -100) {
+      if (
+        quote &&
+        typeof quote.price === 'number' && Number.isFinite(quote.price) &&
+        typeof quote.daily_var === 'number' && Number.isFinite(quote.daily_var) &&
+        quote.daily_var > -100
+      ) {
         const positionValue = quote.price * p.quantity;
         current += positionValue;
         quotedCurrent += positionValue;

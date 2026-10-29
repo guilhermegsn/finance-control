@@ -21,6 +21,7 @@ export const accountLogos: Record<string, any> = {
   revolut: require('../../assets/logos/revolut.png'),
   monzo: require('../../assets/logos/monzo.png'),
   wise: require('../../assets/logos/wise.png'),
+  arq: require('../../assets/logos/arq.png'),
   paypal: require('../../assets/logos/paypal.png'),
   
   // Bandeiras de cartão (também podem ser usadas como logos de contas)
@@ -52,6 +53,8 @@ export const getAccountLogoByCode = (bankCode: string): any => {
     '336': 'c6',
     '102': 'xp',
     '323': 'mercadopago',
+    wise: 'wise',
+    arq: 'arq',
   };
   
   const bankId = codeToId[bankCode];
