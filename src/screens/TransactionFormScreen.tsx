@@ -15,7 +15,7 @@ import { getAccountLogoByCode } from '../utils/accountLogos';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCurrency } from '../contexts/CurrencyContext';
-import { formatAmountInput, getCurrencyInputPrefix, parseAmountInput } from '../utils/currencyInput';
+import { formatAmountInput, getCurrencyInputPrefix, maskAmountInput, parseAmountInput } from '../utils/currencyInput';
 
 interface FormData {
   id: string;
@@ -370,9 +370,9 @@ export default function TransactionFormScreen() {
           mode="outlined"
           label={t('Valor')}
           value={formData.value}
-          onChangeText={text => setFormData(prev => ({ ...prev, value: text }))}
+          onChangeText={text => setFormData(prev => ({ ...prev, value: maskAmountInput(text, currency) }))}
           placeholder={currency === 'BRL' ? '0,00' : '0.00'}
-          keyboardType="numbers-and-punctuation"
+          keyboardType="numeric"
           left={<TextInput.Affix text={getCurrencyInputPrefix(currency)} textStyle={{ color: c.textSecondary }} />}
           theme={inputTheme}
           style={[styles.input, { backgroundColor: c.card }]}

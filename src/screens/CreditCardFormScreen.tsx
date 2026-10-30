@@ -15,7 +15,7 @@ import { brandLogos } from '../utils/brandLogos';
 import { getAccountLogoByCode } from '../utils/accountLogos';
 import { Select } from '../components/Select';
 import { useCurrency } from '../contexts/CurrencyContext';
-import { formatAmountInput, getCurrencyInputPrefix, parseAmountInput } from '../utils/currencyInput';
+import { formatAmountInput, getCurrencyInputPrefix, maskAmountInput, parseAmountInput } from '../utils/currencyInput';
 
 const PRESET_COLORS = [
   '#6366F1', '#8B5CF6', '#EC4899', '#F43F5E',
@@ -184,9 +184,9 @@ const CreditCardFormScreen = () => {
           mode="outlined"
           label={t('Limite')}
           value={limit}
-          onChangeText={setLimit}
+          onChangeText={text => setLimit(maskAmountInput(text, currency))}
           placeholder={currency === 'BRL' ? '0,00' : '0.00'}
-          keyboardType="numbers-and-punctuation"
+          keyboardType="numeric"
           left={<TextInput.Affix text={getCurrencyInputPrefix(currency)} textStyle={{ color: c.textSecondary }} />}
           theme={inputTheme}
           style={{ backgroundColor: c.inputBg }}

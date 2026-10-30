@@ -6,9 +6,27 @@ export const getCurrencyDecimalSeparator = (currency: DisplayCurrency) =>
 export const getCurrencyInputPrefix = (currency: DisplayCurrency) =>
   currency === 'BRL' ? 'R$ ' : 'USD ';
 
+const getGroupingSeparator = (currency: DisplayCurrency) =>
+  currency === 'BRL' ? '.' : ',';
+
+const groupIntegerDigits = (digits: string, currency: DisplayCurrency) =>
+  digits.replace(/\B(?=(\d{3})+(?!\d))/g, getGroupingSeparator(currency));
+
 export const formatAmountInput = (amount: number, currency: DisplayCurrency) => {
-  const separator = getCurrencyDecimalSeparator(currency);
-  return String(amount).replace('.', separator);
+  const sign = amount < 0 ? '-' : '';
+  const [integerPart, fractionalPart] = Math.abs(amount).toFixed(2).split('.');
+  return `${sign}${groupIntegerDigits(integerPart, currency)}${getCurrencyDecimalSeparator(currency)}${fractionalPart}`;
+};
+
+export const maskAmountInput = (input: string, currency: DisplayCurrency) => {
+  const rawDigits = input.replace(/\D/g, '');
+  if (!rawDigits) return '';
+
+  const digits = rawDigits.replace(/^0+(?=\d)/, '').padStart(3, '0');
+  const integerPart = digits.slice(0, -2);
+  const fractionalPart = digits.slice(-2);
+
+  return `${groupIntegerDigits(integerPart, currency)}${getCurrencyDecimalSeparator(currency)}${fractionalPart}`;
 };
 
 export const parseAmountInput = (input: string, currency: DisplayCurrency): number | null => {
