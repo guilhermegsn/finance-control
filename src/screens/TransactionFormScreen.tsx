@@ -1,8 +1,8 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View, TouchableOpacity, ScrollView, Alert, StyleSheet, Text } from 'react-native';
-import { TextInput, Switch, Portal, Dialog, Button, Icon } from 'react-native-paper';
+import { View, TouchableOpacity, ScrollView, StyleSheet, Text } from 'react-native';
+import { TextInput, Switch, Portal, Dialog, Button, Icon, RadioButton } from 'react-native-paper';
 import { Select } from '../components/Select';
 import { TransactionService } from '../service/TransactionService';
 import NotificationService from '../service/NotificationService';
@@ -40,6 +40,9 @@ export default function TransactionFormScreen() {
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
   const [recurringDialogVisible, setRecurringDialogVisible] = useState(false);
+  const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
+  const [recurringDeleteDialogVisible, setRecurringDeleteDialogVisible] = useState(false);
+  const [recurringDeleteMode, setRecurringDeleteMode] = useState<'only_this' | 'all_future'>('only_this');
   const [pendingUpdateData, setPendingUpdateData] = useState<any>(null);
   const [activePicker, setActivePicker] = useState<'date' | 'recurringEndDate' | null>(null);
   const { transaction, initialType, accounts = [], categories = [], onSave } = route.params || {};
@@ -216,42 +219,13 @@ export default function TransactionFormScreen() {
   const handleDelete = async () => {
     if (!transaction) return;
     if (transaction.isRecurring) {
-      Alert.alert(
-        t('Esta é uma transação recorrente. O que deseja excluir?'),
-        '',
-        [
-          { text: t('Cancelar'), style: 'cancel' },
-          {
-            text: t('Esta e todas as futuras'),
-            onPress: async () => {
-              try {
-                const recurringId = (transaction as any).recurringId || '';
-                await TransactionService.deleteRecurring(transaction.id, recurringId, transaction.date, 'all_future');
-                onSave?.();
-                navigation.goBack();
-              } catch (error) {
-                console.error(error);
-              }
-            },
-          },
-          {
-            text: t('Apenas esta ocorrência'),
-            onPress: async () => {
-              try {
-                await TransactionService.delete(transaction.id);
-                onSave?.();
-                navigation.goBack();
-              } catch (error) {
-                console.error(error);
-              }
-            },
-          },
-        ],
-        { cancelable: true }
-      );
+      setDeleteDialogVisible(false);
+      setRecurringDeleteMode('only_this');
+      setRecurringDeleteDialogVisible(true);
     } else {
       try {
         await TransactionService.delete(transaction.id);
+        setDeleteDialogVisible(false);
         onSave?.();
         navigation.goBack();
       } catch (error) {
@@ -261,15 +235,24 @@ export default function TransactionFormScreen() {
   };
 
   const confirmDelete = () => {
-    Alert.alert(
-      t('Confirmação'),
-      t('Confirma a exclusão do registro?'),
-      [
-        { text: t('Não'), style: 'cancel' },
-        { text: t('Sim'), onPress: handleDelete },
-      ],
-      { cancelable: true }
-    );
+    setDeleteDialogVisible(true);
+  };
+
+  const deleteRecurring = async (mode: 'only_this' | 'all_future') => {
+    if (!transaction) return;
+    try {
+      if (mode === 'all_future') {
+        const recurringId = (transaction as any).recurringId || '';
+        await TransactionService.deleteRecurring(transaction.id, recurringId, transaction.date, mode);
+      } else {
+        await TransactionService.delete(transaction.id);
+      }
+      setRecurringDeleteDialogVisible(false);
+      onSave?.();
+      navigation.goBack();
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   const accountItems = accounts.map((account: Account) => {
@@ -558,6 +541,32 @@ export default function TransactionFormScreen() {
       </View>
 
       <Portal>
+        <Dialog visible={deleteDialogVisible} onDismiss={() => setDeleteDialogVisible(false)}>
+          <Dialog.Title>{t('Confirmação')}</Dialog.Title>
+          <Dialog.Content>
+            <Text style={{ color: c.textPrimary }}>{t('Confirma a exclusão do registro?')}</Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setDeleteDialogVisible(false)}>{t('Não')}</Button>
+            <Button onPress={handleDelete} mode="contained" buttonColor="#F43F5E">{t('Sim')}</Button>
+          </Dialog.Actions>
+        </Dialog>
+        <Dialog visible={recurringDeleteDialogVisible} onDismiss={() => setRecurringDeleteDialogVisible(false)}>
+          <Dialog.Title>{t('Esta é uma transação recorrente. O que deseja excluir?')}</Dialog.Title>
+          <Dialog.Content>
+            <RadioButton.Group
+              onValueChange={(value) => setRecurringDeleteMode(value as 'only_this' | 'all_future')}
+              value={recurringDeleteMode}
+            >
+              <RadioButton.Item label={t('Apenas esta ocorrência')} value="only_this" />
+              <RadioButton.Item label={t('Esta e todas as futuras')} value="all_future" />
+            </RadioButton.Group>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setRecurringDeleteDialogVisible(false)}>{t('Cancelar')}</Button>
+            <Button onPress={() => deleteRecurring(recurringDeleteMode)} mode="contained" buttonColor="#F43F5E">{t('Confirmar Exclusão')}</Button>
+          </Dialog.Actions>
+        </Dialog>
         <Dialog visible={recurringDialogVisible} onDismiss={() => setRecurringDialogVisible(false)}>
           <Dialog.Title>{t('Editar Transação Recorrente')}</Dialog.Title>
           <Dialog.Content>

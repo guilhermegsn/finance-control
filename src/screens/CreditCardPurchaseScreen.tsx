@@ -33,7 +33,7 @@ interface CreditCardPurchaseScreenProps {
 
 function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps) {
   const { user } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { isDarkMode } = useTheme();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
@@ -321,9 +321,9 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
           label={t('Valor Original')}
           value={formData.amount}
           onChangeText={text => setFormData(prev => ({ ...prev, amount: text }))}
-          placeholder="0,00"
+          placeholder={i18n.language.startsWith('en') ? '0.00' : '0,00'}
           keyboardType="numeric"
-          left={<TextInput.Affix text="R$ " textStyle={{ color: c.textSecondary }} />}
+          left={<TextInput.Affix text={i18n.language.startsWith('en') ? '$ ' : 'R$ '} textStyle={{ color: c.textSecondary }} />}
           theme={inputTheme}
           style={[styles.input, { backgroundColor: c.card }]}
         />
@@ -337,7 +337,7 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
         >
           <Icon source="calendar" size={18} color="#6366F1" />
           <Text style={[styles.dateBtnText, { color: c.textPrimary }]}>
-            {formData.date.toLocaleDateString('pt-BR')}
+            {formData.date.toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'pt-BR')}
           </Text>
           <Icon source="chevron-right" size={16} color={c.sectionLabel} />
         </TouchableOpacity>
@@ -415,7 +415,7 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
               <View style={styles.previewRow}>
                 <Text style={[styles.previewLabel, { color: c.textSecondary }]}>{t('Valor por parcela')}</Text>
                 <Text style={[styles.previewValue, { color: c.textPrimary }]}>
-                  R$ {previewInfo.installmentAmount.toFixed(2).replace('.', ',')}
+                  {i18n.language.startsWith('en') ? '$' : 'R$'} {previewInfo.installmentAmount.toLocaleString(i18n.language.startsWith('en') ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
               </View>
               <View style={[styles.divider, { backgroundColor: c.border, marginLeft: 0 }]} />
@@ -427,7 +427,7 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
               <View style={styles.previewRow}>
                 <Text style={[styles.previewLabel, { color: c.textSecondary, fontWeight: '700' }]}>{t('Total final')}</Text>
                 <Text style={[styles.previewValue, { color: '#F43F5E', fontWeight: '700' }]}>
-                  R$ {previewInfo.totalAmount.toFixed(2).replace('.', ',')}
+                  {i18n.language.startsWith('en') ? '$' : 'R$'} {previewInfo.totalAmount.toLocaleString(i18n.language.startsWith('en') ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
               </View>
             </View>

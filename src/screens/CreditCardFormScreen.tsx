@@ -145,19 +145,19 @@ const CreditCardFormScreen = () => {
         keyboardShouldPersistTaps="handled"
       >
         {/* Nome */}
-        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>DADOS</Text>
+        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>{t('DADOS')}</Text>
         <TextInput
           mode="outlined"
           label={t('Nome do Cartão')}
           value={name}
           onChangeText={setName}
-          placeholder="Ex: Nubank, Itaú..."
+          placeholder={t('Ex: Nubank, Itaú...')}
           theme={inputTheme}
           style={{ backgroundColor: c.inputBg, marginBottom: 10 }}
         />
 
         {/* Bandeira */}
-        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>BANDEIRA</Text>
+        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>{t('BANDEIRA')}</Text>
         <Select
           items={brandOptions}
           selectedValue={brand}
@@ -168,7 +168,7 @@ const CreditCardFormScreen = () => {
         />
 
         {/* Conta padrão */}
-        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>CONTA DE PAGAMENTO</Text>
+        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>{t('CONTA DE PAGAMENTO')}</Text>
         <Select
           items={accounts}
           selectedValue={accountId}
@@ -179,7 +179,7 @@ const CreditCardFormScreen = () => {
         />
 
         {/* Limite */}
-        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>LIMITE</Text>
+        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>{t('LIMITE')}</Text>
         <TextInput
           mode="outlined"
           label={t('Limite')}
@@ -193,7 +193,7 @@ const CreditCardFormScreen = () => {
         />
 
         {/* Datas */}
-        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>DATAS</Text>
+        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>{t('DATAS')}</Text>
         <View style={[styles.datesCard, { backgroundColor: c.card, borderColor: c.border }]}>
           <View style={styles.datesRow}>
             <View style={styles.dateField}>
@@ -201,14 +201,14 @@ const CreditCardFormScreen = () => {
                 <Icon source="calendar-arrow-right" size={16} color={color} />
               </View>
               <View style={styles.dateInputWrap}>
-                <Text style={[styles.dateLabel, { color: c.sectionLabel }]}>Fechamento</Text>
+                <Text style={[styles.dateLabel, { color: c.sectionLabel }]}>{t('Fechamento')}</Text>
                 <TextInput
                   mode="flat"
                   value={closingDay}
                   onChangeText={setClosingDay}
                   keyboardType="numeric"
                   maxLength={2}
-                  placeholder="Dia"
+                  placeholder={t('Dia')}
                   underlineColor="transparent"
                   activeUnderlineColor={color}
                   textColor={c.textPrimary}
@@ -225,14 +225,14 @@ const CreditCardFormScreen = () => {
                 <Icon source="calendar-check" size={16} color="#F59E0B" />
               </View>
               <View style={styles.dateInputWrap}>
-                <Text style={[styles.dateLabel, { color: c.sectionLabel }]}>Vencimento</Text>
+                <Text style={[styles.dateLabel, { color: c.sectionLabel }]}>{t('Vencimento')}</Text>
                 <TextInput
                   mode="flat"
                   value={dueDay}
                   onChangeText={setDueDay}
                   keyboardType="numeric"
                   maxLength={2}
-                  placeholder="Dia"
+                  placeholder={t('Dia')}
                   underlineColor="transparent"
                   activeUnderlineColor="#F59E0B"
                   textColor={c.textPrimary}
@@ -245,7 +245,7 @@ const CreditCardFormScreen = () => {
         </View>
 
         {/* Cor */}
-        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>COR DO CARTÃO</Text>
+        <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>{t('COR DO CARTÃO')}</Text>
         <View style={styles.colorRow}>
           {PRESET_COLORS.map(clr => (
             <TouchableOpacity

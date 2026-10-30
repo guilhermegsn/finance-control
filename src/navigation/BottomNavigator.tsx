@@ -6,9 +6,11 @@ import HomeScreen from '../screens/HomeScreen';
 import MonthlyControlScreen from '../screens/MonthlyControlScreen';
 import SentinelaScreen from '../screens/SentinelaScreen';
 import MenuScreen from '../screens/MenuScreen';
+import { useTranslation } from 'react-i18next';
 
 const Tab = createBottomTabNavigator()
 export default function BottomNavigator() {
+  const { t } = useTranslation();
   return (
     <Tab.Navigator>
       <Tab.Screen
@@ -38,7 +40,7 @@ export default function BottomNavigator() {
         name='MonthlyControlScreen'
         component={MonthlyControlScreen}
         options={{
-          tabBarLabel: 'Controle',
+          tabBarLabel: t('Controle'),
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="today" size={size} color={color} />
