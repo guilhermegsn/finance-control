@@ -14,6 +14,8 @@ import Category from '../models/Caterogy';
 import { getAccountLogoByCode } from '../utils/accountLogos';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCurrency } from '../contexts/CurrencyContext';
+import { formatAmountInput, getCurrencyInputPrefix, parseAmountInput } from '../utils/currencyInput';
 
 interface FormData {
   id: string;
@@ -33,6 +35,7 @@ export default function TransactionFormScreen() {
   const { user } = useAuth();
   const { t } = useTranslation();
   const { isDarkMode } = useTheme();
+  const { currency } = useCurrency();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
@@ -65,7 +68,7 @@ export default function TransactionFormScreen() {
       return {
         id: transaction.id,
         description: transaction.description,
-        value: transaction.amount.toString(),
+        value: formatAmountInput(transaction.amount, currency),
         date: new Date(transaction.date),
         type: transaction.type,
         isRecurring: false,
@@ -133,12 +136,12 @@ export default function TransactionFormScreen() {
   };
 
   const isInvalidForm = () =>
-    !formData.description.trim() || !formData.value.trim() || !formData.type || !formData.date;
+    !formData.description.trim() || parseAmountInput(formData.value, currency) == null || !formData.type || !formData.date;
 
   const handleSave = async () => {
     if (!user || !formData.type) return;
-    const amount = parseFloat(formData.value);
-    if (isNaN(amount)) return;
+    const amount = parseAmountInput(formData.value, currency);
+    if (amount == null) return;
 
     const filteredCategories = categories.filter((cat: Category) => cat.type === formData.type);
     const categoryId = formData.categoryId ||
@@ -385,9 +388,9 @@ export default function TransactionFormScreen() {
           label={t('Valor')}
           value={formData.value}
           onChangeText={text => setFormData(prev => ({ ...prev, value: text }))}
-          placeholder="0,00"
-          keyboardType="numeric"
-          left={<TextInput.Affix text="R$ " textStyle={{ color: c.textSecondary }} />}
+          placeholder={currency === 'BRL' ? '0,00' : '0.00'}
+          keyboardType="numbers-and-punctuation"
+          left={<TextInput.Affix text={getCurrencyInputPrefix(currency)} textStyle={{ color: c.textSecondary }} />}
           theme={inputTheme}
           style={[styles.input, { backgroundColor: c.card }]}
         />

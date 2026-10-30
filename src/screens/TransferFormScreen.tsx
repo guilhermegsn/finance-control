@@ -12,6 +12,8 @@ import Account from '../models/Accounts';
 import { getAccountLogoByCode } from '../utils/accountLogos';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCurrency } from '../contexts/CurrencyContext';
+import { getCurrencyInputPrefix, parseAmountInput } from '../utils/currencyInput';
 
 interface TransferFormData {
   value: string;
@@ -25,6 +27,7 @@ export default function TransferFormScreen() {
   const { user } = useAuth();
   const { t } = useTranslation();
   const { isDarkMode } = useTheme();
+  const { currency } = useCurrency();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
@@ -68,9 +71,9 @@ export default function TransferFormScreen() {
     formData.sourceAssetId === formData.destinationAssetId;
 
   const isInvalidForm = () => {
-    const amount = parseFloat(formData.value.replace(',', '.'));
+    const amount = parseAmountInput(formData.value, currency);
     return (
-      isNaN(amount) ||
+      amount == null ||
       amount <= 0 ||
       !formData.description.trim() ||
       !formData.sourceAssetId ||
@@ -93,8 +96,8 @@ export default function TransferFormScreen() {
       Alert.alert(t('Atenção'), t('A conta de destino deve ser diferente da origem'));
       return;
     }
-    const amount = parseFloat(formData.value.replace(',', '.'));
-    if (isNaN(amount) || amount <= 0) return;
+    const amount = parseAmountInput(formData.value, currency);
+    if (amount == null || amount <= 0) return;
 
     try {
       await TransactionService.createTransfer({
@@ -163,9 +166,9 @@ export default function TransferFormScreen() {
           label={t('Valor')}
           value={formData.value}
           onChangeText={text => setFormData(prev => ({ ...prev, value: text }))}
-          placeholder="0,00"
-          keyboardType="numeric"
-          left={<TextInput.Affix text="R$ " textStyle={{ color: c.textSecondary }} />}
+          placeholder={currency === 'BRL' ? '0,00' : '0.00'}
+          keyboardType="numbers-and-punctuation"
+          left={<TextInput.Affix text={getCurrencyInputPrefix(currency)} textStyle={{ color: c.textSecondary }} />}
           theme={inputTheme}
           style={[styles.input, { backgroundColor: c.card }]}
         />

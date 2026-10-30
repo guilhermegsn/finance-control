@@ -7,6 +7,7 @@ import { Icon } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import GlassHeader from '../components/GlassHeader';
 import { useTranslation } from 'react-i18next';
+import { useCurrency, DisplayCurrency } from '../contexts/CurrencyContext';
 
 const ICON_COLORS: Record<string, string> = {
   wallet: '#F59E0B',
@@ -24,6 +25,7 @@ export default function MenuScreen() {
   const { isDarkMode, toggleDarkMode } = useTheme();
   const { user, signOut } = useAuth();
   const { t, i18n } = useTranslation();
+  const { currency, setCurrency } = useCurrency();
   const currentLanguage = i18n.resolvedLanguage ?? i18n.language;
 
   const c = {
@@ -173,6 +175,39 @@ export default function MenuScreen() {
                   >
                     <Text style={[styles.languageOptionText, { color: selected ? '#FFFFFF' : c.textSecondary }]}>
                       {language.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+          <View style={[styles.divider, { backgroundColor: c.border }]} />
+          <View style={styles.row}>
+            <View style={[styles.iconPill, { backgroundColor: '#10B9811A' }]}>
+              <Icon source="currency-usd" size={20} color="#10B981" />
+            </View>
+            <Text style={[styles.rowLabel, { color: c.textPrimary }]}>{t('Moeda')}</Text>
+            <View style={[styles.languagePicker, { backgroundColor: c.bg }]}>
+              {([
+                { code: 'BRL', label: 'R$' },
+                { code: 'USD', label: 'USD' },
+              ] as { code: DisplayCurrency; label: string }[]).map((option) => {
+                const selected = currency === option.code;
+                return (
+                  <TouchableOpacity
+                    key={option.code}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={option.code === 'BRL' ? t('Real brasileiro') : t('Dólar americano')}
+                    onPress={() => setCurrency(option.code)}
+                    style={[
+                      styles.languageOption,
+                      selected && { backgroundColor: isDarkMode ? '#6366F1' : '#4F46E5' },
+                    ]}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[styles.languageOptionText, { color: selected ? '#FFFFFF' : c.textSecondary }]}>
+                      {option.label}
                     </Text>
                   </TouchableOpacity>
                 );

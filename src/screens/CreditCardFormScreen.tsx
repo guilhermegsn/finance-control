@@ -14,6 +14,8 @@ import CreditCard from '../models/CreditCard';
 import { brandLogos } from '../utils/brandLogos';
 import { getAccountLogoByCode } from '../utils/accountLogos';
 import { Select } from '../components/Select';
+import { useCurrency } from '../contexts/CurrencyContext';
+import { formatAmountInput, getCurrencyInputPrefix, parseAmountInput } from '../utils/currencyInput';
 
 const PRESET_COLORS = [
   '#6366F1', '#8B5CF6', '#EC4899', '#F43F5E',
@@ -26,13 +28,14 @@ const CreditCardFormScreen = () => {
   const route = useRoute<any>();
   const { user } = useAuth();
   const { isDarkMode } = useTheme();
+  const { currency } = useCurrency();
   const insets = useSafeAreaInsets();
 
   const editingCard = route.params?.card as CreditCard | undefined;
 
   const [name, setName] = useState(editingCard?.name || '');
   const [brand, setBrand] = useState(editingCard?.brand || 'visa');
-  const [limit, setLimit] = useState(editingCard?.limit?.toString() || '');
+  const [limit, setLimit] = useState(editingCard ? formatAmountInput(editingCard.limit, currency) : '');
   const [closingDay, setClosingDay] = useState(editingCard?.closingDay?.toString() || '');
   const [dueDay, setDueDay] = useState(editingCard?.dueDay?.toString() || '');
   const [color, setColor] = useState(editingCard?.color || '#6366F1');
@@ -96,7 +99,8 @@ const CreditCardFormScreen = () => {
     return { id: key, label: key.charAt(0).toUpperCase() + key.slice(1), value: key, imageUri };
   });
 
-  const isInvalid = !name.trim() || !limit || !closingDay || !dueDay || !accountId;
+  const parsedLimit = parseAmountInput(limit, currency);
+  const isInvalid = !name.trim() || parsedLimit == null || !closingDay || !dueDay || !accountId;
 
   const handleSave = async () => {
     if (isInvalid) { Alert.alert(t('Erro'), t('Preencha todos os campos obrigatórios')); return; }
@@ -104,7 +108,7 @@ const CreditCardFormScreen = () => {
       const data = {
         name,
         brand,
-        limit: parseFloat(limit.replace(',', '.')),
+        limit: parsedLimit!,
         closingDay: parseInt(closingDay, 10),
         dueDay: parseInt(dueDay, 10),
         color,
@@ -181,9 +185,9 @@ const CreditCardFormScreen = () => {
           label={t('Limite')}
           value={limit}
           onChangeText={setLimit}
-          keyboardType="numeric"
-          placeholder="0,00"
-          left={<TextInput.Affix text="R$ " textStyle={{ color: c.textSecondary }} />}
+          placeholder={currency === 'BRL' ? '0,00' : '0.00'}
+          keyboardType="numbers-and-punctuation"
+          left={<TextInput.Affix text={getCurrencyInputPrefix(currency)} textStyle={{ color: c.textSecondary }} />}
           theme={inputTheme}
           style={{ backgroundColor: c.inputBg }}
         />

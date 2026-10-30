@@ -18,6 +18,8 @@ import OnboardingChecklistCard from '../components/OnboardingChecklistCard';
 import greetingsData from '../utils/greetings.json';
 import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useCurrency } from '../contexts/CurrencyContext';
+import { formatCurrency } from '../utils/formatCurrency';
 
 const BALANCE_VISIBLE_KEY = '@balance_visible';
 
@@ -44,6 +46,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const { user } = useAuth();
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
+  const { currency } = useCurrency();
   const [typeModalVisible, setTypeModalVisible] = useState(false);
   const [balancesVisible, setBalancesVisible] = useState(true);
 
@@ -153,7 +156,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const handleAddCreditCard = () => nav.navigate('CreditCardForm');
   const handleAddTransaction = () => handleSelectType('expense');
 
-  const fmt = (v: number) => `R$ ${Math.abs(v).toFixed(2)}`;
+  const fmt = (v: number) => formatCurrency(Math.abs(v), currency);
   const masked = '• • • • •';
   const maskedSmall = '• • •';
 

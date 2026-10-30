@@ -6,6 +6,8 @@ import BankService from '../service/BankService';
 import Transaction from '../models/Transactions';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTranslation } from 'react-i18next';
+import { useCurrency } from '../contexts/CurrencyContext';
+import { formatCurrency } from '../utils/formatCurrency';
 
 export type SyntheticTransaction = {
   id: string;
@@ -63,6 +65,8 @@ export default function AccountsTable({
 
   const { theme } = useTheme()
   const { t } = useTranslation();
+  const { currency } = useCurrency();
+  const money = (amount: number) => formatCurrency(amount, currency);
 
   const renderAccountLogo = (group: AccountTransactionGroup) => {
     const account = accounts.find(acc => acc.id === group.accountId);
@@ -119,7 +123,7 @@ export default function AccountsTable({
               </DataTable.Cell>
 
               <DataTable.Cell numeric>
-                <Text style={{ fontWeight: 'bold', fontSize: 14 }}>R$ {group.totalBalance.toFixed(2)}</Text>
+                <Text style={{ fontWeight: 'bold', fontSize: 14 }}>{money(group.totalBalance)}</Text>
               </DataTable.Cell>
             </DataTable.Row>
 
@@ -137,7 +141,7 @@ export default function AccountsTable({
                       <Text variant="labelMedium" style={{ marginLeft: 20 }}>{t('Saldo Inicial do Mês')}</Text>
                     </DataTable.Cell>
                     <DataTable.Cell numeric>
-                      <Text variant="labelMedium">R$ {group.previousBalance.toFixed(2)}</Text>
+                      <Text variant="labelMedium">{money(group.previousBalance)}</Text>
                     </DataTable.Cell>
                   </DataTable.Row>
                 )}
@@ -155,11 +159,11 @@ export default function AccountsTable({
                       <DataTable.Cell numeric>
                         <View style={{ alignItems: 'flex-end' }}>
                           <Text style={{ color: theme.success, fontWeight: '600' }}>
-                            R$ {group.income.consolidatedTotal.toFixed(2)}
+                            {money(group.income.consolidatedTotal)}
                           </Text>
                           {group.income.total - group.income.consolidatedTotal > 0.001 && (
                             <Text style={{ color: 'gray', fontSize: 11 }}>
-                              + R$ {(group.income.total - group.income.consolidatedTotal).toFixed(2)}
+                              + {money(group.income.total - group.income.consolidatedTotal)}
                             </Text>
                           )}
                         </View>
@@ -189,11 +193,11 @@ export default function AccountsTable({
                       <DataTable.Cell numeric>
                         <View style={{ alignItems: 'flex-end' }}>
                           <Text style={{ color: theme.danger, fontWeight: '600' }}>
-                            R$ {group.expense.consolidatedTotal.toFixed(2)}
+                            {money(group.expense.consolidatedTotal)}
                           </Text>
                           {group.expense.total - group.expense.consolidatedTotal > 0.001 && (
                             <Text style={{ color: 'gray', fontSize: 11 }}>
-                              + R$ {(group.expense.total - group.expense.consolidatedTotal).toFixed(2)}
+                              + {money(group.expense.total - group.expense.consolidatedTotal)}
                             </Text>
                           )}
                         </View>
@@ -221,7 +225,7 @@ export default function AccountsTable({
                                   <Icon source="credit-card-outline" size={16} color="#666" />
                                   <Text variant="labelMedium" style={{ marginLeft: 6, color: textColor }}>{item.description}</Text>
                                 </View>
-                                <Text variant="labelMedium" style={{ color: textColor }}>R$ {item.amount.toFixed(2)}</Text>
+                                <Text variant="labelMedium" style={{ color: textColor }}>{money(item.amount)}</Text>
                               </View>
                             </DataTable.Cell>
                           </DataTable.Row>
@@ -253,7 +257,7 @@ export default function AccountsTable({
             style={{
               fontWeight: 'bold', color: totalBalance < 0 ? theme.danger : theme.text
             }}>
-            R$ {totalBalance.toFixed(2)}
+            {money(totalBalance)}
           </Text>
         </DataTable.Cell>
       </DataTable.Row>

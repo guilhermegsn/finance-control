@@ -7,6 +7,8 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import Transaction from '../models/Transactions';
 import { isTransactionDueInMonth } from '../utils/creditCardInvoiceHelper';
+import { useCurrency } from '../contexts/CurrencyContext';
+import { formatCurrency } from '../utils/formatCurrency';
 
 const GREEN = '#10B981';
 const RED = '#F43F5E';
@@ -15,9 +17,6 @@ const MONTHS_SHOWN = 6;
 const BAR_WIDTH = 13;
 const INTRA_PAIR_GAP = 3;
 const Y_AXIS_WIDTH = 40;
-
-const fmt = (v: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
 // Eixo compacto: 12500 → "12,5k"
 const fmtAxis = (v: number) => {
@@ -44,6 +43,7 @@ const MonthlyFlowChart = ({
   currentDate: Date;
 }) => {
   const { t, i18n } = useTranslation();
+  const { currency } = useCurrency();
   const dateLocale = i18n.resolvedLanguage?.startsWith('en') ? 'en' : 'pt-br';
   const { isDarkMode } = useTheme();
 
@@ -176,7 +176,7 @@ const MonthlyFlowChart = ({
           rulesType="solid"
           renderTooltip={(item: { value: number; month: string }) => (
             <View style={[styles.tooltip, { backgroundColor: c.card, borderColor: c.border }]}>
-              <Text style={[styles.tooltipText, { color: c.textPrimary }]}>{fmt(item.value)}</Text>
+              <Text style={[styles.tooltipText, { color: c.textPrimary }]}>{formatCurrency(item.value, currency)}</Text>
             </View>
           )}
         />

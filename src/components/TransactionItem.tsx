@@ -6,6 +6,8 @@ import Transaction from '../models/Transactions';
 import { TransactionService } from '../service/TransactionService';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTranslation } from 'react-i18next';
+import { useCurrency } from '../contexts/CurrencyContext';
+import { formatCurrency } from '../utils/formatCurrency';
 
 
 interface TransactionItemProps {
@@ -17,6 +19,7 @@ function TransactionItemComponent({ transaction, onLongPress }: TransactionItemP
 
   const { theme } = useTheme()
   const { i18n } = useTranslation();
+  const { currency } = useCurrency();
   const dateLocale = i18n.resolvedLanguage?.startsWith('en') ? 'en-US' : 'pt-BR';
 
   // @ts-ignore - WatermelonDB usa esta sintaxe para relacionamentos
@@ -66,7 +69,7 @@ function TransactionItemComponent({ transaction, onLongPress }: TransactionItemP
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Text variant='labelMedium'
             style={{ color: textColor }}>
-            R$ {transaction.amount.toFixed(2)}
+            {formatCurrency(transaction.amount, currency)}
           </Text>
         </View>
       </View>

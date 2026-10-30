@@ -7,6 +7,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import OnboardingNavigator from './src/navigation/OnboardingNavigator';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
+import { CurrencyProvider } from './src/contexts/CurrencyContext';
 import useAutoSync from './src/service/useAutoSync';
 import { useNotifications } from './src/hooks/useNotifications';
 import { useOnboardingStatus } from './src/hooks/useOnboardingStatus';
@@ -79,7 +80,9 @@ function App() {
     <Sentry.ErrorBoundary fallback={({ resetError }) => <ErrorFallback resetError={resetError} />}>
       <AuthProvider>
         <ThemeProvider>
-          <ThemedApp />
+          <CurrencyProvider>
+            <ThemedApp />
+          </CurrencyProvider>
         </ThemeProvider>
       </AuthProvider>
     </Sentry.ErrorBoundary>

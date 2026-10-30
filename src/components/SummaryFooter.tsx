@@ -7,6 +7,8 @@ import { database } from '../database';
 import Transaction from '../models/Transactions';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTranslation } from 'react-i18next';
+import { useCurrency } from '../contexts/CurrencyContext';
+import { formatCurrency } from '../utils/formatCurrency';
 
 interface SummaryFooterProps {
   currentDate: Date;
@@ -18,6 +20,7 @@ interface SummaryFooterProps {
 
 const SummaryFooterComponent = ({ isFutureMonth, currentBalance, projectedBalance, transactions }: SummaryFooterProps) => {
   const { t } = useTranslation();
+  const { currency } = useCurrency();
   const { isDarkMode } = useTheme();
 
   const totals = useMemo(() => {
@@ -103,11 +106,11 @@ const SummaryFooterComponent = ({ isFutureMonth, currentBalance, projectedBalanc
               <Text style={[styles.cardLabel, { color: c.textSecondary }]}>{card.label}</Text>
             </View>
             <Text style={[styles.cardValue, { color: card.valueColor }]}>
-              R$ {card.value.toFixed(2)}
+              {formatCurrency(card.value, currency)}
             </Text>
             {card.pending != null && card.pending > 0.001 && (
               <Text style={[styles.pendingText, { color: c.sectionLabel }]}>
-                + R$ {card.pending.toFixed(2)} {t('pendente')}
+                + {formatCurrency(card.pending, currency)} {t('pendente')}
               </Text>
             )}
           </View>

@@ -10,6 +10,8 @@ import {
   filterTransactionsByInvoiceMonth,
 } from '../utils/creditCardInvoiceHelper';
 import { useTranslation } from 'react-i18next';
+import { useCurrency } from '../contexts/CurrencyContext';
+import { formatCurrency } from '../utils/formatCurrency';
 
 interface CreditCardSectionProps {
   creditCards: CreditCard[];
@@ -38,6 +40,8 @@ function CreditCardSectionComponent({
 }: CreditCardSectionProps) {
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const { t } = useTranslation();
+  const { currency } = useCurrency();
+  const money = (amount: number) => formatCurrency(amount, currency);
 
   // Filtrar transações que têm credit_card_id (são transações de cartão)
   const creditCardTransactions = allTransactions.filter(t =>
@@ -145,7 +149,7 @@ function CreditCardSectionComponent({
 
               <DataTable.Cell numeric>
                 <Text style={{ fontWeight: 'bold', fontSize: 14 }}>
-                  R$ {group.invoiceTotal.toFixed(2)}
+                  {money(group.invoiceTotal)}
                 </Text>
               </DataTable.Cell>
             </DataTable.Row>
@@ -187,7 +191,7 @@ function CreditCardSectionComponent({
         </DataTable.Cell>
         <DataTable.Cell numeric>
           <Text style={{ fontWeight: 'bold', color: '#CC4A4A' }}>
-            R$ {totalInvoice.toFixed(2)}
+            {money(totalInvoice)}
           </Text>
         </DataTable.Cell>
       </DataTable.Row>
