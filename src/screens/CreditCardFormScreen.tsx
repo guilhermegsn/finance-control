@@ -15,7 +15,7 @@ import { brandLogos } from '../utils/brandLogos';
 import { getAccountLogoByCode } from '../utils/accountLogos';
 import { Select } from '../components/Select';
 import { useCurrency } from '../contexts/CurrencyContext';
-import { formatAmountInput, getCurrencyInputPrefix, maskAmountInput, parseAmountInput } from '../utils/currencyInput';
+import CurrencyCalculatorInput from '../components/CurrencyCalculatorInput';
 
 const PRESET_COLORS = [
   '#6366F1', '#8B5CF6', '#EC4899', '#F43F5E',
@@ -35,7 +35,7 @@ const CreditCardFormScreen = () => {
 
   const [name, setName] = useState(editingCard?.name || '');
   const [brand, setBrand] = useState(editingCard?.brand || 'visa');
-  const [limit, setLimit] = useState(editingCard ? formatAmountInput(editingCard.limit, currency) : '');
+  const [limit, setLimit] = useState<number | null>(editingCard?.limit ?? null);
   const [closingDay, setClosingDay] = useState(editingCard?.closingDay?.toString() || '');
   const [dueDay, setDueDay] = useState(editingCard?.dueDay?.toString() || '');
   const [color, setColor] = useState(editingCard?.color || '#6366F1');
@@ -99,8 +99,7 @@ const CreditCardFormScreen = () => {
     return { id: key, label: key.charAt(0).toUpperCase() + key.slice(1), value: key, imageUri };
   });
 
-  const parsedLimit = parseAmountInput(limit, currency);
-  const isInvalid = !name.trim() || parsedLimit == null || !closingDay || !dueDay || !accountId;
+  const isInvalid = !name.trim() || limit == null || !closingDay || !dueDay || !accountId;
 
   const handleSave = async () => {
     if (isInvalid) { Alert.alert(t('Erro'), t('Preencha todos os campos obrigatórios')); return; }
@@ -108,7 +107,7 @@ const CreditCardFormScreen = () => {
       const data = {
         name,
         brand,
-        limit: parsedLimit!,
+        limit: limit!,
         closingDay: parseInt(closingDay, 10),
         dueDay: parseInt(dueDay, 10),
         color,
@@ -180,14 +179,12 @@ const CreditCardFormScreen = () => {
 
         {/* Limite */}
         <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>{t('LIMITE')}</Text>
-        <TextInput
-          mode="outlined"
+        <CurrencyCalculatorInput
           label={t('Limite')}
           value={limit}
-          onChangeText={text => setLimit(maskAmountInput(text, currency))}
+          onChangeValue={setLimit}
+          currency={currency}
           placeholder={currency === 'BRL' ? '0,00' : '0.00'}
-          keyboardType="numeric"
-          left={<TextInput.Affix text={getCurrencyInputPrefix(currency)} textStyle={{ color: c.textSecondary }} />}
           theme={inputTheme}
           style={{ backgroundColor: c.inputBg }}
         />

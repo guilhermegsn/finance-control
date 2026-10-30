@@ -15,12 +15,12 @@ import { getAccountLogoByCode } from '../utils/accountLogos';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCurrency } from '../contexts/CurrencyContext';
-import { formatAmountInput, getCurrencyInputPrefix, maskAmountInput, parseAmountInput } from '../utils/currencyInput';
+import CurrencyCalculatorInput from '../components/CurrencyCalculatorInput';
 
 interface FormData {
   id: string;
   description: string;
-  value: string;
+  value: number | null;
   date: Date;
   type: 'income' | 'expense' | null;
   isRecurring: boolean;
@@ -71,7 +71,7 @@ export default function TransactionFormScreen() {
       return {
         id: transaction.id,
         description: transaction.description,
-        value: formatAmountInput(transaction.amount, currency),
+        value: transaction.amount,
         date: new Date(transaction.date),
         type: transaction.type,
         isRecurring: false,
@@ -86,7 +86,7 @@ export default function TransactionFormScreen() {
     return {
       id: '',
       description: '',
-      value: '',
+      value: null,
       date: now,
       type: initialType || null,
       isRecurring: false,
@@ -139,11 +139,11 @@ export default function TransactionFormScreen() {
   };
 
   const isInvalidForm = () =>
-    !formData.description.trim() || parseAmountInput(formData.value, currency) == null || !formData.type || !formData.date;
+    !formData.description.trim() || formData.value == null || !formData.type || !formData.date;
 
   const handleSave = async () => {
     if (!user || !formData.type) return;
-    const amount = parseAmountInput(formData.value, currency);
+    const amount = formData.value;
     if (amount == null) return;
 
     const filteredCategories = categories.filter((cat: Category) => cat.type === formData.type);
@@ -366,14 +366,12 @@ export default function TransactionFormScreen() {
           theme={inputTheme}
           style={[styles.input, { backgroundColor: c.card }]}
         />
-        <TextInput
-          mode="outlined"
+        <CurrencyCalculatorInput
           label={t('Valor')}
           value={formData.value}
-          onChangeText={text => setFormData(prev => ({ ...prev, value: maskAmountInput(text, currency) }))}
+          onChangeValue={value => setFormData(prev => ({ ...prev, value }))}
+          currency={currency}
           placeholder={currency === 'BRL' ? '0,00' : '0.00'}
-          keyboardType="numeric"
-          left={<TextInput.Affix text={getCurrencyInputPrefix(currency)} textStyle={{ color: c.textSecondary }} />}
           theme={inputTheme}
           style={[styles.input, { backgroundColor: c.card }]}
         />

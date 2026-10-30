@@ -16,9 +16,12 @@ import CreditCardService from '../service/CreditCardService';
 import { Q } from '@nozbe/watermelondb';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCurrency } from '../contexts/CurrencyContext';
+import CurrencyCalculatorInput from '../components/CurrencyCalculatorInput';
+import { formatCurrency } from '../utils/formatCurrency';
 
 interface CreditCardPurchaseFormData {
-  amount: string;
+  amount: number | null;
   description: string;
   date: Date;
   creditCardId: string;
@@ -35,6 +38,7 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
   const { user } = useAuth();
   const { t, i18n } = useTranslation();
   const { isDarkMode } = useTheme();
+  const { currency } = useCurrency();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
@@ -70,7 +74,7 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return {
-      amount: '',
+      amount: null,
       description: '',
       date: today,
       creditCardId: creditCards.length > 0 ? creditCards[0].id : '',
@@ -95,7 +99,7 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
           const categoryId = tx._raw?.category_id;
           const purchaseDate = tx.purchaseDate || tx.date;
           setFormData({
-            amount: tx.amount.toString(),
+            amount: tx.amount,
             description: tx.description.replace(/ \(\d+\/\d+\)$/, ''),
             date: new Date(purchaseDate),
             creditCardId: creditCardId || '',
@@ -121,7 +125,7 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
   }, [categories]);
 
   useEffect(() => {
-    const amount = parseFloat(formData.amount.replace(',', '.'));
+    const amount = formData.amount ?? 0;
     const installments = formData.installments;
     const interestRate = parseFloat(formData.interestRate.replace(',', '.')) || 0;
 
@@ -141,8 +145,8 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
   }, [formData.amount, formData.installments, formData.interestRate]);
 
   const isInvalidForm = () => {
-    const amount = parseFloat(formData.amount.replace(',', '.'));
-    return isNaN(amount) || amount <= 0 || !formData.description.trim() || !formData.creditCardId || !formData.categoryId || formData.installments < 1;
+    const amount = formData.amount;
+    return amount == null || amount <= 0 || !formData.description.trim() || !formData.creditCardId || !formData.categoryId || formData.installments < 1;
   };
 
   const handleDelete = async () => {
@@ -205,8 +209,8 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
 
   const handleSave = async () => {
     if (!user) return;
-    const amount = parseFloat(formData.amount.replace(',', '.'));
-    if (isNaN(amount) || amount <= 0) { Alert.alert(t('Erro'), t('Valor inválido')); return; }
+    const amount = formData.amount;
+    if (amount == null || amount <= 0) { Alert.alert(t('Erro'), t('Valor inválido')); return; }
     const interestRate = parseFloat(formData.interestRate.replace(',', '.')) || 0;
     if (interestRate < 0) { Alert.alert(t('Erro'), t('Taxa de juros não pode ser negativa')); return; }
 
@@ -316,14 +320,12 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
           theme={inputTheme}
           style={[styles.input, { backgroundColor: c.card }]}
         />
-        <TextInput
-          mode="outlined"
+        <CurrencyCalculatorInput
           label={t('Valor Original')}
           value={formData.amount}
-          onChangeText={text => setFormData(prev => ({ ...prev, amount: text }))}
-          placeholder={i18n.language.startsWith('en') ? '0.00' : '0,00'}
-          keyboardType="numeric"
-          left={<TextInput.Affix text={i18n.language.startsWith('en') ? '$ ' : 'R$ '} textStyle={{ color: c.textSecondary }} />}
+          onChangeValue={amount => setFormData(prev => ({ ...prev, amount }))}
+          currency={currency}
+          placeholder={currency === 'BRL' ? '0,00' : '0.00'}
           theme={inputTheme}
           style={[styles.input, { backgroundColor: c.card }]}
         />
@@ -415,7 +417,7 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
               <View style={styles.previewRow}>
                 <Text style={[styles.previewLabel, { color: c.textSecondary }]}>{t('Valor por parcela')}</Text>
                 <Text style={[styles.previewValue, { color: c.textPrimary }]}>
-                  {i18n.language.startsWith('en') ? '$' : 'R$'} {previewInfo.installmentAmount.toLocaleString(i18n.language.startsWith('en') ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatCurrency(previewInfo.installmentAmount, currency)}
                 </Text>
               </View>
               <View style={[styles.divider, { backgroundColor: c.border, marginLeft: 0 }]} />
@@ -427,7 +429,7 @@ function CreditCardPurchaseScreen({ creditCards }: CreditCardPurchaseScreenProps
               <View style={styles.previewRow}>
                 <Text style={[styles.previewLabel, { color: c.textSecondary, fontWeight: '700' }]}>{t('Total final')}</Text>
                 <Text style={[styles.previewValue, { color: '#F43F5E', fontWeight: '700' }]}>
-                  {i18n.language.startsWith('en') ? '$' : 'R$'} {previewInfo.totalAmount.toLocaleString(i18n.language.startsWith('en') ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatCurrency(previewInfo.totalAmount, currency)}
                 </Text>
               </View>
             </View>

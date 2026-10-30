@@ -10,6 +10,8 @@ import { AccountService } from '../../service/AccountService';
 import { brandLogos } from '../../utils/brandLogos';
 import { getAccountLogoByCode } from '../../utils/accountLogos';
 import { Select } from '../../components/Select';
+import { useCurrency } from '../../contexts/CurrencyContext';
+import CurrencyCalculatorInput from '../../components/CurrencyCalculatorInput';
 
 const PRESET_COLORS = [
   '#6366F1', '#8B5CF6', '#EC4899', '#F43F5E',
@@ -19,11 +21,12 @@ const PRESET_COLORS = [
 export default function OnboardingCreditCardScreen({ navigation }: any) {
   const { user } = useAuth();
   const { theme, isDarkMode } = useTheme();
+  const { currency } = useCurrency();
   const insets = useSafeAreaInsets();
 
   const [name, setName] = useState('');
   const [brand, setBrand] = useState('visa');
-  const [limit, setLimit] = useState('');
+  const [limit, setLimit] = useState<number | null>(null);
   const [closingDay, setClosingDay] = useState('');
   const [dueDay, setDueDay] = useState('');
   const [color, setColor] = useState('#6366F1');
@@ -76,7 +79,7 @@ export default function OnboardingCreditCardScreen({ navigation }: any) {
     return { id: key, label: key.charAt(0).toUpperCase() + key.slice(1), value: key, imageUri };
   });
 
-  const isInvalid = !name.trim() || !limit || !closingDay || !dueDay || !accountId;
+  const isInvalid = !name.trim() || limit == null || !closingDay || !dueDay || !accountId;
 
   const handleCreate = async () => {
     if (isInvalid) { Alert.alert('Erro', 'Preencha todos os campos obrigatórios'); return; }
@@ -85,7 +88,7 @@ export default function OnboardingCreditCardScreen({ navigation }: any) {
       await CreditCardService.create({
         name,
         brand,
-        limit: parseFloat(limit.replace(',', '.')),
+        limit: limit!,
         closingDay: parseInt(closingDay, 10),
         dueDay: parseInt(dueDay, 10),
         color,
@@ -147,14 +150,12 @@ export default function OnboardingCreditCardScreen({ navigation }: any) {
         />
 
         <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>LIMITE</Text>
-        <TextInput
-          mode="outlined"
+        <CurrencyCalculatorInput
           label="Limite"
           value={limit}
-          onChangeText={setLimit}
-          keyboardType="numeric"
-          placeholder="0,00"
-          left={<TextInput.Affix text="R$ " textStyle={{ color: theme.textSecondary }} />}
+          onChangeValue={setLimit}
+          currency={currency}
+          placeholder={currency === 'BRL' ? '0,00' : '0.00'}
           theme={inputTheme}
           style={{ backgroundColor: inputTheme.colors.background }}
         />

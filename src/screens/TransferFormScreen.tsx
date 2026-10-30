@@ -13,10 +13,10 @@ import { getAccountLogoByCode } from '../utils/accountLogos';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCurrency } from '../contexts/CurrencyContext';
-import { getCurrencyInputPrefix, maskAmountInput, parseAmountInput } from '../utils/currencyInput';
+import CurrencyCalculatorInput from '../components/CurrencyCalculatorInput';
 
 interface TransferFormData {
-  value: string;
+  value: number | null;
   description: string;
   date: Date;
   sourceAssetId: string;
@@ -58,7 +58,7 @@ export default function TransferFormScreen() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return {
-      value: '',
+      value: null,
       description: '',
       date: today,
       sourceAssetId: accounts.length > 0 ? accounts[0].id : '',
@@ -71,10 +71,9 @@ export default function TransferFormScreen() {
     formData.sourceAssetId === formData.destinationAssetId;
 
   const isInvalidForm = () => {
-    const amount = parseAmountInput(formData.value, currency);
     return (
-      amount == null ||
-      amount <= 0 ||
+      formData.value == null ||
+      formData.value <= 0 ||
       !formData.description.trim() ||
       !formData.sourceAssetId ||
       !formData.destinationAssetId ||
@@ -96,7 +95,7 @@ export default function TransferFormScreen() {
       Alert.alert(t('Atenção'), t('A conta de destino deve ser diferente da origem'));
       return;
     }
-    const amount = parseAmountInput(formData.value, currency);
+    const amount = formData.value;
     if (amount == null || amount <= 0) return;
 
     try {
@@ -161,14 +160,12 @@ export default function TransferFormScreen() {
 
         {/* Valor + Data */}
         <Text style={[styles.sectionLabel, { color: c.sectionLabel }]}>{t('DETALHES')}</Text>
-        <TextInput
-          mode="outlined"
+        <CurrencyCalculatorInput
           label={t('Valor')}
           value={formData.value}
-          onChangeText={text => setFormData(prev => ({ ...prev, value: maskAmountInput(text, currency) }))}
+          onChangeValue={value => setFormData(prev => ({ ...prev, value }))}
+          currency={currency}
           placeholder={currency === 'BRL' ? '0,00' : '0.00'}
-          keyboardType="numeric"
-          left={<TextInput.Affix text={getCurrencyInputPrefix(currency)} textStyle={{ color: c.textSecondary }} />}
           theme={inputTheme}
           style={[styles.input, { backgroundColor: c.card }]}
         />
